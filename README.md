@@ -141,7 +141,7 @@ For features that CSS alone can't handle (like hiding "Explore more topics"), a 
 
 ## License
 
-[GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html)
+[GNU General Public License v3.0](LICENSE)
 
 ---
 
@@ -228,4 +228,4 @@ pnpm build:firefox  # Firefox
 
 ## Лицензия
 
-[GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html)
+[GNU General Public License v3.0](LICENSE)
