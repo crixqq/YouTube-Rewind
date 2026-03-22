@@ -1,3 +1,10 @@
+# WXT
+.wxt
+.output
+
+# Claude
+.claude
+
 # Logs
 logs
 *.log

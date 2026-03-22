@@ -1,0 +1,80 @@
+{
+  "extensionName": {
+    "message": "YouTube Rewind"
+  },
+  "extensionDescription": {
+    "message": "Оптимизация интерфейса YouTube с настраиваемым дизайном и фильтрацией контента"
+  },
+  "sectionAdaptiveColors": {
+    "message": "Адаптивные цвета"
+  },
+  "settingAdaptiveHover": {
+    "message": "Отключить цвет при наведении"
+  },
+  "settingAdaptiveDescription": {
+    "message": "Отключить цвет описания"
+  },
+  "sectionHomepageLayout": {
+    "message": "Макет главной"
+  },
+  "settingVideosPerRow": {
+    "message": "Видео в ряду"
+  },
+  "settingVideosPerRowDefault": {
+    "message": "По умолчанию"
+  },
+  "sectionHomepageFilter": {
+    "message": "Фильтр главной"
+  },
+  "settingHideShorts": {
+    "message": "Шортсы"
+  },
+  "settingHidePosts": {
+    "message": "Посты"
+  },
+  "settingHideMixes": {
+    "message": "Миксы"
+  },
+  "settingHideBreakingNews": {
+    "message": "Срочные новости"
+  },
+  "settingHideLatestPosts": {
+    "message": "Последние посты"
+  },
+  "sectionSearchFilter": {
+    "message": "Фильтр поиска"
+  },
+  "settingHideSearchShorts": {
+    "message": "Шортсы"
+  },
+  "settingHideSearchChannels": {
+    "message": "Каналы"
+  },
+  "settingHideSearchPeopleWatched": {
+    "message": "Также смотрели"
+  },
+  "sectionAvatarShape": {
+    "message": "Форма аватарок"
+  },
+  "sectionThumbnailShape": {
+    "message": "Форма превью"
+  },
+  "shapeDefault": {
+    "message": "По умолчанию"
+  },
+  "shapeCircle": {
+    "message": "Круг"
+  },
+  "shapeSuperellipse": {
+    "message": "Суперэллипс"
+  },
+  "shapeWaves": {
+    "message": "Волны"
+  },
+  "shapeHexagon": {
+    "message": "Шестиугольник"
+  },
+  "shapeRoundedSquare": {
+    "message": "Скруглённый квадрат"
+  }
+}
