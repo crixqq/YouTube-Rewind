@@ -1,231 +1,100 @@
-# YouTube Rewind
+<p align="center">
+  <img src="icon.png" alt="YouTube Rewind" width="128" height="128">
+  <br><br>
+  <b>YouTube Rewind</b>
+  <br>
+  Clean up YouTube's interface — hide clutter, filter content, customize the look.
+  <br><br>
+  <a href="https://t.me/ytrewind_extension">Telegram</a> &middot;
+  <a href="../../releases">Releases</a> &middot;
+  <a href="LICENSE">GPL-3.0</a>
+</p>
 
-Browser extension that cleans up YouTube's interface. Remove visual clutter, filter out content you don't want to see, and customize the look of the site — all without breaking anything.
+---
 
-Works on **Chromium** (Chrome, Edge, Brave, Opera, Vivaldi, Arc) and **Firefox**.
-
-## What it does
-
-### Homepage
-| Feature | Description |
-|---------|-------------|
-| **Disable hover glow** | Removes YouTube's ambient color effect when hovering over video cards |
-| **Videos Per Row** | Sets how many videos appear per row (1–8), or leave it at YouTube's default |
-| **Content Filter** | Hides Shorts, Posts, Mixes, Breaking News, Latest Posts, and "Explore more topics" sections |
-
-### Search
-| Feature | Description |
-|---------|-------------|
-| **Search Filter** | Hides Shorts, Channels, and "People also watched" shelves in search results |
+## Features
 
 ### Watch Page
-| Feature | Description |
-|---------|-------------|
-| **Disable description color** | Removes the adaptive color from the video description area |
-| **Classic Player** | Brings back the classic gradient under player controls, removes material design pill backgrounds |
-| **Wider Sidebar** | Makes the recommendations sidebar wider for better readability |
-| **Hide Like Bar** | Removes the like/dislike sentiment bar under the video |
+| | |
+|---|---|
+| **Classic Player** | Brings back the classic gradient under player controls, removes pill-shaped backgrounds |
+| **Disable Description Color** | Removes the adaptive color tint and hover effects from the description area |
+| **Wide Content** | Removes width limits — player, metadata, and recommendations fill the full page |
 
-### Appearance & General
-| Feature | Description |
-|---------|-------------|
-| **Avatar Shapes** | Changes all avatar shapes across YouTube: squircle, rounded square, clover, flower, or hexagon |
-| **Language** | Switch the extension UI between English, Russian, or auto-detect |
+### Homepage
+| | |
+|---|---|
+| **Videos Per Row** | Set how many videos appear per row (1–8), or keep YouTube's default |
+| **Content Filter** | Hide Shorts, Posts, Mixes, Breaking News, Latest Posts, and "Explore more topics" |
 
-All settings are applied instantly without reloading the page.
+### Search
+| | |
+|---|---|
+| **Search Filter** | Hide Shorts, Channels, and "People also watched" shelves from search results |
+
+### Appearance
+| | |
+|---|---|
+| **Avatar Shapes** | Change all avatars across YouTube: squircle, rounded square, diamond, hexagon, octagon, clover, or flower |
+
+### Updates
+| | |
+|---|---|
+| **Update Checker** | Click the version badge — the extension checks GitHub for new releases and shows a download button if an update is available |
+
+All settings apply instantly — no page reload needed.
+
+## Languages
+
+The extension UI is available in **11 languages** (auto-detected from browser, or pick manually):
+
+English, Русский, Українська, Español, Português, Français, Deutsch, Türkçe, 日本語, 한국어, 中文
 
 ## Installation
 
-### Option A: Chrome Web Store / Firefox Add-ons (recommended)
+### Chrome / Edge / Brave / Opera / Vivaldi / Arc
 
-> The extension is not yet published to the stores. See the "Publishing" section below for how to do it.
+1. Download `youtube-rewind-0.1.0-chrome.zip` from [Releases](../../releases)
+2. Unzip to any folder
+3. Go to `chrome://extensions` and enable **Developer mode** (top-right toggle)
+4. Click **Load unpacked** and select the unzipped folder
+5. Done — the icon appears in your toolbar
 
-Once published, users simply install from the store — no developer mode needed.
+> The browser shows a "developer mode" warning on startup. This is normal. Publishing to the Chrome Web Store removes it.
 
-### Option B: From a ZIP file (Chromium)
+### Firefox
 
-1. Download the latest release ZIP (`chrome-mv3.zip`) from the [Releases](../../releases) page
-2. Unzip it to any folder (e.g. `YouTube-Rewind-chrome`)
-3. Open your browser and go to `chrome://extensions`
-4. Enable **Developer mode** — toggle switch in the **top-right corner** of the page
-5. Click **Load unpacked** (button appears in the top-left after enabling developer mode)
-6. Select the **unzipped folder** (the one containing `manifest.json`)
-7. Done — the extension icon should appear in your toolbar
+1. Download `youtube-rewind-0.1.0-firefox.zip` from [Releases](../../releases)
+2. Go to `about:debugging#/runtime/this-firefox`
+3. Click **Load Temporary Add-on** and select the ZIP file
+4. The extension works until Firefox restarts
 
-> **Note:** In developer mode, the browser will show a warning on startup ("Disable developer mode extensions"). This is normal and harmless. To avoid this, publish the extension to the Chrome Web Store (see below).
+> For permanent Firefox installation, publish to [Firefox Add-ons](https://addons.mozilla.org/developers/) or use Firefox ESR with `xpinstall.signatures.required` set to `false`.
 
-### Option C: From a ZIP file (Firefox)
-
-1. Download the latest release ZIP (`firefox-mv2.zip`) from the [Releases](../../releases) page
-2. Open Firefox and go to `about:debugging#/runtime/this-firefox`
-3. Click **Load Temporary Add-on...**
-4. Select the ZIP file (or any file inside it)
-5. The extension is loaded until you restart Firefox
-
-> **Note:** Firefox temporary add-ons don't persist across restarts. For permanent installation, publish to Firefox Add-ons (see below) or use [Firefox ESR with xpinstall.signatures.required set to false](https://support.mozilla.org/kb/add-on-signing-in-firefox).
-
-### Option D: Build from source
+### Build from source
 
 ```bash
-# Clone the repo
-git clone https://github.com/user/youtube-rewind.git
-cd youtube-rewind
-
-# Install dependencies (requires Node.js 18+ and pnpm)
+git clone https://github.com/crixqq/YouTube-Rewind.git
+cd YouTube-Rewind
 pnpm install
 
-# Build for Chrome/Chromium
-pnpm build
+pnpm build            # Chrome/Chromium
+pnpm build:firefox    # Firefox
 
-# Build for Firefox
-pnpm build:firefox
-
-# The output is in .output/chrome-mv3 or .output/firefox-mv2
-# Load it as described in Option B or C
-```
-
-## Publishing to stores (no developer mode)
-
-To make the extension installable without developer mode, you need to publish it to the browser stores.
-
-### Chrome Web Store
-
-1. Go to the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
-2. Pay a one-time $5 developer registration fee
-3. Run `pnpm zip` — this creates a `.output/chrome-mv3.zip`
-4. Upload the ZIP file to the dashboard
-5. Fill in the store listing (description, screenshots, etc.)
-6. Submit for review — approval typically takes 1–3 business days
-7. After approval, anyone can install it from the store link
-
-### Firefox Add-ons (AMO)
-
-1. Go to [Firefox Add-on Developer Hub](https://addons.mozilla.org/developers/)
-2. Create an account (free)
-3. Run `pnpm zip:firefox` — this creates a `.output/firefox-mv2.zip`
-4. Upload the ZIP file
-5. Fill in the listing details
-6. Submit for review — approval typically takes 1–5 business days
-7. After approval, anyone can install from the AMO page
-
-### Microsoft Edge Add-ons
-
-1. Go to the [Edge Add-ons Developer Dashboard](https://partner.microsoft.com/dashboard/microsoftedge)
-2. Use the same `chrome-mv3.zip` — Edge supports Chrome extensions
-3. Upload and submit for review
-
-## Development
-
-```bash
-pnpm install        # Install dependencies
-pnpm dev            # Dev mode with hot reload (Chrome)
-pnpm dev:firefox    # Dev mode with hot reload (Firefox)
-pnpm build          # Production build (Chrome MV3)
-pnpm build:firefox  # Production build (Firefox MV2)
-pnpm zip            # Package for Chrome Web Store
-pnpm zip:firefox    # Package for Firefox Add-ons
+pnpm zip              # → .output/youtube-rewind-<ver>-chrome.zip
+pnpm zip:firefox      # → .output/youtube-rewind-<ver>-firefox.zip
 ```
 
 ## How it works
 
-The extension injects CSS into YouTube pages and uses `data-*` attributes on the `<html>` element to conditionally activate styles. When you change a setting in the popup, it saves to `browser.storage.local` and the content script updates the data attributes — CSS rules take effect instantly without a page reload.
+The extension injects CSS into YouTube and uses `data-*` attributes on `<html>` to toggle styles. Settings are saved to `browser.storage.local` — the content script updates attributes instantly, no reload required.
 
-For features that CSS alone can't handle (like hiding "Explore more topics"), a lightweight MutationObserver tags matching DOM elements with attributes that CSS then hides.
+For things CSS can't handle (like "Explore more topics"), a lightweight MutationObserver tags matching elements so CSS can hide them.
 
 ## Tech Stack
 
-- [WXT](https://wxt.dev) — cross-browser extension framework (Vite-based)
-- [Svelte 5](https://svelte.dev) — popup UI with runes
-- CSS injection via manifest — pure CSS + data attributes
-- `browser.storage.local` — persistent settings
+[WXT](https://wxt.dev) &middot; [Svelte 5](https://svelte.dev) &middot; CSS injection via manifest &middot; `browser.storage.local`
 
 ## License
-
-[GNU General Public License v3.0](LICENSE)
-
----
-
-# YouTube Rewind (Русский)
-
-Расширение для браузера, которое приводит в порядок интерфейс YouTube. Убирает визуальный мусор, фильтрует нежелательный контент и кастомизирует внешний вид сайта — не ломая при этом ничего.
-
-Работает на **Chromium** (Chrome, Edge, Brave, Opera, Vivaldi, Arc) и **Firefox**.
-
-## Возможности
-
-### Главная
-| Функция | Описание |
-|---------|----------|
-| **Отключить ореол при наведении** | Убирает адаптивный цветовой эффект при наведении на карточки видео |
-| **Видео в ряду** | Настройка количества видео в строке (1–8) или значение YouTube по умолчанию |
-| **Фильтр контента** | Скрывает Shorts, посты, миксы, срочные новости, последние посты и «Explore more topics» |
-
-### Поиск
-| Функция | Описание |
-|---------|----------|
-| **Фильтр поиска** | Скрывает Shorts, каналы и разделы «Также смотрели» в результатах поиска |
-
-### Страница видео
-| Функция | Описание |
-|---------|----------|
-| **Отключить цвет описания** | Убирает адаптивный цвет из области описания видео |
-| **Классический плеер** | Возвращает классический градиент под элементами управления плеера |
-| **Шире боковые рекомендации** | Увеличивает ширину боковой панели рекомендаций |
-| **Скрыть полоску лайков** | Убирает полоску соотношения лайков/дизлайков под видео |
-
-### Внешний вид и общее
-| Функция | Описание |
-|---------|----------|
-| **Форма аватарок** | Меняет форму аватарок: суперэллипс, скруглённый квадрат, клевер, цветок или шестиугольник |
-| **Язык** | Переключение интерфейса расширения между английским, русским или автоопределением |
-
-Все настройки применяются мгновенно без перезагрузки страницы.
-
-## Установка
-
-### Вариант А: Магазины расширений (рекомендуется)
-
-> Расширение пока не опубликовано в магазинах. Смотрите раздел «Публикация» выше (на английском) для инструкций.
-
-После публикации пользователи просто устанавливают из магазина — режим разработчика не нужен.
-
-### Вариант Б: Из ZIP-файла (Chromium — Chrome, Edge, Brave и др.)
-
-1. Скачайте последний релиз (`chrome-mv3.zip`) со страницы [Releases](../../releases)
-2. Разархивируйте в любую папку (например, `YouTube-Rewind-chrome`)
-3. Откройте браузер и перейдите на `chrome://extensions`
-4. Включите **Режим разработчика** — переключатель в **правом верхнем углу** страницы
-5. Нажмите **Загрузить распакованное расширение** (кнопка появляется слева вверху после включения режима разработчика)
-6. Выберите **разархивированную папку** (ту, в которой лежит `manifest.json`)
-7. Готово — иконка расширения появится в панели инструментов
-
-> **Важно:** В режиме разработчика браузер будет показывать предупреждение при запуске. Это нормально. Чтобы убрать его, нужно опубликовать расширение в Chrome Web Store.
-
-### Вариант В: Из ZIP-файла (Firefox)
-
-1. Скачайте последний релиз (`firefox-mv2.zip`) со страницы [Releases](../../releases)
-2. Откройте Firefox и перейдите на `about:debugging#/runtime/this-firefox`
-3. Нажмите **Загрузить временное дополнение...**
-4. Выберите ZIP-файл (или любой файл внутри него)
-5. Расширение будет работать до перезапуска Firefox
-
-### Вариант Г: Сборка из исходников
-
-```bash
-git clone https://github.com/user/youtube-rewind.git
-cd youtube-rewind
-pnpm install
-pnpm build          # Chrome/Chromium
-pnpm build:firefox  # Firefox
-# Результат в .output/chrome-mv3 или .output/firefox-mv2
-```
-
-## Как это работает
-
-Расширение внедряет CSS в страницы YouTube и использует `data-*` атрибуты на `<html>` для условной активации стилей. При изменении настройки в попапе она сохраняется в `browser.storage.local`, а content script обновляет data-атрибуты — CSS-правила вступают в силу мгновенно.
-
-Для функций, которые невозможно реализовать на чистом CSS (например, скрытие «Explore more topics»), используется легковесный MutationObserver, который размечает нужные элементы DOM атрибутами, а CSS их прячет.
-
-## Лицензия
 
 [GNU General Public License v3.0](LICENSE)

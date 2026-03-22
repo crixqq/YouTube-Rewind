@@ -1,0 +1,80 @@
+{
+  "extensionName": {
+    "message": "YouTube Rewind"
+  },
+  "extensionDescription": {
+    "message": "Clean up YouTube's interface with customizable layout and filtering options"
+  },
+  "sectionAdaptiveColors": {
+    "message": "Adaptive Colors"
+  },
+  "settingAdaptiveHover": {
+    "message": "Disable hover color effect"
+  },
+  "settingAdaptiveDescription": {
+    "message": "Disable description color effect"
+  },
+  "sectionHomepageLayout": {
+    "message": "Homepage Layout"
+  },
+  "settingVideosPerRow": {
+    "message": "Videos per row"
+  },
+  "settingVideosPerRowDefault": {
+    "message": "Default"
+  },
+  "sectionHomepageFilter": {
+    "message": "Homepage Filter"
+  },
+  "settingHideShorts": {
+    "message": "Shorts"
+  },
+  "settingHidePosts": {
+    "message": "Posts"
+  },
+  "settingHideMixes": {
+    "message": "Mixes"
+  },
+  "settingHideBreakingNews": {
+    "message": "Breaking News"
+  },
+  "settingHideLatestPosts": {
+    "message": "Latest Posts"
+  },
+  "sectionSearchFilter": {
+    "message": "Search Filter"
+  },
+  "settingHideSearchShorts": {
+    "message": "Shorts"
+  },
+  "settingHideSearchChannels": {
+    "message": "Channels"
+  },
+  "settingHideSearchPeopleWatched": {
+    "message": "People also watched"
+  },
+  "sectionAvatarShape": {
+    "message": "Avatar Shape"
+  },
+  "sectionThumbnailShape": {
+    "message": "Thumbnail Shape"
+  },
+  "shapeDefault": {
+    "message": "Default"
+  },
+  "shapeCircle": {
+    "message": "Circle"
+  },
+  "shapeSuperellipse": {
+    "message": "Squircle"
+  },
+  "shapeWaves": {
+    "message": "Waves"
+  },
+  "shapeHexagon": {
+    "message": "Hexagon"
+  },
+  "shapeRoundedSquare": {
+    "message": "Rounded Square"
+  }
+}
