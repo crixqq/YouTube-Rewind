@@ -33,18 +33,11 @@ function applySettings(s: Settings): void {
   el.dataset.ytrHideTopbarVoiceSearch = String(s.hideTopbarVoiceSearch);
   el.dataset.ytrHideTopbarNotifications = String(s.hideTopbarNotifications);
   el.dataset.ytrHideCountryCode = String(s.hideCountryCode);
-
-  // Custom logo
-  if (s.customLogo) {
-    el.dataset.ytrCustomLogo = 'true';
-    el.style.setProperty('--ytr-custom-logo', `url(${s.customLogo})`);
-  } else {
-    delete el.dataset.ytrCustomLogo;
-    el.style.removeProperty('--ytr-custom-logo');
-  }
+  el.dataset.ytrHideTopbarSearch = String(s.hideTopbarSearch);
 
   // Thumbnail effect
   el.dataset.ytrThumbnailEffect = s.thumbnailEffect || 'none';
+  el.dataset.ytrThumbnailNoReveal = String(!s.thumbnailHoverReveal);
 
   if (s.videosPerRow > 0) {
     el.dataset.ytrVideosPerRow = String(s.videosPerRow);
@@ -73,6 +66,7 @@ function applySettings(s: Settings): void {
   el.dataset.ytrHideSidebarFooter = String(s.hideSidebarFooter);
 
   el.dataset.ytrAvatarShape = s.avatarShape;
+  el.dataset.ytrDisableHoverAnimation = String(s.disableHoverAnimation);
   el.dataset.ytrClassicPlayer = String(s.classicPlayer);
   el.dataset.ytrWidePlayer = String(s.widePlayer);
 }
@@ -101,22 +95,18 @@ function tagExploreSections(): void {
 
 function tagSidebarSections(): void {
   document.querySelectorAll('ytd-guide-section-renderer').forEach((section) => {
-    // Subscriptions: contains collapsible channel list
     if (section.querySelector('ytd-guide-collapsible-section-entry-renderer')) {
       section.setAttribute('data-ytr-sidebar-subscriptions', 'true');
       return;
     }
-    // You: contains links to history, library, watch later
     if (section.querySelector('a[href="/feed/history"], a[href="/feed/library"], a[href*="list=WL"], a[href*="list=LL"]')) {
       section.setAttribute('data-ytr-sidebar-you', 'true');
       return;
     }
-    // More from YouTube: contains links to premium, music.youtube.com, kids
     if (section.querySelector('a[href*="youtube.com/premium"], a[href*="/premium"], a[href*="music.youtube.com"], a[href*="/kids"]')) {
       section.setAttribute('data-ytr-sidebar-more-yt', 'true');
       return;
     }
-    // Explore: any titled section that doesn't match the above
     const title = section.querySelector('#guide-section-title');
     if (title && title.textContent?.trim()) {
       section.setAttribute('data-ytr-sidebar-explore', 'true');
@@ -150,7 +140,6 @@ function injectPixelFilter(): void {
 
 let debounceTimer: ReturnType<typeof setTimeout>;
 let sidebarDebounceTimer: ReturnType<typeof setTimeout>;
-
 function startObserver(): void {
   const observer = new MutationObserver((mutations) => {
     let needsExploreCheck = false;
@@ -188,6 +177,7 @@ function startObserver(): void {
       clearTimeout(sidebarDebounceTimer);
       sidebarDebounceTimer = setTimeout(tagSidebarSections, 50);
     }
+
   });
 
   observer.observe(document.documentElement, {

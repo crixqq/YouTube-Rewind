@@ -4,13 +4,18 @@
 
 /* --- Top Bar --- */
 
-/* Hide Create button — first button in the end section (before notifications and avatar) */
-html[data-ytr-hide-topbar-create="true"] ytd-masthead #end ytd-topbar-menu-button-renderer:first-child {
+/* Hide Create button — ytd-button-renderer inside #buttons (NOT the profile avatar) */
+html[data-ytr-hide-topbar-create="true"] ytd-masthead #buttons ytd-button-renderer {
   display: none !important;
 }
 
 /* Hide Voice search */
 html[data-ytr-hide-topbar-voice-search="true"] #voice-search-button {
+  display: none !important;
+}
+
+/* Hide Search bar */
+html[data-ytr-hide-topbar-search="true"] ytd-masthead #center {
   display: none !important;
 }
 
@@ -25,66 +30,134 @@ html[data-ytr-hide-country-code="true"] ytd-topbar-logo-renderer #country-code {
   display: none !important;
 }
 
-/* Custom logo — hide original, show custom */
-html[data-ytr-custom-logo] ytd-topbar-logo-renderer #logo-icon yt-icon,
-html[data-ytr-custom-logo] ytd-topbar-logo-renderer #logo-icon svg,
-html[data-ytr-custom-logo] ytd-topbar-logo-renderer #logo-icon ytd-logo {
-  visibility: hidden !important;
-  width: 0 !important;
-  overflow: hidden !important;
-}
-
-html[data-ytr-custom-logo] ytd-topbar-logo-renderer #logo-icon {
-  display: flex !important;
-  align-items: center !important;
-}
-
-html[data-ytr-custom-logo] ytd-topbar-logo-renderer #logo-icon::after {
-  content: '' !important;
-  display: block !important;
-  height: 20px !important;
-  min-width: 20px !important;
-  background-image: var(--ytr-custom-logo) !important;
-  background-size: contain !important;
-  background-repeat: no-repeat !important;
-  background-position: center left !important;
-  /* Auto width — the image's aspect ratio determines width at 20px height */
-  aspect-ratio: auto;
-  width: auto !important;
-  padding-right: 60px !important;
-}
-
 /* --- Thumbnail Effects --- */
 
+/* Strategy: apply effects unconditionally to all thumbnail images,
+   then remove them only on a:hover (the clickable/pointer area).
+   This ensures effects work everywhere (including watch page sidebar)
+   and only reveal when cursor is over the actual link, not outer container edges. */
+
 /* Pixelate */
-html[data-ytr-thumbnail-effect="pixelate"] ytd-thumbnail:not(:hover) img,
-html[data-ytr-thumbnail-effect="pixelate"] ytd-playlist-thumbnail:not(:hover) img {
+html[data-ytr-thumbnail-effect="pixelate"] :is(
+  ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model,
+  .yt-lockup-view-model-wiz__content-image, ytm-shorts-lockup-view-model
+) img {
   filter: url(#ytr-pixelate) !important;
+  transform: scale(1.05) !important;
+}
+html[data-ytr-thumbnail-effect="pixelate"] .ytp-videowall-still .ytp-videowall-still-image {
+  filter: url(#ytr-pixelate) !important;
+  transform: scale(1.05) !important;
 }
 
 /* Blur */
-html[data-ytr-thumbnail-effect="blur"] ytd-thumbnail:not(:hover) img,
-html[data-ytr-thumbnail-effect="blur"] ytd-playlist-thumbnail:not(:hover) img {
+html[data-ytr-thumbnail-effect="blur"] :is(
+  ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model,
+  .yt-lockup-view-model-wiz__content-image, ytm-shorts-lockup-view-model
+) img {
+  filter: blur(15px) !important;
+  transform: scale(1.1) !important;
+}
+html[data-ytr-thumbnail-effect="blur"] .ytp-videowall-still .ytp-videowall-still-image {
   filter: blur(15px) !important;
   transform: scale(1.1) !important;
 }
 
 /* Grayscale */
-html[data-ytr-thumbnail-effect="grayscale"] ytd-thumbnail:not(:hover) img,
-html[data-ytr-thumbnail-effect="grayscale"] ytd-playlist-thumbnail:not(:hover) img {
+html[data-ytr-thumbnail-effect="grayscale"] :is(
+  ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model,
+  .yt-lockup-view-model-wiz__content-image, ytm-shorts-lockup-view-model
+) img {
+  filter: grayscale(1) !important;
+}
+html[data-ytr-thumbnail-effect="grayscale"] .ytp-videowall-still .ytp-videowall-still-image {
   filter: grayscale(1) !important;
 }
 
 /* Hidden */
-html[data-ytr-thumbnail-effect="hidden"] ytd-thumbnail:not(:hover) img,
-html[data-ytr-thumbnail-effect="hidden"] ytd-playlist-thumbnail:not(:hover) img {
+html[data-ytr-thumbnail-effect="hidden"] :is(
+  ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model,
+  .yt-lockup-view-model-wiz__content-image, ytm-shorts-lockup-view-model
+) img {
+  opacity: 0 !important;
+}
+html[data-ytr-thumbnail-effect="hidden"] .ytp-videowall-still .ytp-videowall-still-image {
   opacity: 0 !important;
 }
 
-/* Hover: reveal original with smooth transition */
-html:not([data-ytr-thumbnail-effect="none"]) ytd-thumbnail img,
-html:not([data-ytr-thumbnail-effect="none"]) ytd-playlist-thumbnail img {
+/* Hover reveal — only when enabled (no-reveal is NOT true).
+   Target the <a> link (pointer cursor area) so the effect only clears
+   when cursor is actually over the clickable part, not outer container edges. */
+html:not([data-ytr-thumbnail-no-reveal="true"]):not([data-ytr-thumbnail-effect="none"]) :is(
+  ytd-thumbnail a, ytd-playlist-thumbnail a,
+  yt-thumbnail-view-model a, a.yt-lockup-view-model__content-image,
+  ytm-shorts-lockup-view-model a
+):hover img {
+  filter: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+html:not([data-ytr-thumbnail-no-reveal="true"]):not([data-ytr-thumbnail-effect="none"]) .ytp-videowall-still:hover .ytp-videowall-still-image {
+  filter: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* Smooth transition for hover reveal */
+html:not([data-ytr-thumbnail-effect="none"]):not([data-ytr-thumbnail-no-reveal="true"]) :is(
+  ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model,
+  .yt-lockup-view-model-wiz__content-image, ytm-shorts-lockup-view-model,
+  .ytp-videowall-still
+) img {
   transition: filter 0.3s ease, opacity 0.3s ease, transform 0.3s ease !important;
+}
+html:not([data-ytr-thumbnail-effect="none"]):not([data-ytr-thumbnail-no-reveal="true"]) .ytp-videowall-still-image {
+  transition: filter 0.3s ease, opacity 0.3s ease, transform 0.3s ease !important;
+}
+
+/* --- Disable Hover Animation (glow/ripple on thumbnails + metadata color shift) --- */
+
+html[data-ytr-disable-hover-animation="true"] yt-touch-feedback-shape {
+  display: none !important;
+}
+
+/* Prevent metadata text color changes on hover */
+html[data-ytr-disable-hover-animation="true"] :is(
+  ytd-rich-item-renderer, ytd-compact-video-renderer, ytd-video-renderer,
+  ytd-grid-video-renderer, yt-lockup-view-model
+):hover :is(
+  .yt-lockup-metadata-view-model-wiz__text-container,
+  yt-lockup-metadata-view-model,
+  .yt-content-metadata-view-model-wiz__metadata-text,
+  yt-content-metadata-view-model,
+  #metadata, #metadata-line, #byline-container,
+  .ytd-video-meta-block, ytd-video-meta-block,
+  #channel-name, .ytd-channel-name, #video-title
+) {
+  color: inherit !important;
+  --yt-spec-text-secondary: var(--yt-spec-text-secondary) !important;
+}
+
+html[data-ytr-disable-hover-animation="true"] :is(
+  ytd-rich-item-renderer, ytd-compact-video-renderer, ytd-video-renderer,
+  ytd-grid-video-renderer, yt-lockup-view-model
+):hover :is(
+  span.yt-content-metadata-view-model-wiz__metadata-text,
+  .yt-core-attributed-string--link-inherit-color,
+  #text.ytd-channel-name, .ytd-video-meta-block span,
+  yt-formatted-string#text
+) {
+  color: var(--yt-spec-text-secondary, #aaa) !important;
+}
+
+/* Keep title text its normal color (primary text) */
+html[data-ytr-disable-hover-animation="true"] :is(
+  ytd-rich-item-renderer, ytd-compact-video-renderer, ytd-video-renderer,
+  ytd-grid-video-renderer, yt-lockup-view-model
+):hover :is(
+  #video-title, h3, .yt-lockup-metadata-view-model-wiz__title
+) {
+  color: var(--yt-spec-text-primary, #f1f1f1) !important;
 }
 
 /* --- Base fixes --- */
@@ -389,6 +462,14 @@ html:not([data-ytr-avatar-shape="none"]) yt-avatar-shape #avatar {
   border-radius: 0 !important;
 }
 
+/* Reset avatar stack containers for collaboration videos */
+html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model,
+html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model *,
+html:not([data-ytr-avatar-shape="none"]) #avatar-stack,
+html:not([data-ytr-avatar-shape="none"]) #avatar-stack * {
+  border-radius: 0 !important;
+}
+
 /* Common avatar image selectors — includes collab avatars, sidebar, search, feed */
 
 html[data-ytr-avatar-shape="superellipse"] :is(
@@ -641,3 +722,4 @@ html[data-ytr-wide-player="true"] ytd-watch-flexy[theater] #secondary.ytd-watch-
 ytd-watch-metadata #top-row.ytd-watch-metadata {
   padding-bottom: 0 !important;
 }
+

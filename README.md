@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon.png" alt="YouTube Rewind" width="128" height="128">
+  <img src="logo.png" alt="YouTube Rewind" height="64">
   <br><br>
   <b>YouTube Rewind</b>
   <br>
@@ -17,8 +17,7 @@
 ### Top Bar
 | | |
 |---|---|
-| **Hide Elements** | Hide Create button, voice search, notifications, and country code from the top bar |
-| **Custom Logo** | Replace the YouTube logo with your own image — auto-sized to fit |
+| **Hide Elements** | Hide Create button, voice search, search bar, notifications, and country code from the top bar |
 
 ### Watch Page
 | | |
@@ -47,7 +46,8 @@
 | | |
 |---|---|
 | **Avatar Shapes** | Change all avatars across YouTube: squircle, rounded square, diamond, hexagon, octagon, clover, or flower |
-| **Thumbnail Effects** | Reduce distractions: pixelate, blur, grayscale, or hide video thumbnails (hover to reveal) |
+| **Thumbnail Effects** | Reduce distractions: pixelate, blur, grayscale, or hide video thumbnails everywhere (hover reveal is optional) |
+| **Disable Hover Glow** | Remove the ripple/glow animation on thumbnail hover and prevent metadata text color changes |
 
 ### Updates
 | | |
@@ -64,26 +64,36 @@ English, Русский, Українська, Español, Português, Français, 
 
 ## Installation
 
-### Chrome / Edge / Brave / Opera / Vivaldi / Arc
+Download the extension from [Releases](../../releases):
 
-1. Download `youtube-rewind-0.1.0-chrome.zip` from [Releases](../../releases)
-2. Unzip to any folder
-3. Go to `chrome://extensions` and enable **Developer mode** (top-right toggle)
-4. Click **Load unpacked** and select the unzipped folder
-5. Done — the icon appears in your toolbar
+- **Chromium** (Chrome, Edge, Brave, Opera, Vivaldi, Arc) — `.crx` file
+- **Firefox** (Firefox, Zen, Waterfox, LibreWolf) — `.xpi` file
 
-> The browser shows a "developer mode" warning on startup. This is normal. Publishing to the Chrome Web Store removes it.
+Install it like any other extension file — drag into the browser or open from the extensions page.
 
-### Firefox
+<details>
+<summary><b>Build from source</b></summary>
 
-1. Download `youtube-rewind-0.1.0-firefox.zip` from [Releases](../../releases)
-2. Go to `about:debugging#/runtime/this-firefox`
-3. Click **Load Temporary Add-on** and select the ZIP file
-4. The extension works until Firefox restarts
+#### Chrome — CRX via browser
 
-> For permanent Firefox installation, publish to [Firefox Add-ons](https://addons.mozilla.org/developers/) or use Firefox ESR with `xpinstall.signatures.required` set to `false`.
+1. Build the extension: `pnpm build`
+2. Go to `chrome://extensions` → enable **Developer mode**
+3. Click **Pack extension** → select `.output/chrome-mv3` as the root directory
+4. Chrome generates a `.crx` file and a `.pem` private key (keep the key for future updates)
 
-### Build from source
+#### Firefox — XPI via web-ext
+
+```bash
+pnpm add -D web-ext
+npx web-ext build --source-dir .output/firefox-mv2
+```
+
+The `.xpi` file will be in the `web-ext-artifacts/` folder. To sign it for permanent installation, use [`web-ext sign`](https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/#signing-your-extension-for-self-distribution) with your AMO credentials.
+
+</details>
+
+<details>
+<summary><b>Manual packaging (CRX / XPI)</b></summary>
 
 ```bash
 git clone https://github.com/crixqq/YouTube-Rewind.git
@@ -96,6 +106,8 @@ pnpm build:firefox    # Firefox
 pnpm zip              # → .output/youtube-rewind-<ver>-chrome.zip
 pnpm zip:firefox      # → .output/youtube-rewind-<ver>-firefox.zip
 ```
+
+</details>
 
 ## How it works
 

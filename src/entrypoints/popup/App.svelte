@@ -161,6 +161,7 @@
       { key: 'hideTopbarCreate', label: t('settingHideTopbarCreate'), checked: settings.hideTopbarCreate, onchange: (v: boolean) => update('hideTopbarCreate', v) },
       { key: 'hideTopbarVoiceSearch', label: t('settingHideTopbarVoiceSearch'), checked: settings.hideTopbarVoiceSearch, onchange: (v: boolean) => update('hideTopbarVoiceSearch', v) },
       { key: 'hideTopbarNotifications', label: t('settingHideTopbarNotifications'), checked: settings.hideTopbarNotifications, onchange: (v: boolean) => update('hideTopbarNotifications', v) },
+      { key: 'hideTopbarSearch', label: t('settingHideTopbarSearch'), checked: settings.hideTopbarSearch, onchange: (v: boolean) => update('hideTopbarSearch', v) },
       { key: 'hideCountryCode', label: t('settingHideCountryCode'), checked: settings.hideCountryCode, onchange: (v: boolean) => update('hideCountryCode', v) },
     ];
   });
@@ -172,24 +173,6 @@
     { id: 'grayscale', label: 'thumbnailGrayscale' },
     { id: 'hidden', label: 'thumbnailHidden' },
   ];
-
-  function handleLogoUpload(e: Event) {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    if (file.size > 100 * 1024) return; // 100KB limit
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUri = reader.result as string;
-      update('customLogo', dataUri);
-    };
-    reader.readAsDataURL(file);
-    input.value = '';
-  }
-
-  function clearLogo() {
-    update('customLogo', '');
-  }
 
   let sidebarFilters = $derived.by(() => {
     void langVersion;
@@ -303,20 +286,6 @@
       <main class="app-body">
         <SettingsSection title={t('sectionTopBar')}>
           <FilterGroup filters={topbarFilters} />
-          <div class="logo-row">
-            <span class="logo-label">{t('settingCustomLogo')}</span>
-            <div class="logo-actions">
-              {#if settings.customLogo}
-                <img class="logo-preview" src={settings.customLogo} alt="Logo" />
-                <button class="logo-btn logo-btn-clear" onclick={clearLogo}>{t('settingCustomLogoClear')}</button>
-              {:else}
-                <label class="logo-btn logo-btn-upload">
-                  {t('settingCustomLogoUpload')}
-                  <input type="file" accept="image/*" onchange={handleLogoUpload} hidden />
-                </label>
-              {/if}
-            </div>
-          </div>
         </SettingsSection>
 
         <SettingsSection title={t('sectionWatchPage')}>
@@ -364,6 +333,10 @@
               </button>
             {/each}
           </div>
+          {#if settings.thumbnailEffect !== 'none'}
+            <Toggle label={t('thumbnailHoverReveal')} checked={settings.thumbnailHoverReveal} onchange={(v) => update('thumbnailHoverReveal', v)} />
+          {/if}
+          <Toggle label={t('settingDisableHoverAnimation')} checked={settings.disableHoverAnimation} onchange={(v) => update('disableHoverAnimation', v)} />
         </SettingsSection>
       </main>
 
@@ -535,7 +508,7 @@
     background: var(--md-surface-container-highest);
   }
 
-  /* M3 Menu: Extra Small shape (4dp), elevation level 2, 4dp vertical padding */
+  /* M3 Expressive Menu: Medium shape (12dp), elevation level 2 */
   .lang-menu {
     position: absolute;
     top: calc(100% + 4px);
@@ -543,7 +516,7 @@
     min-width: 140px;
     max-height: 360px;
     background: var(--md-surface-container);
-    border-radius: var(--md-shape-xs);
+    border-radius: var(--md-shape-md);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
     padding: 4px 0;
     z-index: 20;
@@ -647,7 +620,7 @@
     right: 0;
     min-width: 200px;
     background: var(--md-surface-container);
-    border-radius: var(--md-shape-xs);
+    border-radius: var(--md-shape-md);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
     padding: 4px 0;
     z-index: 20;
@@ -708,58 +681,6 @@
   }
 
   /* Logo upload row */
-  .logo-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 16px;
-  }
-
-  .logo-label {
-    font-size: 14px;
-    color: var(--md-on-surface);
-  }
-
-  .logo-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .logo-preview {
-    height: 20px;
-    width: auto;
-    border-radius: var(--md-shape-xs);
-  }
-
-  .logo-btn {
-    font-size: 12px;
-    font-family: inherit;
-    padding: 4px 12px;
-    border: none;
-    border-radius: var(--md-shape-full);
-    cursor: pointer;
-    transition: background var(--md-duration-short) var(--md-easing-standard);
-  }
-
-  .logo-btn-upload {
-    background: var(--md-primary);
-    color: var(--md-on-primary);
-  }
-
-  .logo-btn-upload:hover {
-    opacity: 0.9;
-  }
-
-  .logo-btn-clear {
-    background: var(--md-surface-container-high);
-    color: var(--md-on-surface-variant);
-  }
-
-  .logo-btn-clear:hover {
-    background: var(--md-surface-container-highest);
-  }
-
   /* Thumbnail effect picker */
   .effect-picker {
     display: flex;

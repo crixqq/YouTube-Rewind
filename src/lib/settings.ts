@@ -4,8 +4,9 @@ export interface Settings {
   hideTopbarVoiceSearch: boolean;
   hideTopbarNotifications: boolean;
   hideCountryCode: boolean;
-  customLogo: string;
+  hideTopbarSearch: boolean;
   thumbnailEffect: string;
+  thumbnailHoverReveal: boolean;
   videosPerRow: number;
   hideShorts: boolean;
   hidePosts: boolean;
@@ -23,6 +24,7 @@ export interface Settings {
   hideSidebarReportHistory: boolean;
   hideSidebarFooter: boolean;
   avatarShape: string;
+  disableHoverAnimation: boolean;
   classicPlayer: boolean;
   widePlayer: boolean;
   language: string;
@@ -34,8 +36,9 @@ export const DEFAULT_SETTINGS: Settings = {
   hideTopbarVoiceSearch: false,
   hideTopbarNotifications: false,
   hideCountryCode: false,
-  customLogo: '',
+  hideTopbarSearch: false,
   thumbnailEffect: 'none',
+  thumbnailHoverReveal: true,
   videosPerRow: 0,
   hideShorts: false,
   hidePosts: false,
@@ -53,6 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideSidebarReportHistory: false,
   hideSidebarFooter: false,
   avatarShape: 'none',
+  disableHoverAnimation: false,
   classicPlayer: false,
   widePlayer: false,
   language: 'auto',
