@@ -85,6 +85,11 @@ html[data-ytr-thumbnail-effect="hidden"] .ytp-videowall-still .ytp-videowall-sti
   opacity: 0 !important;
 }
 
+/* Hide moving thumbnail preview (auto-play on hover in Chromium) when effect is active */
+html:not([data-ytr-thumbnail-effect="none"]) ytd-moving-thumbnail-renderer {
+  display: none !important;
+}
+
 /* Hover reveal — only when enabled (no-reveal is NOT true).
    Target the <a> link (pointer cursor area) so the effect only clears
    when cursor is actually over the clickable part, not outer container edges. */
