@@ -222,19 +222,8 @@
     showFeedback('imported');
   }
 
-  function importFile() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,.txt';
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      const text = await file.text();
-      const parsed = parseSettings(text);
-      if (parsed) await applyImport(parsed);
-      else showFeedback('error');
-    };
-    input.click();
+  function openImportPage() {
+    browser.tabs.create({ url: browser.runtime.getURL('import.html') });
   }
 
   async function pasteFromClipboard() {
@@ -544,7 +533,7 @@
             <div class="data-row">
               <span class="data-label">{t('importSettings')}</span>
               <div class="data-actions">
-                <button class="data-btn" onclick={importFile}>{t('importSettings')}</button>
+                <button class="data-btn" onclick={openImportPage}>{t('importSettings')}</button>
                 <button class="data-btn" onclick={pasteFromClipboard}>{t('pasteClipboard')}</button>
               </div>
             </div>
@@ -1095,6 +1084,7 @@
   .data-btn:active {
     transform: scale(0.95);
   }
+
 
   .data-feedback {
     font-size: 12px;
