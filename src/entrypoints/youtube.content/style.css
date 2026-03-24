@@ -2,6 +2,14 @@
    YouTube Rewind — Content Script Styles
    ============================================ */
 
+/* Material Symbols font for classic like/dislike icons (thumb_down + thumb_up, with FILL axis) */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 400;
+  src: url(https://fonts.gstatic.com/l/font?kit=kJF4BvYX7BgnkSrUwT8OhrdQw4oELdPIeeII9v6oDMzBwG-RpA6RzaxHMPdY40KH8nGzv3fzfVJU22ZZLsYEpzC_1ver5Y0R3e49__1hwl8XK7LRLdw7xna2t9M&skey=b8dc2088854b122f&v=v321) format('woff2');
+}
+
 /* --- Top Bar --- */
 
 /* Hide Create button — ytd-button-renderer inside #buttons (NOT the profile avatar) */
@@ -91,8 +99,20 @@ html:not([data-ytr-thumbnail-effect="none"]) ytd-moving-thumbnail-renderer {
 }
 
 /* Hover reveal — only when enabled (no-reveal is NOT true).
-   Target the <a> link (pointer cursor area) so the effect only clears
-   when cursor is actually over the clickable part, not outer container edges. */
+   Reveal when hovering the entire video card (pointer cursor area),
+   not just the thumbnail itself. */
+html:not([data-ytr-thumbnail-no-reveal="true"]):not([data-ytr-thumbnail-effect="none"]) :is(
+  ytd-rich-item-renderer, ytd-compact-video-renderer, ytd-video-renderer,
+  ytd-grid-video-renderer, yt-lockup-view-model, ytd-rich-grid-media
+):hover :is(
+  ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model,
+  .yt-lockup-view-model-wiz__content-image, ytm-shorts-lockup-view-model
+) img {
+  filter: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+/* Direct thumbnail link hover (for places without a card wrapper) */
 html:not([data-ytr-thumbnail-no-reveal="true"]):not([data-ytr-thumbnail-effect="none"]) :is(
   ytd-thumbnail a, ytd-playlist-thumbnail a,
   yt-thumbnail-view-model a, a.yt-lockup-view-model__content-image,
@@ -119,6 +139,106 @@ html:not([data-ytr-thumbnail-effect="none"]):not([data-ytr-thumbnail-no-reveal="
 html:not([data-ytr-thumbnail-effect="none"]):not([data-ytr-thumbnail-no-reveal="true"]) .ytp-videowall-still-image {
   transition: filter 0.3s ease, opacity 0.3s ease, transform 0.3s ease !important;
 }
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-ytr-thumbnail-effect="none"]):not([data-ytr-thumbnail-no-reveal="true"]) :is(
+    ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model,
+    .yt-lockup-view-model-wiz__content-image, ytm-shorts-lockup-view-model,
+    .ytp-videowall-still
+  ) img,
+  html:not([data-ytr-thumbnail-effect="none"]):not([data-ytr-thumbnail-no-reveal="true"]) .ytp-videowall-still-image {
+    transition: none !important;
+  }
+}
+
+/* --- Thumbnail Shapes --- */
+
+/* Macro for thumb container + img + all inner wrappers */
+html[data-ytr-thumbnail-shape="sharp"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image),
+html[data-ytr-thumbnail-shape="sharp"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) *,
+html[data-ytr-thumbnail-shape="sharp"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) img {
+  border-radius: 0 !important;
+}
+
+html[data-ytr-thumbnail-shape="rounded"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) {
+  border-radius: 20px !important;
+  overflow: hidden !important;
+}
+html[data-ytr-thumbnail-shape="rounded"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) *,
+html[data-ytr-thumbnail-shape="rounded"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) img {
+  border-radius: 20px !important;
+}
+
+/* Scallop — soft M3-style wavy edges */
+html[data-ytr-thumbnail-shape="scallop"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) {
+  overflow: hidden !important;
+}
+html[data-ytr-thumbnail-shape="scallop"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) * {
+  border-radius: 0 !important;
+}
+html[data-ytr-thumbnail-shape="scallop"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) img {
+  border-radius: 0 !important;
+  clip-path: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3CclipPath id='sc' clipPathUnits='objectBoundingBox'%3E%3Cpath d='M0,0.06 C0.08,0.06,0.12,0,0.2,0 C0.28,0,0.32,0.06,0.4,0.06 C0.48,0.06,0.52,0,0.6,0 C0.68,0,0.72,0.06,0.8,0.06 C0.88,0.06,0.92,0,1,0 L1,0.94 C0.92,0.94,0.88,1,0.8,1 C0.72,1,0.68,0.94,0.6,0.94 C0.52,0.94,0.48,1,0.4,1 C0.32,1,0.28,0.94,0.2,0.94 C0.12,0.94,0.08,1,0,1Z'/%3E%3C/clipPath%3E%3C/svg%3E#sc") !important;
+}
+
+/* Notched — octagonal cut corners */
+html[data-ytr-thumbnail-shape="notched"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) {
+  overflow: hidden !important;
+}
+html[data-ytr-thumbnail-shape="notched"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) * {
+  border-radius: 0 !important;
+}
+html[data-ytr-thumbnail-shape="notched"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) img {
+  border-radius: 0 !important;
+  clip-path: polygon(8% 0%, 92% 0%, 100% 8%, 100% 92%, 92% 100%, 8% 100%, 0% 92%, 0% 8%) !important;
+}
+
+/* Slanted — parallelogram */
+html[data-ytr-thumbnail-shape="slanted"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) {
+  overflow: visible !important;
+}
+html[data-ytr-thumbnail-shape="slanted"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) * {
+  border-radius: 0 !important;
+}
+html[data-ytr-thumbnail-shape="slanted"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) img {
+  border-radius: 0 !important;
+  clip-path: polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%) !important;
+}
+
+/* Arch — rounded top, flat bottom */
+html[data-ytr-thumbnail-shape="arch"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) {
+  overflow: hidden !important;
+}
+html[data-ytr-thumbnail-shape="arch"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) * {
+  border-radius: 0 !important;
+}
+html[data-ytr-thumbnail-shape="arch"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) img {
+  border-radius: 50% 50% 0 0 !important;
+}
+
+/* Fan — one corner strongly rounded */
+html[data-ytr-thumbnail-shape="fan"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) {
+  overflow: hidden !important;
+}
+html[data-ytr-thumbnail-shape="fan"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) * {
+  border-radius: 0 !important;
+}
+html[data-ytr-thumbnail-shape="fan"] :is(ytd-thumbnail, ytd-playlist-thumbnail, yt-thumbnail-view-model, .yt-lockup-view-model-wiz__content-image) img {
+  border-radius: 0 50% 0 0 !important;
+}
+
+/* Videowall endscreen thumbnails */
+html:not([data-ytr-thumbnail-shape="none"]) .ytp-videowall-still .ytp-videowall-still-image {
+  transition: clip-path 0.2s ease, border-radius 0.2s ease !important;
+}
+html[data-ytr-thumbnail-shape="sharp"] .ytp-videowall-still .ytp-videowall-still-image { border-radius: 0 !important; }
+html[data-ytr-thumbnail-shape="rounded"] .ytp-videowall-still .ytp-videowall-still-image { border-radius: 20px !important; }
+html[data-ytr-thumbnail-shape="notched"] .ytp-videowall-still .ytp-videowall-still-image { clip-path: polygon(8% 0%, 92% 0%, 100% 8%, 100% 92%, 92% 100%, 8% 100%, 0% 92%, 0% 8%) !important; }
+html[data-ytr-thumbnail-shape="slanted"] .ytp-videowall-still .ytp-videowall-still-image { clip-path: polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%) !important; }
+html[data-ytr-thumbnail-shape="arch"] .ytp-videowall-still .ytp-videowall-still-image { border-radius: 50% 50% 0 0 !important; }
+html[data-ytr-thumbnail-shape="fan"] .ytp-videowall-still .ytp-videowall-still-image { border-radius: 0 50% 0 0 !important; }
+html[data-ytr-thumbnail-shape="scallop"] .ytp-videowall-still .ytp-videowall-still-image { clip-path: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3CclipPath id='sc' clipPathUnits='objectBoundingBox'%3E%3Cpath d='M0,0.06 C0.08,0.06,0.12,0,0.2,0 C0.28,0,0.32,0.06,0.4,0.06 C0.48,0.06,0.52,0,0.6,0 C0.68,0,0.72,0.06,0.8,0.06 C0.88,0.06,0.92,0,1,0 L1,0.94 C0.92,0.94,0.88,1,0.8,1 C0.72,1,0.68,0.94,0.6,0.94 C0.52,0.94,0.48,1,0.4,1 C0.32,1,0.28,0.94,0.2,0.94 C0.12,0.94,0.08,1,0,1Z'/%3E%3C/clipPath%3E%3C/svg%3E#sc") !important; }
 
 /* --- Disable Hover Animation (glow/ripple on thumbnails + metadata color shift) --- */
 
@@ -284,22 +404,23 @@ html[data-ytr-no-adaptive-desc="true"] #description .yt-video-attribute-view-mod
 
 /* --- Videos Per Row --- */
 
-html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer {
+/* Only target the top-level grid, not grids nested inside sections */
+html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:not(ytd-rich-section-renderer *) {
   --ytd-rich-grid-items-per-row: var(--ytr-videos-per-row) !important;
   max-width: 100% !important;
 }
 
-/* Flatten row wrappers */
-html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer #contents > ytd-rich-grid-row {
+/* Flatten row wrappers — only top-level grid */
+html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:not(ytd-rich-section-renderer *) #contents > ytd-rich-grid-row {
   display: contents !important;
 }
 
-html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer #contents > ytd-rich-grid-row > #contents {
+html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:not(ytd-rich-section-renderer *) #contents > ytd-rich-grid-row > #contents {
   display: contents !important;
 }
 
-/* Grid container — minmax(0, 1fr) prevents items from overflowing */
-html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer > #contents {
+/* Grid container — only top-level grid */
+html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:not(ytd-rich-section-renderer *) > #contents {
   display: grid !important;
   grid-template-columns: repeat(var(--ytr-videos-per-row), minmax(0, 1fr)) !important;
   column-gap: 4px !important;
@@ -309,9 +430,9 @@ html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-rend
   overflow: hidden !important;
 }
 
-/* Force equal sizing on all items — prevent one item being larger */
-html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer > #contents > ytd-rich-grid-row ytd-rich-item-renderer,
-html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer > #contents > ytd-rich-item-renderer {
+/* Force equal sizing on items — only top-level grid */
+html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:not(ytd-rich-section-renderer *) > #contents > ytd-rich-grid-row ytd-rich-item-renderer,
+html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:not(ytd-rich-section-renderer *) > #contents > ytd-rich-item-renderer {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
@@ -320,24 +441,18 @@ html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-rend
   box-sizing: border-box !important;
 }
 
-/* Sections (shelves, Explore more topics, etc.) span full width */
-html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer > #contents > ytd-rich-section-renderer {
+/* Sections span full width and reset inherited grid variables */
+html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:not(ytd-rich-section-renderer *) > #contents > ytd-rich-section-renderer {
   grid-column: 1 / -1;
   max-width: 100% !important;
   overflow: hidden !important;
-}
-
-/* Items inside sections keep their own layout */
-html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-section-renderer ytd-rich-item-renderer {
-  width: auto !important;
-  max-width: none !important;
-  min-width: auto !important;
-  margin: 0 !important;
-  padding: 0 !important;
+  /* Break CSS variable inheritance — YouTube uses these internally for item sizing */
+  --ytd-rich-grid-items-per-row: initial !important;
+  --ytr-videos-per-row: initial !important;
 }
 
 /* Continuation items span full width */
-html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer > #contents > ytd-continuation-item-renderer {
+html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:not(ytd-rich-section-renderer *) > #contents > ytd-continuation-item-renderer {
   grid-column: 1 / -1;
 }
 
@@ -473,6 +588,25 @@ html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model *,
 html:not([data-ytr-avatar-shape="none"]) #avatar-stack,
 html:not([data-ytr-avatar-shape="none"]) #avatar-stack * {
   border-radius: 0 !important;
+}
+
+/* Ensure avatar stack and ALL children don't clip non-circle shapes */
+html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model,
+html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model *,
+html:not([data-ytr-avatar-shape="none"]) #avatar-stack,
+html:not([data-ytr-avatar-shape="none"]) #avatar-stack * {
+  overflow: visible !important;
+}
+
+/* Reset individual collab avatar wrappers */
+html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model yt-avatar-shape,
+html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model yt-avatar-shape > *,
+html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model yt-img-shadow,
+html:not([data-ytr-avatar-shape="none"]) #avatar-stack yt-avatar-shape,
+html:not([data-ytr-avatar-shape="none"]) #avatar-stack yt-avatar-shape > *,
+html:not([data-ytr-avatar-shape="none"]) #avatar-stack yt-img-shadow {
+  border-radius: 0 !important;
+  overflow: visible !important;
 }
 
 /* Common avatar image selectors — includes collab avatars, sidebar, search, feed */
@@ -657,6 +791,31 @@ html[data-ytr-avatar-shape="flower"] :is(
   clip-path: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3CclipPath id='f' clipPathUnits='objectBoundingBox'%3E%3Cpath d='M0.838,0.162 C0.939,0.263,0.879,0.365,0.933,0.5 C0.98,0.628,0.939,0.737,0.838,0.838 C0.737,0.939,0.635,0.879,0.5,0.933 C0.372,0.98,0.263,0.939,0.162,0.838 C0.061,0.737,0.121,0.635,0.067,0.5 C0.02,0.372,0.061,0.263,0.162,0.162 C0.263,0.061,0.365,0.121,0.5,0.067 C0.628,0.02,0.737,0.061,0.838,0.162Z'/%3E%3C/clipPath%3E%3C/svg%3E#f") !important;
 }
 
+html[data-ytr-avatar-shape="square"] :is(
+  yt-avatar-shape img,
+  yt-img-shadow.ytd-rich-grid-media, yt-img-shadow.ytd-video-owner-renderer,
+  yt-img-shadow.ytd-comment-renderer, yt-img-shadow.ytd-comment-view-model,
+  #avatar img, #avatar-container img, #owner-thumbnail img,
+  #channel-thumbnail img, #author-thumbnail img,
+  ytd-video-owner-renderer yt-img-shadow, ytd-video-owner-renderer yt-img-shadow img,
+  ytd-comment-renderer yt-img-shadow img,
+  #masthead button#avatar-btn img, #masthead yt-img-shadow img,
+  ytd-topbar-menu-button-renderer yt-img-shadow img, ytd-topbar-menu-button-renderer img,
+  button#avatar-btn img,
+  ytd-guide-entry-renderer yt-img-shadow, ytd-guide-entry-renderer yt-img-shadow img,
+  ytd-guide-entry-renderer yt-avatar-shape img,
+  ytd-mini-guide-entry-renderer yt-img-shadow, ytd-mini-guide-entry-renderer yt-img-shadow img,
+  ytd-search ytd-channel-renderer yt-img-shadow img, ytd-search #avatar-section img,
+  ytd-video-renderer #avatar img,
+  ytd-compact-video-renderer yt-img-shadow.ytd-compact-video-renderer img,
+  ytd-compact-video-renderer #avatar img,
+  ytd-rich-grid-media yt-img-shadow img,
+  yt-avatar-stack-view-model img, #avatar-stack img
+) {
+  border-radius: 0 !important;
+  overflow: hidden !important;
+}
+
 /* --- Classic Player --- */
 
 html[data-ytr-classic-player="true"] .ytp-gradient-bottom {
@@ -678,6 +837,19 @@ html[data-ytr-classic-player="true"] .ytp-time-wrapper-delhi {
 }
 
 html[data-ytr-classic-player="true"] .ryd-tooltip-new-design {
+  display: none !important;
+}
+
+/* Hide fullscreen engagement actions overlay (like/dislike/comment/share bar) */
+html[data-ytr-classic-player="true"] .ytp-suggested-action {
+  display: none !important;
+}
+html[data-ytr-classic-player="true"] .ytp-suggested-action-badge {
+  display: none !important;
+}
+
+/* Hide quick action buttons (like/dislike/share) above progress bar */
+html[data-ytr-classic-player="true"] yt-player-quick-action-buttons {
   display: none !important;
 }
 
@@ -722,9 +894,247 @@ html[data-ytr-wide-player="true"] ytd-watch-flexy[theater] #secondary.ytd-watch-
   min-width: 300px !important;
 }
 
+/* --- Channel Banner Style --- */
+
+/* Sharp banner — remove border-radius (both old and new layout) */
+html[data-ytr-banner-style="sharp"] .page-header-view-model-wiz__page-header-banner,
+html[data-ytr-banner-style="sharp"] .page-header-view-model-wiz__page-header-banner *,
+html[data-ytr-banner-style="sharp"] yt-image-banner-view-model,
+html[data-ytr-banner-style="sharp"] yt-image-banner-view-model *,
+html[data-ytr-banner-style="sharp"] #banner-container,
+html[data-ytr-banner-style="sharp"] #banner-container *,
+html[data-ytr-banner-style="sharp"] .banner-visible-area,
+html[data-ytr-banner-style="sharp"] .banner-visible-area *,
+html[data-ytr-banner-style="sharp"] ytd-c4-tabbed-header-renderer .banner-visible-area,
+html[data-ytr-banner-style="sharp"] yt-page-header-renderer [class*="banner"] {
+  border-radius: 0 !important;
+}
+
+/* --- Hide Video Buttons --- */
+
+html[data-ytr-hide-join-button="true"] #sponsor-button,
+html[data-ytr-hide-join-button="true"] ytd-watch-metadata #sponsor-button {
+  display: none !important;
+}
+
+html[data-ytr-hide-subscribe-button="true"] ytd-watch-metadata #subscribe-button,
+html[data-ytr-hide-subscribe-button="true"] ytd-video-owner-renderer ytd-subscribe-button-renderer {
+  display: none !important;
+}
+
+html[data-ytr-hide-like-dislike="true"] segmented-like-dislike-button-view-model,
+html[data-ytr-hide-like-dislike="true"] ytd-menu-renderer #top-level-buttons-computed > segmented-like-dislike-button-view-model,
+html[data-ytr-hide-like-dislike="true"] #segmented-like-button,
+html[data-ytr-hide-like-dislike="true"] #segmented-dislike-button {
+  display: none !important;
+}
+
+html[data-ytr-hide-share-button="true"] [data-ytr-action="share"] {
+  display: none !important;
+}
+
+html[data-ytr-hide-download-button="true"] ytd-download-button-renderer,
+html[data-ytr-hide-download-button="true"] [data-ytr-action="download"] {
+  display: none !important;
+}
+
+html[data-ytr-hide-clip-button="true"] [data-ytr-action="clip"] {
+  display: none !important;
+}
+
+html[data-ytr-hide-thanks-button="true"] [data-ytr-action="thanks"] {
+  display: none !important;
+}
+
+html[data-ytr-hide-save-button="true"] [data-ytr-action="save"] {
+  display: none !important;
+}
+
+/* --- Classic Like/Dislike Icons (Material Symbols Outlined) --- */
+
+/* Position icon containers and hide original SVG icons */
+html[data-ytr-classic-like-icons="true"] like-button-view-model .yt-spec-button-shape-next__icon,
+html[data-ytr-classic-like-icons="true"] dislike-button-view-model .yt-spec-button-shape-next__icon,
+html[data-ytr-classic-like-icons="true"] #segmented-like-button .yt-spec-button-shape-next__icon,
+html[data-ytr-classic-like-icons="true"] #segmented-dislike-button .yt-spec-button-shape-next__icon {
+  position: relative !important;
+}
+
+html[data-ytr-classic-like-icons="true"] like-button-view-model .yt-spec-button-shape-next__icon > *,
+html[data-ytr-classic-like-icons="true"] dislike-button-view-model .yt-spec-button-shape-next__icon > *,
+html[data-ytr-classic-like-icons="true"] #segmented-like-button .yt-spec-button-shape-next__icon > *,
+html[data-ytr-classic-like-icons="true"] #segmented-dislike-button .yt-spec-button-shape-next__icon > * {
+  visibility: hidden !important;
+}
+
+/* Base pseudo-element — Material Symbols Outlined font */
+html[data-ytr-classic-like-icons="true"] like-button-view-model .yt-spec-button-shape-next__icon::before,
+html[data-ytr-classic-like-icons="true"] dislike-button-view-model .yt-spec-button-shape-next__icon::before,
+html[data-ytr-classic-like-icons="true"] #segmented-like-button .yt-spec-button-shape-next__icon::before,
+html[data-ytr-classic-like-icons="true"] #segmented-dislike-button .yt-spec-button-shape-next__icon::before {
+  position: absolute !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  visibility: visible !important;
+  font-family: 'Material Symbols Outlined' !important;
+  font-weight: 400 !important;
+  font-size: 24px !important;
+  line-height: 1 !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  -webkit-font-feature-settings: 'liga' !important;
+  font-feature-settings: 'liga' !important;
+  -webkit-font-smoothing: antialiased !important;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+  color: currentColor !important;
+}
+
+/* Like icon — outlined (default) */
+html[data-ytr-classic-like-icons="true"] like-button-view-model .yt-spec-button-shape-next__icon::before,
+html[data-ytr-classic-like-icons="true"] #segmented-like-button .yt-spec-button-shape-next__icon::before {
+  content: 'thumb_up' !important;
+}
+
+/* Like icon — filled (active) */
+html[data-ytr-classic-like-icons="true"] like-button-view-model button[aria-pressed="true"] .yt-spec-button-shape-next__icon::before,
+html[data-ytr-classic-like-icons="true"] #segmented-like-button[is-active] .yt-spec-button-shape-next__icon::before,
+html[data-ytr-classic-like-icons="true"] like-button-view-model[is-active] .yt-spec-button-shape-next__icon::before {
+  content: 'thumb_up' !important;
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+}
+
+/* Dislike icon — outlined (default) */
+html[data-ytr-classic-like-icons="true"] dislike-button-view-model .yt-spec-button-shape-next__icon::before,
+html[data-ytr-classic-like-icons="true"] #segmented-dislike-button .yt-spec-button-shape-next__icon::before {
+  content: 'thumb_down' !important;
+}
+
+/* Dislike icon — filled (active) */
+html[data-ytr-classic-like-icons="true"] dislike-button-view-model button[aria-pressed="true"] .yt-spec-button-shape-next__icon::before,
+html[data-ytr-classic-like-icons="true"] #segmented-dislike-button[is-active] .yt-spec-button-shape-next__icon::before,
+html[data-ytr-classic-like-icons="true"] dislike-button-view-model[is-active] .yt-spec-button-shape-next__icon::before {
+  content: 'thumb_down' !important;
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+}
+
+/* --- Classic Like/Dislike Icons: Comments & Posts --- */
+
+/* Position icon containers and hide original SVG icons */
+html[data-ytr-classic-like-icons="true"] :is(
+  ytd-comment-action-buttons-renderer,
+  ytd-comment-engagement-bar
+) :is(#like-button, #dislike-button) .yt-spec-button-shape-next__icon {
+  position: relative !important;
+}
+
+html[data-ytr-classic-like-icons="true"] :is(
+  ytd-comment-action-buttons-renderer,
+  ytd-comment-engagement-bar
+) :is(#like-button, #dislike-button) .yt-spec-button-shape-next__icon > * {
+  visibility: hidden !important;
+}
+
+/* Base pseudo-element for comment/post icons */
+html[data-ytr-classic-like-icons="true"] :is(
+  ytd-comment-action-buttons-renderer,
+  ytd-comment-engagement-bar
+) :is(#like-button, #dislike-button) .yt-spec-button-shape-next__icon::before {
+  position: absolute !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  visibility: visible !important;
+  font-family: 'Material Symbols Outlined' !important;
+  font-weight: 400 !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  -webkit-font-feature-settings: 'liga' !important;
+  font-feature-settings: 'liga' !important;
+  -webkit-font-smoothing: antialiased !important;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20 !important;
+  color: currentColor !important;
+}
+
+/* Comment/post like icon */
+html[data-ytr-classic-like-icons="true"] :is(
+  ytd-comment-action-buttons-renderer,
+  ytd-comment-engagement-bar
+) #like-button .yt-spec-button-shape-next__icon::before {
+  content: 'thumb_up' !important;
+}
+
+/* Comment/post like — filled (active) */
+html[data-ytr-classic-like-icons="true"] :is(
+  ytd-comment-action-buttons-renderer,
+  ytd-comment-engagement-bar
+) #like-button button[aria-pressed="true"] .yt-spec-button-shape-next__icon::before {
+  content: 'thumb_up' !important;
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20 !important;
+}
+
+/* Comment/post dislike icon */
+html[data-ytr-classic-like-icons="true"] :is(
+  ytd-comment-action-buttons-renderer,
+  ytd-comment-engagement-bar
+) #dislike-button .yt-spec-button-shape-next__icon::before {
+  content: 'thumb_down' !important;
+}
+
+/* Comment/post dislike — filled (active) */
+html[data-ytr-classic-like-icons="true"] :is(
+  ytd-comment-action-buttons-renderer,
+  ytd-comment-engagement-bar
+) #dislike-button button[aria-pressed="true"] .yt-spec-button-shape-next__icon::before {
+  content: 'thumb_down' !important;
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20 !important;
+}
+
+/* --- Hide "New" Badge --- */
+
+html[data-ytr-hide-new-badge="true"] badge-shape.yt-badge-shape--default {
+  display: none !important;
+}
+html[data-ytr-hide-new-badge="true"] ytd-badge-supported-renderer:has(.badge-style-type-simple) {
+  display: none !important;
+}
+
 /* --- Watch Page: Remove top-row padding --- */
 
 ytd-watch-metadata #top-row.ytd-watch-metadata {
   padding-bottom: 0 !important;
+}
+
+/* --- Custom Logo --- */
+
+/* Hide original YouTube logo icon */
+html[data-ytr-custom-logo="true"] ytd-topbar-logo-renderer yt-icon#logo-icon,
+html[data-ytr-custom-logo="true"] ytd-topbar-logo-renderer #logo-icon {
+  visibility: hidden !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Show custom logo via pseudo-element on the link container */
+html[data-ytr-custom-logo="true"] ytd-topbar-logo-renderer a#logo {
+  display: flex !important;
+  align-items: center !important;
+}
+
+html[data-ytr-custom-logo="true"] ytd-topbar-logo-renderer a#logo::before {
+  content: '' !important;
+  display: block !important;
+  height: 20px !important;
+  aspect-ratio: var(--ytr-custom-logo-ratio) !important;
+  min-width: 24px !important;
+  max-width: 120px !important;
+  background: var(--ytr-custom-logo) no-repeat center / contain !important;
 }
 

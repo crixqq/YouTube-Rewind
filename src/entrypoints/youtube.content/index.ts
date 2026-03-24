@@ -10,7 +10,6 @@ export default defineContentScript({
   async main() {
     const settings = await loadSettings();
     applySettings(settings);
-    injectPixelFilter();
     startObserver();
 
     browser.storage.onChanged.addListener((changes) => {
@@ -18,6 +17,7 @@ export default defineContentScript({
         applySettings(changes.ytr_settings.newValue);
         tagExploreSections();
         tagSidebarSections();
+        tagActionButtons();
       }
     });
   },
@@ -25,50 +25,79 @@ export default defineContentScript({
 
 function applySettings(s: Settings): void {
   const el = document.documentElement;
+  const d = el.dataset;
 
-  el.dataset.ytrNoAdaptiveDesc = String(s.adaptiveColorsDescription);
+  d.ytrNoAdaptiveDesc = String(s.adaptiveColorsDescription);
 
   // Top bar
-  el.dataset.ytrHideTopbarCreate = String(s.hideTopbarCreate);
-  el.dataset.ytrHideTopbarVoiceSearch = String(s.hideTopbarVoiceSearch);
-  el.dataset.ytrHideTopbarNotifications = String(s.hideTopbarNotifications);
-  el.dataset.ytrHideCountryCode = String(s.hideCountryCode);
-  el.dataset.ytrHideTopbarSearch = String(s.hideTopbarSearch);
+  d.ytrHideTopbarCreate = String(s.hideTopbarCreate);
+  d.ytrHideTopbarVoiceSearch = String(s.hideTopbarVoiceSearch);
+  d.ytrHideTopbarNotifications = String(s.hideTopbarNotifications);
+  d.ytrHideCountryCode = String(s.hideCountryCode);
+  d.ytrHideTopbarSearch = String(s.hideTopbarSearch);
 
   // Thumbnail effect
-  el.dataset.ytrThumbnailEffect = s.thumbnailEffect || 'none';
-  el.dataset.ytrThumbnailNoReveal = String(!s.thumbnailHoverReveal);
+  d.ytrThumbnailEffect = s.thumbnailEffect || 'none';
+  d.ytrThumbnailNoReveal = String(!s.thumbnailHoverReveal);
+
+  // Inject pixel filter SVG only when needed
+  if (s.thumbnailEffect === 'pixelate') injectPixelFilter();
 
   if (s.videosPerRow > 0) {
-    el.dataset.ytrVideosPerRow = String(s.videosPerRow);
+    d.ytrVideosPerRow = String(s.videosPerRow);
     el.style.setProperty('--ytr-videos-per-row', String(s.videosPerRow));
   } else {
-    delete el.dataset.ytrVideosPerRow;
+    delete d.ytrVideosPerRow;
     el.style.removeProperty('--ytr-videos-per-row');
   }
 
-  el.dataset.ytrHideShorts = String(s.hideShorts);
-  el.dataset.ytrHidePosts = String(s.hidePosts);
-  el.dataset.ytrHideMixes = String(s.hideMixes);
-  el.dataset.ytrHideBreakingNews = String(s.hideBreakingNews);
-  el.dataset.ytrHideLatestPosts = String(s.hideLatestPosts);
-  el.dataset.ytrHideExploreTopics = String(s.hideExploreTopics);
+  d.ytrHideShorts = String(s.hideShorts);
+  d.ytrHidePosts = String(s.hidePosts);
+  d.ytrHideMixes = String(s.hideMixes);
+  d.ytrHideBreakingNews = String(s.hideBreakingNews);
+  d.ytrHideLatestPosts = String(s.hideLatestPosts);
+  d.ytrHideExploreTopics = String(s.hideExploreTopics);
 
-  el.dataset.ytrHideSearchShorts = String(s.hideSearchShorts);
-  el.dataset.ytrHideSearchChannels = String(s.hideSearchChannels);
-  el.dataset.ytrHideSearchPeopleWatched = String(s.hideSearchPeopleWatched);
+  d.ytrHideSearchShorts = String(s.hideSearchShorts);
+  d.ytrHideSearchChannels = String(s.hideSearchChannels);
+  d.ytrHideSearchPeopleWatched = String(s.hideSearchPeopleWatched);
 
-  el.dataset.ytrHideSidebarSubscriptions = String(s.hideSidebarSubscriptions);
-  el.dataset.ytrHideSidebarYou = String(s.hideSidebarYou);
-  el.dataset.ytrHideSidebarExplore = String(s.hideSidebarExplore);
-  el.dataset.ytrHideSidebarMoreFromYt = String(s.hideSidebarMoreFromYT);
-  el.dataset.ytrHideSidebarReportHistory = String(s.hideSidebarReportHistory);
-  el.dataset.ytrHideSidebarFooter = String(s.hideSidebarFooter);
+  d.ytrHideSidebarSubscriptions = String(s.hideSidebarSubscriptions);
+  d.ytrHideSidebarYou = String(s.hideSidebarYou);
+  d.ytrHideSidebarExplore = String(s.hideSidebarExplore);
+  d.ytrHideSidebarMoreFromYt = String(s.hideSidebarMoreFromYT);
+  d.ytrHideSidebarReportHistory = String(s.hideSidebarReportHistory);
+  d.ytrHideSidebarFooter = String(s.hideSidebarFooter);
 
-  el.dataset.ytrAvatarShape = s.avatarShape;
-  el.dataset.ytrDisableHoverAnimation = String(s.disableHoverAnimation);
-  el.dataset.ytrClassicPlayer = String(s.classicPlayer);
-  el.dataset.ytrWidePlayer = String(s.widePlayer);
+  d.ytrAvatarShape = s.avatarShape;
+  d.ytrThumbnailShape = s.thumbnailShape || 'none';
+  d.ytrDisableHoverAnimation = String(s.disableHoverAnimation);
+  d.ytrBannerStyle = s.bannerStyle || 'none';
+  d.ytrClassicLikeIcons = String(s.classicLikeIcons);
+  d.ytrClassicPlayer = String(s.classicPlayer);
+  d.ytrWidePlayer = String(s.widePlayer);
+  d.ytrHideNewBadge = String(s.hideNewBadge);
+
+  // Video buttons
+  d.ytrHideJoinButton = String(s.hideJoinButton);
+  d.ytrHideSubscribeButton = String(s.hideSubscribeButton);
+  d.ytrHideLikeDislike = String(s.hideLikeDislike);
+  d.ytrHideShareButton = String(s.hideShareButton);
+  d.ytrHideDownloadButton = String(s.hideDownloadButton);
+  d.ytrHideClipButton = String(s.hideClipButton);
+  d.ytrHideThanksButton = String(s.hideThanksButton);
+  d.ytrHideSaveButton = String(s.hideSaveButton);
+
+  // Custom logo
+  if (s.customLogo) {
+    d.ytrCustomLogo = 'true';
+    el.style.setProperty('--ytr-custom-logo', `url("${s.customLogo}")`);
+    el.style.setProperty('--ytr-custom-logo-ratio', String(s.customLogoRatio || 'auto'));
+  } else {
+    delete d.ytrCustomLogo;
+    el.style.removeProperty('--ytr-custom-logo');
+    el.style.removeProperty('--ytr-custom-logo-ratio');
+  }
 }
 
 // --- Explore More Topics: tag sections by title text ---
@@ -82,10 +111,9 @@ const EXPLORE_KEYWORDS = [
 ];
 
 function tagExploreSections(): void {
-  document.querySelectorAll('ytd-rich-section-renderer').forEach((section) => {
+  document.querySelectorAll('ytd-rich-section-renderer:not([data-ytr-explore-topics])').forEach((section) => {
     const text = (section.textContent || '').toLowerCase();
-    const isExplore = EXPLORE_KEYWORDS.some((kw) => text.includes(kw));
-    if (isExplore) {
+    if (EXPLORE_KEYWORDS.some((kw) => text.includes(kw))) {
       section.setAttribute('data-ytr-explore-topics', 'true');
     }
   });
@@ -94,7 +122,7 @@ function tagExploreSections(): void {
 // --- Sidebar: tag sections by content ---
 
 function tagSidebarSections(): void {
-  document.querySelectorAll('ytd-guide-section-renderer').forEach((section) => {
+  document.querySelectorAll('ytd-guide-section-renderer:not([data-ytr-sidebar-subscriptions]):not([data-ytr-sidebar-you]):not([data-ytr-sidebar-more-yt]):not([data-ytr-sidebar-explore])').forEach((section) => {
     if (section.querySelector('ytd-guide-collapsible-section-entry-renderer')) {
       section.setAttribute('data-ytr-sidebar-subscriptions', 'true');
       return;
@@ -111,6 +139,31 @@ function tagSidebarSections(): void {
     if (title && title.textContent?.trim()) {
       section.setAttribute('data-ytr-sidebar-explore', 'true');
     }
+  });
+}
+
+// --- Action buttons: tag by aria-label ---
+
+const ACTION_BUTTON_KEYWORDS: Record<string, string[]> = {
+  share: ['share', 'поделиться', 'compartir', 'compartilhar', 'partager', 'teilen', 'paylaş', '共有', '공유', '分享'],
+  download: ['download', 'скачать', 'descargar', 'baixar', 'télécharger', 'herunterladen', 'indir', 'ダウンロード', '다운로드', '下载', 'offline'],
+  clip: ['clip', 'клип', 'recortar', 'recorte', 'extrait', 'schneiden', 'klip', 'クリップ', '클립', '剪辑', 'remix', 'ремикс'],
+  thanks: ['thanks', 'спасибо', 'gracias', 'obrigado', 'merci', 'danke', 'teşekkür', 'ありがとう', '감사', '感谢', 'super thanks'],
+  save: ['save', 'сохранить', 'guardar', 'salvar', 'enregistrer', 'speichern', 'kaydet', '保存', '저장', 'зберегти', 'playlist'],
+};
+
+function tagActionButtons(): void {
+  const containers = document.querySelectorAll('#top-level-buttons-computed, ytd-menu-renderer.ytd-watch-metadata');
+  containers.forEach((container) => {
+    container.querySelectorAll('yt-button-view-model:not([data-ytr-action]), ytd-button-renderer:not([data-ytr-action]), ytd-download-button-renderer:not([data-ytr-action])').forEach((btn) => {
+      const label = (btn.getAttribute('aria-label') || btn.querySelector('button')?.getAttribute('aria-label') || btn.textContent || '').toLowerCase();
+      for (const [action, keywords] of Object.entries(ACTION_BUTTON_KEYWORDS)) {
+        if (keywords.some((kw) => label.includes(kw))) {
+          btn.setAttribute('data-ytr-action', action);
+          return;
+        }
+      }
+    });
   });
 }
 
@@ -138,46 +191,54 @@ function injectPixelFilter(): void {
 
 // --- MutationObserver ---
 
-let debounceTimer: ReturnType<typeof setTimeout>;
-let sidebarDebounceTimer: ReturnType<typeof setTimeout>;
+const TAGS_NEEDING_EXPLORE = new Set(['YTD-RICH-SECTION-RENDERER']);
+const TAGS_NEEDING_SIDEBAR = new Set(['YTD-GUIDE-SECTION-RENDERER', 'YTD-GUIDE-RENDERER']);
+const TAGS_NEEDING_ACTION = new Set(['YT-BUTTON-VIEW-MODEL', 'YTD-BUTTON-RENDERER', 'YTD-DOWNLOAD-BUTTON-RENDERER']);
+
+let pendingFlags = 0; // bitmask: 1=explore, 2=sidebar, 4=action
+let rafId = 0;
+
+function flushPending(): void {
+  rafId = 0;
+  const flags = pendingFlags;
+  pendingFlags = 0;
+  if (flags & 1) tagExploreSections();
+  if (flags & 2) tagSidebarSections();
+  if (flags & 4) tagActionButtons();
+}
+
+function scheduleScan(flag: number): void {
+  pendingFlags |= flag;
+  if (!rafId) rafId = requestAnimationFrame(flushPending);
+}
+
 function startObserver(): void {
   const observer = new MutationObserver((mutations) => {
-    let needsExploreCheck = false;
-    let needsSidebarCheck = false;
+    let flags = 0;
 
     for (const mutation of mutations) {
-      if (mutation.type === 'childList') {
-        for (const node of mutation.addedNodes) {
-          if (!(node instanceof HTMLElement)) continue;
+      if (mutation.type !== 'childList') continue;
+      for (const node of mutation.addedNodes) {
+        if (!(node instanceof HTMLElement)) continue;
+        const tag = node.tagName;
 
-          if (
-            node.tagName === 'YTD-RICH-SECTION-RENDERER' ||
-            node.querySelector?.('ytd-rich-section-renderer')
-          ) {
-            needsExploreCheck = true;
-          }
-
-          if (
-            node.tagName === 'YTD-GUIDE-SECTION-RENDERER' ||
-            node.tagName === 'YTD-GUIDE-RENDERER' ||
-            node.querySelector?.('ytd-guide-section-renderer')
-          ) {
-            needsSidebarCheck = true;
-          }
+        if (!(flags & 1) && (TAGS_NEEDING_EXPLORE.has(tag) ||
+            (tag === 'YTD-BROWSE' && node.querySelector('ytd-rich-section-renderer') !== null))) {
+          flags |= 1;
         }
+        if (!(flags & 2) && TAGS_NEEDING_SIDEBAR.has(tag)) {
+          flags |= 2;
+        }
+        if (!(flags & 4) && (TAGS_NEEDING_ACTION.has(tag) || node.id === 'top-level-buttons-computed')) {
+          flags |= 4;
+        }
+
+        if (flags === 7) break;
       }
+      if (flags === 7) break;
     }
 
-    if (needsExploreCheck) {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(tagExploreSections, 50);
-    }
-
-    if (needsSidebarCheck) {
-      clearTimeout(sidebarDebounceTimer);
-      sidebarDebounceTimer = setTimeout(tagSidebarSections, 50);
-    }
-
+    if (flags) scheduleScan(flags);
   });
 
   observer.observe(document.documentElement, {
@@ -186,9 +247,5 @@ function startObserver(): void {
   });
 
   // Initial scan after YouTube renders content
-  setTimeout(tagExploreSections, 500);
-  setTimeout(tagExploreSections, 2000);
-  setTimeout(tagExploreSections, 5000);
-  setTimeout(tagSidebarSections, 500);
-  setTimeout(tagSidebarSections, 2000);
+  setTimeout(() => scheduleScan(7), 800);
 }

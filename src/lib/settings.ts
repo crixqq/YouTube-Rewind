@@ -24,9 +24,23 @@ export interface Settings {
   hideSidebarReportHistory: boolean;
   hideSidebarFooter: boolean;
   avatarShape: string;
+  thumbnailShape: string;
   disableHoverAnimation: boolean;
+  bannerStyle: string;
+  classicLikeIcons: boolean;
   classicPlayer: boolean;
   widePlayer: boolean;
+  hideJoinButton: boolean;
+  hideSubscribeButton: boolean;
+  hideLikeDislike: boolean;
+  hideShareButton: boolean;
+  hideDownloadButton: boolean;
+  hideClipButton: boolean;
+  hideThanksButton: boolean;
+  hideSaveButton: boolean;
+  hideNewBadge: boolean;
+  customLogo: string;
+  customLogoRatio: number;
   language: string;
 }
 
@@ -56,18 +70,38 @@ export const DEFAULT_SETTINGS: Settings = {
   hideSidebarReportHistory: false,
   hideSidebarFooter: false,
   avatarShape: 'none',
+  thumbnailShape: 'none',
   disableHoverAnimation: false,
+  bannerStyle: 'none',
+  classicLikeIcons: false,
   classicPlayer: false,
   widePlayer: false,
+  hideJoinButton: false,
+  hideSubscribeButton: false,
+  hideLikeDislike: false,
+  hideShareButton: false,
+  hideDownloadButton: false,
+  hideClipButton: false,
+  hideThanksButton: false,
+  hideSaveButton: false,
+  hideNewBadge: false,
+  customLogo: '',
+  customLogoRatio: 0,
   language: 'auto',
 };
 
 const STORAGE_KEY = 'ytr_settings';
 
+const VALID_BANNER_STYLES = ['none', 'sharp'];
+
 export async function loadSettings(): Promise<Settings> {
   try {
     const result = await browser.storage.local.get(STORAGE_KEY);
-    return { ...DEFAULT_SETTINGS, ...(result[STORAGE_KEY] || {}) };
+    const merged = { ...DEFAULT_SETTINGS, ...(result[STORAGE_KEY] || {}) };
+    if (!VALID_BANNER_STYLES.includes(merged.bannerStyle)) {
+      merged.bannerStyle = 'none';
+    }
+    return merged;
   } catch {
     return { ...DEFAULT_SETTINGS };
   }

@@ -12,6 +12,11 @@
   let langVersion = $state(0);
   let langMenuOpen = $state(false);
 
+  // Export/Import
+  type DataFeedback = '' | 'copied' | 'imported' | 'error';
+  let dataFeedback = $state<DataFeedback>('');
+  let feedbackTimeout: ReturnType<typeof setTimeout>;
+
   // Update checker
   type UpdateState = 'idle' | 'checking' | 'available' | 'up-to-date' | 'error';
   let updateState = $state<UpdateState>('idle');
@@ -93,12 +98,13 @@
     { id: 'zh', label: '中文' },
   ] as const;
 
+  // Init once on mount — no reactive deps, so $effect runs only once
   $effect(() => {
     loadSettings().then((s) => {
       settings = s;
       setLocale(s.language);
-      loaded = true;
       langVersion++;
+      loaded = true;
       checkForUpdates();
     });
   });
@@ -116,6 +122,16 @@
     langVersion++;
   }
 
+  function openLogoPage() {
+    browser.tabs.create({ url: browser.runtime.getURL('logo.html') });
+  }
+
+  function removeLogo() {
+    settings.customLogo = '';
+    settings.customLogoRatio = 0;
+    saveSettings({ customLogo: '', customLogoRatio: 0 });
+  }
+
   function toggleLangMenu() {
     langMenuOpen = !langMenuOpen;
   }
@@ -127,6 +143,108 @@
     }
     if (!target.closest('.version-wrapper')) {
       updateMenuOpen = false;
+    }
+  }
+
+  function showFeedback(type: DataFeedback) {
+    dataFeedback = type;
+    clearTimeout(feedbackTimeout);
+    feedbackTimeout = setTimeout(() => { dataFeedback = ''; }, 2000);
+  }
+
+  function exportFile(format: 'json' | 'txt') {
+    const { language: _, ...exportData } = settings;
+    let content: string;
+    let mime: string;
+    let ext: string;
+    if (format === 'json') {
+      content = JSON.stringify(exportData, null, 2);
+      mime = 'application/json';
+      ext = 'json';
+    } else {
+      content = Object.entries(exportData).map(([k, v]) => `${k} = ${v}`).join('\n');
+      mime = 'text/plain';
+      ext = 'txt';
+    }
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `youtube-rewind-settings.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function copyToClipboard() {
+    try {
+      const { language: _, ...exportData } = settings;
+      await navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
+      showFeedback('copied');
+    } catch {
+      showFeedback('error');
+    }
+  }
+
+  function parseSettings(text: string): Partial<Settings> | null {
+    // Try JSON
+    try {
+      const obj = JSON.parse(text);
+      if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) return obj;
+    } catch {}
+    // Try key=value TXT format
+    try {
+      const lines = text.split('\n').filter((l) => l.includes('='));
+      if (lines.length === 0) return null;
+      const result: Record<string, unknown> = {};
+      for (const line of lines) {
+        const [key, ...rest] = line.split('=');
+        const k = key.trim();
+        const v = rest.join('=').trim();
+        if (v === 'true') result[k] = true;
+        else if (v === 'false') result[k] = false;
+        else if (!isNaN(Number(v)) && v !== '') result[k] = Number(v);
+        else result[k] = v;
+      }
+      return result as Partial<Settings>;
+    } catch {}
+    return null;
+  }
+
+  async function applyImport(data: Partial<Settings>) {
+    // Only apply known keys
+    const known = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
+    const filtered: Partial<Settings> = {};
+    for (const key of known) {
+      if (key in data) (filtered as any)[key] = (data as any)[key];
+    }
+    settings = { ...settings, ...filtered };
+    await saveSettings(filtered);
+    showFeedback('imported');
+  }
+
+  function importFile() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,.txt';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      const parsed = parseSettings(text);
+      if (parsed) await applyImport(parsed);
+      else showFeedback('error');
+    };
+    input.click();
+  }
+
+  async function pasteFromClipboard() {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsed = parseSettings(text);
+      if (parsed) await applyImport(parsed);
+      else showFeedback('error');
+    } catch {
+      showFeedback('error');
     }
   }
 
@@ -143,6 +261,7 @@
       { key: 'hideBreakingNews', label: t('settingHideBreakingNews'), checked: settings.hideBreakingNews, onchange: (v: boolean) => update('hideBreakingNews', v) },
       { key: 'hideLatestPosts', label: t('settingHideLatestPosts'), checked: settings.hideLatestPosts, onchange: (v: boolean) => update('hideLatestPosts', v) },
       { key: 'hideExploreTopics', label: t('settingHideExploreTopics'), checked: settings.hideExploreTopics, onchange: (v: boolean) => update('hideExploreTopics', v) },
+      { key: 'hideNewBadge', label: t('settingHideNewBadge'), checked: settings.hideNewBadge, onchange: (v: boolean) => update('hideNewBadge', v) },
     ];
   });
 
@@ -173,6 +292,36 @@
     { id: 'grayscale', label: 'thumbnailGrayscale' },
     { id: 'hidden', label: 'thumbnailHidden' },
   ];
+
+  const THUMBNAIL_SHAPES = [
+    { id: 'none', label: 'thumbShapeDefault' },
+    { id: 'sharp', label: 'thumbShapeSharp' },
+    { id: 'rounded', label: 'thumbShapeRounded' },
+    { id: 'scallop', label: 'thumbShapeScallop' },
+    { id: 'notched', label: 'thumbShapeNotched' },
+    { id: 'slanted', label: 'thumbShapeSlanted' },
+    { id: 'arch', label: 'thumbShapeArch' },
+    { id: 'fan', label: 'thumbShapeFan' },
+  ];
+
+  const BANNER_STYLES = [
+    { id: 'none', label: 'bannerDefault' },
+    { id: 'sharp', label: 'bannerSharp' },
+  ];
+
+  let videoButtonFilters = $derived.by(() => {
+    void langVersion;
+    return [
+      { key: 'hideJoinButton', label: t('settingHideJoinButton'), checked: settings.hideJoinButton, onchange: (v: boolean) => update('hideJoinButton', v) },
+      { key: 'hideSubscribeButton', label: t('settingHideSubscribeButton'), checked: settings.hideSubscribeButton, onchange: (v: boolean) => update('hideSubscribeButton', v) },
+      { key: 'hideLikeDislike', label: t('settingHideLikeDislike'), checked: settings.hideLikeDislike, onchange: (v: boolean) => update('hideLikeDislike', v) },
+      { key: 'hideShareButton', label: t('settingHideShareButton'), checked: settings.hideShareButton, onchange: (v: boolean) => update('hideShareButton', v) },
+      { key: 'hideDownloadButton', label: t('settingHideDownloadButton'), checked: settings.hideDownloadButton, onchange: (v: boolean) => update('hideDownloadButton', v) },
+      { key: 'hideClipButton', label: t('settingHideClipButton'), checked: settings.hideClipButton, onchange: (v: boolean) => update('hideClipButton', v) },
+      { key: 'hideThanksButton', label: t('settingHideThanksButton'), checked: settings.hideThanksButton, onchange: (v: boolean) => update('hideThanksButton', v) },
+      { key: 'hideSaveButton', label: t('settingHideSaveButton'), checked: settings.hideSaveButton, onchange: (v: boolean) => update('hideSaveButton', v) },
+    ];
+  });
 
   let sidebarFilters = $derived.by(() => {
     void langVersion;
@@ -286,12 +435,42 @@
       <main class="app-body">
         <SettingsSection title={t('sectionTopBar')}>
           <FilterGroup filters={topbarFilters} />
+          <div class="logo-section">
+            <span class="logo-label">{t('settingCustomLogo')}</span>
+            {#if settings.customLogo}
+              <div class="logo-preview-row">
+                <img src={settings.customLogo} alt="" class="logo-preview" />
+                <button class="data-btn" onclick={removeLogo}>{t('customLogoRemove')}</button>
+              </div>
+            {:else}
+              <button class="data-btn" onclick={openLogoPage}>{t('customLogoUpload')}</button>
+            {/if}
+          </div>
         </SettingsSection>
 
         <SettingsSection title={t('sectionWatchPage')}>
           <Toggle label={t('settingClassicPlayer')} checked={settings.classicPlayer} onchange={(v) => update('classicPlayer', v)} />
           <Toggle label={t('settingAdaptiveDescription')} checked={settings.adaptiveColorsDescription} onchange={(v) => update('adaptiveColorsDescription', v)} />
           <Toggle label={t('settingWidePlayer')} checked={settings.widePlayer} onchange={(v) => update('widePlayer', v)} />
+          <Toggle label={t('settingClassicLikeIcons')} checked={settings.classicLikeIcons} onchange={(v) => update('classicLikeIcons', v)} />
+        </SettingsSection>
+
+        <SettingsSection title={t('sectionVideoButtons')}>
+          <FilterGroup filters={videoButtonFilters} />
+        </SettingsSection>
+
+        <SettingsSection title={t('sectionBannerStyle')}>
+          <div class="effect-picker">
+            {#each BANNER_STYLES as style (style.id)}
+              <button
+                class="effect-option"
+                class:active={settings.bannerStyle === style.id}
+                onclick={() => update('bannerStyle', style.id)}
+              >
+                {t(style.label)}
+              </button>
+            {/each}
+          </div>
         </SettingsSection>
 
         <SettingsSection title={t('sectionHomepageLayout')}>
@@ -337,6 +516,44 @@
             <Toggle label={t('thumbnailHoverReveal')} checked={settings.thumbnailHoverReveal} onchange={(v) => update('thumbnailHoverReveal', v)} />
           {/if}
           <Toggle label={t('settingDisableHoverAnimation')} checked={settings.disableHoverAnimation} onchange={(v) => update('disableHoverAnimation', v)} />
+        </SettingsSection>
+
+        <SettingsSection title={t('sectionThumbnailShape')}>
+          <div class="effect-picker">
+            {#each THUMBNAIL_SHAPES as shape (shape.id)}
+              <button
+                class="effect-option"
+                class:active={settings.thumbnailShape === shape.id}
+                onclick={() => update('thumbnailShape', shape.id)}
+              >
+                {t(shape.label)}
+              </button>
+            {/each}
+          </div>
+        </SettingsSection>
+        <SettingsSection title={t('sectionData')}>
+          <div class="data-section">
+            <div class="data-row">
+              <span class="data-label">{t('exportJSON')}/{t('exportTXT')}</span>
+              <div class="data-actions">
+                <button class="data-btn" onclick={() => exportFile('json')}>{t('exportJSON')}</button>
+                <button class="data-btn" onclick={() => exportFile('txt')}>{t('exportTXT')}</button>
+                <button class="data-btn" onclick={copyToClipboard}>{t('copyClipboard')}</button>
+              </div>
+            </div>
+            <div class="data-row">
+              <span class="data-label">{t('importSettings')}</span>
+              <div class="data-actions">
+                <button class="data-btn" onclick={importFile}>{t('importSettings')}</button>
+                <button class="data-btn" onclick={pasteFromClipboard}>{t('pasteClipboard')}</button>
+              </div>
+            </div>
+            {#if dataFeedback}
+              <div class="data-feedback" class:data-feedback-ok={dataFeedback === 'copied' || dataFeedback === 'imported'} class:data-feedback-err={dataFeedback === 'error'}>
+                {dataFeedback === 'copied' ? t('copiedToClipboard') : dataFeedback === 'imported' ? t('importSuccess') : t('importError')}
+              </div>
+            {/if}
+          </div>
         </SettingsSection>
       </main>
 
@@ -384,11 +601,14 @@
     --md-shape-xl: 28px;
     --md-shape-full: 9999px;
 
-    /* Motion */
+    /* Motion — M3 Expressive */
     --md-easing-standard: cubic-bezier(0.2, 0, 0, 1);
     --md-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+    --md-easing-emphasized-decel: cubic-bezier(0.05, 0.7, 0.1, 1);
+    --md-easing-emphasized-accel: cubic-bezier(0.3, 0, 0.8, 0.15);
     --md-duration-short: 0.2s;
-    --md-duration-medium: 0.4s;
+    --md-duration-medium: 0.35s;
+    --md-duration-long: 0.5s;
 
     font-family: 'Google Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
     font-size: 14px;
@@ -419,6 +639,21 @@
       --md-outline: #938f99;
       --md-outline-variant: #48454e;
       --md-error: #ffb4ab;
+    }
+  }
+
+  /* Respect reduced motion preference — disable all animations */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --md-duration-short: 0s;
+      --md-duration-medium: 0s;
+      --md-duration-long: 0s;
+    }
+    :global(*),
+    :global(*::before),
+    :global(*::after) {
+      animation-duration: 0s !important;
+      transition-duration: 0s !important;
     }
   }
 
@@ -454,12 +689,35 @@
     background: transparent;
   }
 
+  /* --- M3 Entrance Animations --- */
+
+  @keyframes headerSlideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes sectionSlideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes feedbackSlideIn {
+    from { opacity: 0; transform: translateY(-4px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes footerFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
   .app-header {
     position: sticky;
     top: 0;
     z-index: 10;
     background: var(--md-surface);
     border-bottom: 1px solid var(--md-outline-variant);
+    animation: headerSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) both;
   }
 
   .header-content {
@@ -506,6 +764,7 @@
 
   .lang-button:active {
     background: var(--md-surface-container-highest);
+    transform: scale(0.9);
   }
 
   /* M3 Expressive Menu: Medium shape (12dp), elevation level 2 */
@@ -542,11 +801,11 @@
   @keyframes menuFadeIn {
     from {
       opacity: 0;
-      transform: scaleY(0.8);
+      transform: scaleY(0.85) scaleX(0.95);
     }
     to {
       opacity: 1;
-      transform: scaleY(1);
+      transform: scaleY(1) scaleX(1);
     }
   }
 
@@ -601,6 +860,7 @@
 
   .version-button:active {
     background: var(--md-surface-container-highest);
+    transform: scale(0.95);
   }
 
   .update-dot {
@@ -680,7 +940,34 @@
     text-decoration: none;
   }
 
-  /* Logo upload row */
+  /* Logo upload section */
+  .logo-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px 12px;
+    gap: 8px;
+  }
+
+  .logo-label {
+    font-size: 13px;
+    color: var(--md-on-surface-variant);
+  }
+
+  .logo-preview-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-preview {
+    height: 20px;
+    max-width: 80px;
+    object-fit: contain;
+    border-radius: var(--md-shape-xs);
+    border: 1px solid var(--md-outline-variant);
+  }
+
   /* Thumbnail effect picker */
   .effect-picker {
     display: flex;
@@ -705,6 +992,10 @@
     background: var(--md-surface-container-high);
   }
 
+  .effect-option:active {
+    transform: scale(0.95);
+  }
+
   .effect-option.active {
     background: var(--md-primary);
     color: var(--md-on-primary);
@@ -715,6 +1006,20 @@
     padding-bottom: 8px;
   }
 
+  /* M3 stagger animation for sections */
+  .app-body > :global(:nth-child(1)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.04s both; }
+  .app-body > :global(:nth-child(2)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.07s both; }
+  .app-body > :global(:nth-child(3)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.10s both; }
+  .app-body > :global(:nth-child(4)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.13s both; }
+  .app-body > :global(:nth-child(5)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.16s both; }
+  .app-body > :global(:nth-child(6)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.19s both; }
+  .app-body > :global(:nth-child(7)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.22s both; }
+  .app-body > :global(:nth-child(8)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.25s both; }
+  .app-body > :global(:nth-child(9)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.28s both; }
+  .app-body > :global(:nth-child(10)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.31s both; }
+  .app-body > :global(:nth-child(11)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.34s both; }
+  .app-body > :global(:nth-child(n+12)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.37s both; }
+
   .app-footer {
     display: flex;
     align-items: center;
@@ -723,6 +1028,7 @@
     padding: 16px 16px 24px;
     font-size: 13px;
     color: var(--md-on-surface-variant);
+    animation: footerFadeIn var(--md-duration-long) var(--md-easing-emphasized-decel) 0.4s both;
   }
 
   .app-footer a {
@@ -741,4 +1047,79 @@
   .footer-text {
     opacity: 0.7;
   }
+
+  /* --- Export / Import --- */
+
+  .data-section {
+    padding: 8px 16px 12px;
+  }
+
+  .data-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    gap: 8px;
+  }
+
+  .data-label {
+    font-size: 13px;
+    color: var(--md-on-surface-variant);
+    white-space: nowrap;
+  }
+
+  .data-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .data-btn {
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 500;
+    padding: 5px 12px;
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--md-shape-full);
+    background: transparent;
+    color: var(--md-primary);
+    cursor: pointer;
+    transition: all var(--md-duration-short) var(--md-easing-standard);
+  }
+
+  .data-btn:hover {
+    background: var(--md-primary-container);
+  }
+
+  .data-btn:active {
+    transform: scale(0.95);
+  }
+
+  .data-feedback {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: var(--md-shape-sm);
+    text-align: center;
+    animation: feedbackSlideIn var(--md-duration-short) var(--md-easing-emphasized-decel) both;
+  }
+
+  .data-feedback-ok {
+    color: #2e7d32;
+    background: #e8f5e9;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .data-feedback-ok {
+      color: #81c784;
+      background: rgba(129, 199, 132, 0.12);
+    }
+  }
+
+  .data-feedback-err {
+    color: var(--md-error);
+    background: rgba(186, 26, 26, 0.08);
+  }
+
 </style>

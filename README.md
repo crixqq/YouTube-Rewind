@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" alt="YouTube Rewind" height="64">
+  <img src="YTRewind Logo.png" alt="YouTube Rewind" height="64">
   <br><br>
   <b>YouTube Rewind</b>
   <br>
@@ -18,19 +18,22 @@
 | | |
 |---|---|
 | **Hide Elements** | Hide Create button, voice search, search bar, notifications, and country code from the top bar |
+| **Custom Logo** | Replace the YouTube logo with your own image via a dedicated upload page — drag & drop or pick a file, with instant feedback |
 
 ### Watch Page
 | | |
 |---|---|
-| **Classic Player** | Brings back the classic gradient under player controls, removes pill-shaped backgrounds |
+| **Classic Player** | Brings back the classic gradient under player controls, removes pill-shaped backgrounds, hides quick action buttons above the progress bar |
 | **Disable Description Color** | Removes the adaptive color tint and hover effects from the description area |
 | **Wide Content** | Removes width limits — player, metadata, and recommendations fill the full page |
+| **Classic Like/Dislike Icons** | Replaces YouTube's like/dislike icons with the classic Material Icons thumbs-up/thumbs-down style — works on the watch page, comments, and posts |
+| **Video Buttons** | Hide individual video action buttons: Join, Subscribe, Like/Dislike, Share, Download, Clip/Remix, Thanks, Save |
 
 ### Homepage
 | | |
 |---|---|
 | **Videos Per Row** | Set how many videos appear per row (1–8), or keep YouTube's default |
-| **Content Filter** | Hide Shorts, Posts, Mixes, Breaking News, Latest Posts, and "Explore more topics" |
+| **Content Filter** | Hide Shorts, Posts, Mixes, Breaking News, Latest Posts, "Explore more topics", and "New" badges |
 
 ### Search
 | | |
@@ -42,12 +45,23 @@
 |---|---|
 | **Sidebar Filter** | Hide Subscriptions, You, Explore, "More from YouTube", Report history, and footer from the left sidebar |
 
+### Channel Page
+| | |
+|---|---|
+| **Banner Style** | Change channel banner appearance: default or sharp (no rounding) |
+
 ### Appearance
 | | |
 |---|---|
-| **Avatar Shapes** | Change all avatars across YouTube: squircle, rounded square, diamond, hexagon, octagon, clover, or flower |
+| **Avatar Shapes** | 9 shapes: circle (default), squircle, rounded square, square, diamond, hexagon, octagon, clover, flower |
 | **Thumbnail Effects** | Reduce distractions: pixelate, blur, grayscale, or hide video thumbnails everywhere (hover reveal is optional) |
+| **Thumbnail Shapes** | Change the shape of video thumbnails: sharp, rounded, scallop, notched, slanted, arch, or fan |
 | **Disable Hover Glow** | Remove the ripple/glow animation on thumbnail hover and prevent metadata text color changes |
+
+### Settings Data
+| | |
+|---|---|
+| **Export / Import** | Export settings as JSON or TXT file, copy to clipboard — import from file or paste from clipboard |
 
 ### Updates
 | | |

@@ -34,6 +34,10 @@
     background: var(--md-surface-container-high);
   }
 
+  .toggle-row:active .toggle-track {
+    transform: scaleX(1.05);
+  }
+
   .toggle-label {
     font-size: 14px;
     color: var(--md-on-surface);
@@ -55,7 +59,7 @@
     border-radius: var(--md-shape-full);
     background: var(--md-surface-container-highest);
     border: 2px solid var(--md-outline);
-    transition: all var(--md-duration-short) var(--md-easing-standard);
+    transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
     flex-shrink: 0;
   }
 
@@ -73,7 +77,10 @@
     border-radius: var(--md-shape-full);
     background: var(--md-outline);
     transform: translateY(-50%);
-    transition: all var(--md-duration-short) var(--md-easing-emphasized);
+    transition: left 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28),
+                width 0.25s cubic-bezier(0.2, 0, 0, 1),
+                height 0.25s cubic-bezier(0.2, 0, 0, 1),
+                background 0.2s cubic-bezier(0.2, 0, 0, 1);
   }
 
   .toggle-track.active .toggle-thumb {
