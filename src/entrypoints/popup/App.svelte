@@ -6,6 +6,7 @@
   import Slider from '@/components/Slider.svelte';
   import ShapePicker from '@/components/ShapePicker.svelte';
   import FilterGroup from '@/components/FilterGroup.svelte';
+  import ChipGroup from '@/components/ChipGroup.svelte';
 
   let settings = $state<Settings>({ ...DEFAULT_SETTINGS });
   let loaded = $state(false);
@@ -423,17 +424,18 @@
 
       <main class="app-body">
         <SettingsSection title={t('sectionTopBar')}>
-          <FilterGroup filters={topbarFilters} />
-          <div class="logo-section">
-            <span class="logo-label">{t('settingCustomLogo')}</span>
-            {#if settings.customLogo}
-              <div class="logo-preview-row">
+          <ChipGroup filters={topbarFilters} />
+          <div class="inline-row">
+            <span class="inline-label">{t('settingCustomLogo')}</span>
+            <div class="inline-actions">
+              {#if settings.customLogo}
                 <img src={settings.customLogo} alt="" class="logo-preview" />
-                <button class="data-btn" onclick={removeLogo}>{t('customLogoRemove')}</button>
-              </div>
-            {:else}
-              <button class="data-btn" onclick={openLogoPage}>{t('customLogoUpload')}</button>
-            {/if}
+              {/if}
+              <button class="action-btn" onclick={openLogoPage}>{t('customLogoUpload')}</button>
+              {#if settings.customLogo}
+                <button class="action-btn" onclick={removeLogo}>{t('customLogoRemove')}</button>
+              {/if}
+            </div>
           </div>
         </SettingsSection>
 
@@ -442,13 +444,7 @@
           <Toggle label={t('settingAdaptiveDescription')} checked={settings.adaptiveColorsDescription} onchange={(v) => update('adaptiveColorsDescription', v)} />
           <Toggle label={t('settingWidePlayer')} checked={settings.widePlayer} onchange={(v) => update('widePlayer', v)} />
           <Toggle label={t('settingClassicLikeIcons')} checked={settings.classicLikeIcons} onchange={(v) => update('classicLikeIcons', v)} />
-        </SettingsSection>
-
-        <SettingsSection title={t('sectionVideoButtons')}>
-          <FilterGroup filters={videoButtonFilters} />
-        </SettingsSection>
-
-        <SettingsSection title={t('sectionBannerStyle')}>
+          <div class="sub-label">{t('sectionBannerStyle')}</div>
           <div class="effect-picker">
             {#each BANNER_STYLES as style (style.id)}
               <button
@@ -462,7 +458,11 @@
           </div>
         </SettingsSection>
 
-        <SettingsSection title={t('sectionHomepageLayout')}>
+        <SettingsSection title={t('sectionVideoButtons')}>
+          <ChipGroup filters={videoButtonFilters} />
+        </SettingsSection>
+
+        <SettingsSection title={t('sectionHomepageFilter')}>
           <Slider
             label={t('settingVideosPerRow')}
             value={settings.videosPerRow}
@@ -471,18 +471,15 @@
             defaultLabel={t('settingVideosPerRowDefault')}
             onchange={(v) => update('videosPerRow', v)}
           />
-        </SettingsSection>
-
-        <SettingsSection title={t('sectionHomepageFilter')}>
-          <FilterGroup filters={homepageFilters} />
+          <ChipGroup filters={homepageFilters} />
         </SettingsSection>
 
         <SettingsSection title={t('sectionSearchFilter')}>
-          <FilterGroup filters={searchFilters} />
+          <ChipGroup filters={searchFilters} />
         </SettingsSection>
 
         <SettingsSection title={t('sectionSidebarFilter')}>
-          <FilterGroup filters={sidebarFilters} />
+          <ChipGroup filters={sidebarFilters} />
         </SettingsSection>
 
         <SettingsSection title={t('sectionAvatarShape')}>
@@ -505,9 +502,7 @@
             <Toggle label={t('thumbnailHoverReveal')} checked={settings.thumbnailHoverReveal} onchange={(v) => update('thumbnailHoverReveal', v)} />
           {/if}
           <Toggle label={t('settingDisableHoverAnimation')} checked={settings.disableHoverAnimation} onchange={(v) => update('disableHoverAnimation', v)} />
-        </SettingsSection>
-
-        <SettingsSection title={t('sectionThumbnailShape')}>
+          <div class="sub-label">{t('sectionThumbnailShape')}</div>
           <div class="effect-picker">
             {#each THUMBNAIL_SHAPES as shape (shape.id)}
               <button
@@ -520,21 +515,20 @@
             {/each}
           </div>
         </SettingsSection>
+
         <SettingsSection title={t('sectionData')}>
           <div class="data-section">
             <div class="data-row">
-              <span class="data-label">{t('exportJSON')}/{t('exportTXT')}</span>
               <div class="data-actions">
-                <button class="data-btn" onclick={() => exportFile('json')}>{t('exportJSON')}</button>
-                <button class="data-btn" onclick={() => exportFile('txt')}>{t('exportTXT')}</button>
-                <button class="data-btn" onclick={copyToClipboard}>{t('copyClipboard')}</button>
+                <button class="action-btn" onclick={() => exportFile('json')}>{t('exportJSON')}</button>
+                <button class="action-btn" onclick={() => exportFile('txt')}>{t('exportTXT')}</button>
+                <button class="action-btn" onclick={copyToClipboard}>{t('copyClipboard')}</button>
               </div>
             </div>
             <div class="data-row">
-              <span class="data-label">{t('importSettings')}</span>
               <div class="data-actions">
-                <button class="data-btn" onclick={openImportPage}>{t('importSettings')}</button>
-                <button class="data-btn" onclick={pasteFromClipboard}>{t('pasteClipboard')}</button>
+                <button class="action-btn" onclick={openImportPage}>{t('importSettings')}</button>
+                <button class="action-btn" onclick={pasteFromClipboard}>{t('pasteClipboard')}</button>
               </div>
             </div>
             {#if dataFeedback}
@@ -929,21 +923,21 @@
     text-decoration: none;
   }
 
-  /* Logo upload section */
-  .logo-section {
+  /* Inline row (logo, etc.) */
+  .inline-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 16px 12px;
+    padding: 8px 10px;
     gap: 8px;
   }
 
-  .logo-label {
+  .inline-label {
     font-size: 13px;
     color: var(--md-on-surface-variant);
   }
 
-  .logo-preview-row {
+  .inline-actions {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -957,12 +951,21 @@
     border: 1px solid var(--md-outline-variant);
   }
 
-  /* Thumbnail effect picker */
+  .sub-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--md-on-surface-variant);
+    padding: 8px 10px 0;
+    opacity: 0.7;
+  }
+
   .effect-picker {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    padding: 8px 16px 12px;
+    padding: 8px 10px 10px;
   }
 
   .effect-option {
@@ -1040,31 +1043,23 @@
   /* --- Export / Import --- */
 
   .data-section {
-    padding: 8px 16px 12px;
+    padding: 8px 10px 10px;
   }
 
   .data-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     padding: 6px 0;
-    gap: 8px;
-  }
-
-  .data-label {
-    font-size: 13px;
-    color: var(--md-on-surface-variant);
-    white-space: nowrap;
+    gap: 8;
   }
 
   .data-actions {
     display: flex;
     gap: 6px;
     flex-wrap: wrap;
-    justify-content: flex-end;
   }
 
-  .data-btn {
+  .action-btn {
     font-size: 12px;
     font-family: inherit;
     font-weight: 500;
@@ -1077,11 +1072,11 @@
     transition: all var(--md-duration-short) var(--md-easing-standard);
   }
 
-  .data-btn:hover {
+  .action-btn:hover {
     background: var(--md-primary-container);
   }
 
-  .data-btn:active {
+  .action-btn:active {
     transform: scale(0.95);
   }
 

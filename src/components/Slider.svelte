@@ -28,6 +28,7 @@
       class="slider-input"
       {min}
       {max}
+      step="1"
       {value}
       style="--percent: {percent}%"
       oninput={handleInput}
@@ -91,12 +92,12 @@
     border-radius: var(--md-shape-full);
     background: var(--md-primary);
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
     transition: transform var(--md-duration-short) var(--md-easing-standard);
   }
 
   .slider-input::-webkit-slider-thumb:hover {
-    transform: scale(1.15);
+    transform: scale(1.1);
   }
 
   .slider-input::-moz-range-thumb {
@@ -106,6 +107,10 @@
     border-radius: var(--md-shape-full);
     background: var(--md-primary);
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  }
+
+  .slider-input::-moz-range-thumb:hover {
+    transform: scale(1.1);
   }
 </style>
