@@ -1,3 +1,8 @@
+export interface CustomProfile {
+  name: string;
+  settings: Partial<Settings>;
+}
+
 export interface Settings {
   adaptiveColorsDescription: boolean;
   hideTopbarCreate: boolean;
@@ -41,7 +46,20 @@ export interface Settings {
   hideNewBadge: boolean;
   customLogo: string;
   customLogoRatio: number;
+  hideLogoAnimation: boolean;
+  hidePlayables: boolean;
+  hideFilterBar: boolean;
+  disableAvatarLiveRedirect: boolean;
   language: string;
+  // v0.4.0
+  playbackSpeed: number;
+  defaultQuality: string;
+  watchTimerEnabled: boolean;
+  watchTimeLimitMinutes: number;
+  activeProfile: string;
+  downloadThumbnailButton: boolean;
+  watchTimeLimitBlockRepeat: boolean;
+  customProfiles: CustomProfile[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -87,28 +105,179 @@ export const DEFAULT_SETTINGS: Settings = {
   hideNewBadge: false,
   customLogo: '',
   customLogoRatio: 0,
+  hideLogoAnimation: false,
+  hidePlayables: false,
+  hideFilterBar: false,
+  disableAvatarLiveRedirect: false,
   language: 'auto',
+  // v0.4.0
+  playbackSpeed: 0,
+  defaultQuality: 'auto',
+  watchTimerEnabled: false,
+  watchTimeLimitMinutes: 0,
+  activeProfile: 'none',
+  downloadThumbnailButton: false,
+  watchTimeLimitBlockRepeat: true,
+  customProfiles: [],
 };
 
 const STORAGE_KEY = 'ytr_settings';
+const WATCH_TIME_KEY = 'ytr_watch_time';
 
 const VALID_BANNER_STYLES = ['none', 'sharp'];
+const VALID_QUALITIES = ['auto', '144p', '240p', '360p', '480p', '720p', '1080p', '1440p', '2160p', '4320p'];
+
+export const QUALITY_MAP: Record<string, number> = {
+  '4320p': 4320,
+  '2160p': 2160,
+  '1440p': 1440,
+  '1080p': 1080,
+  '720p': 720,
+  '480p': 480,
+  '360p': 360,
+  '240p': 240,
+  '144p': 144,
+};
+
+export const PROFILES: Record<string, Partial<Settings>> = {
+  focus: {
+    hideShorts: true,
+    hidePosts: true,
+    hideMixes: true,
+    hideBreakingNews: true,
+    hideLatestPosts: true,
+    hideExploreTopics: true,
+    hidePlayables: true,
+    hideFilterBar: true,
+    hideTopbarCreate: true,
+    hideTopbarNotifications: true,
+    thumbnailEffect: 'grayscale',
+    watchTimerEnabled: true,
+    watchTimeLimitMinutes: 60,
+  },
+  minimal: {
+    hideShorts: true,
+    hidePosts: true,
+    hideMixes: true,
+    hideBreakingNews: true,
+    hideLatestPosts: true,
+    hideExploreTopics: true,
+    hidePlayables: true,
+    hideFilterBar: true,
+    hideTopbarCreate: true,
+    hideTopbarVoiceSearch: true,
+    hideTopbarNotifications: true,
+    hideSidebarExplore: true,
+    hideSidebarMoreFromYT: true,
+    hideSidebarReportHistory: true,
+    hideSidebarFooter: true,
+    hideNewBadge: true,
+    hideJoinButton: true,
+    hideThanksButton: true,
+    hideClipButton: true,
+  },
+  clean: {
+    hideShorts: true,
+    hidePosts: true,
+    hideMixes: true,
+    hideBreakingNews: true,
+    hideLatestPosts: true,
+    hideNewBadge: true,
+    hideFilterBar: true,
+    hideTopbarCreate: true,
+    hideCountryCode: true,
+    disableHoverAnimation: true,
+  },
+};
+
+function normalizeSettings(input: Partial<Settings> = {}): Settings {
+  const normalized = { ...DEFAULT_SETTINGS, ...input };
+  if (!VALID_BANNER_STYLES.includes(normalized.bannerStyle)) {
+    normalized.bannerStyle = 'none';
+  }
+  if (!VALID_QUALITIES.includes(normalized.defaultQuality)) {
+    normalized.defaultQuality = 'auto';
+  }
+  if (!Array.isArray(normalized.customProfiles)) {
+    normalized.customProfiles = [];
+  }
+  return normalized;
+}
+
+let queuedSettings: Settings | null = null;
+let writeQueue: Promise<void> = Promise.resolve();
 
 export async function loadSettings(): Promise<Settings> {
   try {
     const result = await browser.storage.local.get(STORAGE_KEY);
-    const merged = { ...DEFAULT_SETTINGS, ...(result[STORAGE_KEY] || {}) };
-    if (!VALID_BANNER_STYLES.includes(merged.bannerStyle)) {
-      merged.bannerStyle = 'none';
-    }
+    const merged = normalizeSettings(result[STORAGE_KEY] || {});
+    queuedSettings = merged;
     return merged;
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
 }
 
+export async function writeSettings(settings: Settings): Promise<void> {
+  const normalized = normalizeSettings(settings);
+  queuedSettings = normalized;
+  writeQueue = writeQueue.then(async () => {
+    await browser.storage.local.set({ [STORAGE_KEY]: normalized });
+  });
+  return writeQueue;
+}
+
 export async function saveSettings(partial: Partial<Settings>): Promise<void> {
-  const current = await loadSettings();
-  const merged = { ...current, ...partial };
-  await browser.storage.local.set({ [STORAGE_KEY]: merged });
+  const base = queuedSettings ?? await loadSettings();
+  await writeSettings({ ...base, ...partial });
+}
+
+// --- Watch time tracking ---
+
+interface WatchTimeData {
+  date: string; // YYYY-MM-DD
+  minutes: number;
+}
+
+function todayKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export async function getWatchTime(): Promise<number> {
+  try {
+    const result = await browser.storage.local.get(WATCH_TIME_KEY);
+    const data = result[WATCH_TIME_KEY] as WatchTimeData | undefined;
+    if (data && data.date === todayKey()) return data.minutes;
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function addWatchTime(minutes: number): Promise<number> {
+  const today = todayKey();
+  const current = await getWatchTime();
+  const total = current + minutes;
+  await browser.storage.local.set({ [WATCH_TIME_KEY]: { date: today, minutes: total } });
+  return total;
+}
+
+// --- Block overlay dismissed state (persisted per-day) ---
+
+const BLOCK_DISMISSED_KEY = 'ytr_block_dismissed';
+
+export async function getBlockDismissed(): Promise<boolean> {
+  try {
+    const result = await browser.storage.local.get(BLOCK_DISMISSED_KEY);
+    const data = result[BLOCK_DISMISSED_KEY] as { date: string; dismissed: boolean } | undefined;
+    if (data && data.date === todayKey()) return data.dismissed;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export async function setBlockDismissed(dismissed: boolean): Promise<void> {
+  await browser.storage.local.set({ [BLOCK_DISMISSED_KEY]: { date: todayKey(), dismissed } });
 }

@@ -1,9 +1,7 @@
 <script lang="ts">
-  let { value = 'none', variant = 'avatar', onchange }: {
-    value: string;
-    variant: string;
-    onchange: (value: string) => void;
-  } = $props();
+  export let value = 'none';
+  export let variant = 'avatar';
+  export let onchange: (value: string) => void = () => {};
 
   const shapes = [
     { id: 'none', svgContent: '<circle cx="16" cy="16" r="13" fill="currentColor"/>' },
@@ -18,7 +16,7 @@
   ];
 </script>
 
-<div class="shape-picker" role="radiogroup">
+<div class="shape-picker" role="radiogroup" aria-label={variant}>
   {#each shapes as shape (shape.id)}
     <button
       class="shape-option"
@@ -53,30 +51,74 @@
     border-radius: var(--md-shape-lg);
     background: var(--md-surface-container-high);
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.2, 0, 0, 1),
+    transition: all 0.2s cubic-bezier(0.2, 0, 0, 1),
                 transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
     padding: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shape-option::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  .shape-option:hover::after {
+    opacity: 0.06;
   }
 
   .shape-option:hover {
     background: var(--md-surface-container-highest);
     transform: scale(1.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
   .shape-option:active {
-    transform: scale(0.92);
+    transform: scale(0.88);
+    transition-duration: 0.08s;
   }
 
   .shape-option.active {
     background: var(--md-primary);
     box-shadow: 0 0 0 2px var(--md-primary), 0 0 0 4px var(--md-surface);
     transform: scale(1);
+    animation: shapeSelect 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  }
+
+  @keyframes shapeSelect {
+    0% { transform: scale(0.85); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+  }
+
+  .shape-option.active:hover {
+    box-shadow: 0 0 0 2px var(--md-primary), 0 0 0 4px var(--md-surface), 0 3px 14px rgba(91, 80, 145, 0.35);
+    transform: scale(1.08);
+  }
+
+  .shape-option.active:active {
+    transform: scale(0.88);
+    transition-duration: 0.06s;
   }
 
   .shape-icon {
     color: var(--md-on-surface-variant);
     transition: color 0.2s cubic-bezier(0.2, 0, 0, 1),
                 transform 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  }
+
+  .shape-option:hover .shape-icon {
+    transform: scale(1.1) rotate(5deg);
+  }
+
+  .shape-option:active .shape-icon {
+    transform: scale(0.85);
   }
 
   .shape-option.active .shape-icon {

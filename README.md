@@ -1,56 +1,130 @@
 <p align="center">
-  <img src="YTRewind Logo.png" alt="YouTube Rewind" height="64">
-  <br><br>
-  <b>YouTube Rewind</b>
-  <br>
-  Clean up YouTube's interface — hide clutter, filter content, customize the look.
-  <br><br>
-  <a href="https://t.me/ytrewind_extension">Telegram</a> &middot;
-  <a href="../../releases">Releases</a> &middot;
-  <a href="LICENSE">GPL-3.0</a>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="logo.png">
+    <source media="(prefers-color-scheme: light)" srcset="logo.png">
+    <img src="logo.png" alt="YouTube Rewind" height="80">
+  </picture>
+</p>
+
+<p align="center">
+  <b>Clean up YouTube's interface — hide clutter, filter content, customize the look.</b>
+</p>
+
+<p align="center">
+  <a href="../../releases"><img src="https://img.shields.io/github/v/release/crixqq/YouTube-Rewind?style=flat-square&color=c8bfff&labelColor=1c1b20&label=version" alt="Version"></a>
+  <a href="../../releases"><img src="https://img.shields.io/github/downloads/crixqq/YouTube-Rewind/total?style=flat-square&color=c8bfff&labelColor=1c1b20&label=downloads" alt="Downloads"></a>
+  <a href="https://addons.mozilla.org/firefox/addon/youtube-rewind/"><img src="https://img.shields.io/amo/users/youtube-rewind?style=flat-square&color=c8bfff&labelColor=1c1b20&label=firefox%20users" alt="Firefox Users"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/crixqq/YouTube-Rewind?style=flat-square&color=c8bfff&labelColor=1c1b20" alt="License"></a>
+  <a href="../../stargazers"><img src="https://img.shields.io/github/stars/crixqq/YouTube-Rewind?style=flat-square&color=c8bfff&labelColor=1c1b20" alt="Stars"></a>
+</p>
+
+<p align="center">
+  <a href="https://addons.mozilla.org/firefox/addon/youtube-rewind/">
+    <img src="https://img.shields.io/badge/Firefox_Add--ons-Install-c8bfff?style=for-the-badge&logo=firefoxbrowser&logoColor=white&labelColor=1c1b20" alt="Firefox Add-ons">
+  </a>
+  &nbsp;
+  <a href="../../releases">
+    <img src="https://img.shields.io/badge/GitHub_Releases-Download-c8bfff?style=for-the-badge&logo=github&logoColor=white&labelColor=1c1b20" alt="GitHub Releases">
+  </a>
+  &nbsp;
+  <a href="https://t.me/ytrewind_extension">
+    <img src="https://img.shields.io/badge/Telegram-Channel-c8bfff?style=for-the-badge&logo=telegram&logoColor=white&labelColor=1c1b20" alt="Telegram">
+  </a>
 </p>
 
 ---
 
 ## Features
 
-### Top Bar
-| | |
-|---|---|
-| **Hide Elements** | Hide Create button, voice search, search bar, notifications, and country code from the top bar |
-| **Custom Logo** | Replace the YouTube logo with your own image via a dedicated upload page — drag & drop or pick a file, with instant feedback |
+<details open>
+<summary><b>Profiles</b></summary>
 
-### Watch Page
 | | |
 |---|---|
+| **Built-in Profiles** | Instantly apply a preset: Focus (grayscale thumbnails, watch timer), Minimal (aggressive clutter removal), or Clean (light declutter) |
+| **Custom Profiles** | Save your current settings as a named profile, import profiles from file, switch between them with one click |
+
+</details>
+
+<details open>
+<summary><b>Player</b></summary>
+
+| | |
+|---|---|
+| **Playback Speed** | Set a default playback speed (0.25x–5.0x) applied to every video |
+| **Default Quality** | Force a preferred video quality (144p–8K) — YouTube will use the closest available |
+| **Download Thumbnail** | Adds a button next to the video actions to preview and download the full-resolution thumbnail with zoom/pan support |
 | **Classic Player** | Brings back the classic gradient under player controls, removes pill-shaped backgrounds, hides quick action buttons above the progress bar |
+| **Wide Player** | Removes width limits — player, metadata, and recommendations fill the full page |
 | **Disable Description Color** | Removes the adaptive color tint and hover effects from the description area |
-| **Wide Content** | Removes width limits — player, metadata, and recommendations fill the full page |
 | **Classic Like/Dislike Icons** | Replaces YouTube's like/dislike icons with the classic Material Icons thumbs-up/thumbs-down style — works on the watch page, comments, and posts |
-| **Video Buttons** | Hide individual video action buttons: Join, Subscribe, Like/Dislike, Share, Download, Clip/Remix, Thanks, Save |
 
-### Homepage
+</details>
+
+<details open>
+<summary><b>Watch Page</b></summary>
+
+| | |
+|---|---|
+| **Video Buttons** | Hide individual video action buttons: Join, Subscribe, Like/Dislike, Share, Download, Clip/Remix, Thanks, Save |
+| **Banner Style** | Change channel banner appearance: default or sharp (no rounding) |
+
+</details>
+
+<details open>
+<summary><b>Watch Timer</b></summary>
+
+| | |
+|---|---|
+| **Session Timer** | Track how long you've been watching YouTube today — displayed as a floating overlay |
+| **Daily Time Limit** | Set a daily limit (up to 480 minutes) — get a blocking overlay when you exceed it |
+| **Block Repeat Videos** | Optionally prevent rewatching the same video after the time limit is reached |
+
+</details>
+
+<details open>
+<summary><b>Homepage</b></summary>
+
 | | |
 |---|---|
 | **Videos Per Row** | Set how many videos appear per row (1–8), or keep YouTube's default |
-| **Content Filter** | Hide Shorts, Posts, Mixes, Breaking News, Latest Posts, "Explore more topics", and "New" badges |
+| **Content Filter** | Hide Shorts, Posts, Mixes, Breaking News, Latest Posts, Playables, "Explore more topics", "New" badges, and the filter chips bar |
+| **Disable Avatar Live Redirect** | Prevents clicking a channel avatar from opening a live stream |
 
-### Search
+</details>
+
+<details open>
+<summary><b>Search</b></summary>
+
 | | |
 |---|---|
 | **Search Filter** | Hide Shorts, Channels, and "People also watched" shelves from search results |
 
-### Sidebar
+</details>
+
+<details open>
+<summary><b>Top Bar</b></summary>
+
+| | |
+|---|---|
+| **Hide Elements** | Hide Create button, voice search, search bar, notifications, and country code from the top bar |
+| **Custom Logo** | Replace the YouTube logo with your own image via a dedicated upload page — drag & drop or pick a file, with instant preview |
+| **Hide Logo Animations** | Disable YouTube's event/holiday logo animations (Yoodle) — auto-enabled when custom logo is set |
+
+</details>
+
+<details open>
+<summary><b>Sidebar</b></summary>
+
 | | |
 |---|---|
 | **Sidebar Filter** | Hide Subscriptions, You, Explore, "More from YouTube", Report history, and footer from the left sidebar |
 
-### Channel Page
-| | |
-|---|---|
-| **Banner Style** | Change channel banner appearance: default or sharp (no rounding) |
+</details>
 
-### Appearance
+<details open>
+<summary><b>Appearance</b></summary>
+
 | | |
 |---|---|
 | **Avatar Shapes** | 9 shapes: circle (default), squircle, rounded square, square, diamond, hexagon, octagon, clover, flower |
@@ -58,35 +132,75 @@
 | **Thumbnail Shapes** | Change the shape of video thumbnails: sharp, rounded, scallop, notched, slanted, arch, or fan |
 | **Disable Hover Glow** | Remove the ripple/glow animation on thumbnail hover and prevent metadata text color changes |
 
-### Settings Data
+</details>
+
+<details open>
+<summary><b>Settings Data</b></summary>
+
 | | |
 |---|---|
-| **Export / Import** | Export settings as JSON or TXT file, copy to clipboard — import from file or paste from clipboard |
+| **Export / Import** | Export settings as JSON or TXT file, copy to clipboard — import from file (drag & drop) or paste from clipboard |
+| **Reset** | Reset all settings to defaults with confirmation |
+| **Update Checker** | Click the version badge — the extension checks for updates from the source it was installed from |
 
-### Updates
-| | |
-|---|---|
-| **Update Checker** | Click the version badge — the extension checks GitHub for new releases and shows a download button if an update is available |
+</details>
 
-All settings apply instantly — no page reload needed.
+> All settings apply instantly — no page reload needed.
+
+---
 
 ## Languages
 
 The extension UI is available in **11 languages** (auto-detected from browser, or pick manually):
 
-English, Русский, Українська, Español, Português, Français, Deutsch, Türkçe, 日本語, 한국어, 中文
+`English` `Русский` `Українська` `Español` `Português` `Français` `Deutsch` `Türkçe` `日本語` `한국어` `中文`
+
+---
 
 ## Installation
 
-Download the extension from [Releases](../../releases):
+### <img src="https://cdn.simpleicons.org/firefoxbrowser/FF7139" width="16" height="16"> Firefox (Firefox, Zen, Waterfox, LibreWolf)
 
-- **Chromium** (Chrome, Edge, Brave, Opera, Vivaldi, Arc) — `.crx` file
-- **Firefox** (Firefox, Zen, Waterfox, LibreWolf) — `.xpi` file
+**Recommended:** Install directly from [Mozilla Add-ons (AMO)](https://addons.mozilla.org/firefox/addon/youtube-rewind/) — automatic updates, no config changes needed.
 
-Install it like any other extension file — drag into the browser or open from the extensions page.
+<details>
+<summary><b>Manual installation (unsigned)</b></summary>
+
+1. Open `about:config` and accept the warning
+2. Search for `xpinstall.signatures.required` and set it to **false**
+3. Download the `.xpi` file from [Releases](../../releases) — Firefox will prompt to install it permanently
+
+This works in all Firefox variants (Firefox, Developer Edition, Nightly, ESR, Zen, Waterfox, LibreWolf).
+
+</details>
+
+### <img src="https://cdn.simpleicons.org/googlechrome/4285F4" width="16" height="16"> Chromium (Chrome, Edge, Brave, Opera, Vivaldi, Arc)
+
+Download the `.zip` from [Releases](../../releases).
+
+1. Extract the `.zip` to a folder
+2. Open `chrome://extensions`
+3. Enable **Developer mode** (top right toggle)
+4. Click **Load unpacked** → select the extracted folder
+
+The extension stays active across restarts. Chrome may show a warning on startup — just dismiss it.
+
+> The `.crx` file is included for Chromium forks that support self-signed extensions (e.g. ungoogled-chromium).
 
 <details>
 <summary><b>Build from source</b></summary>
+
+```bash
+git clone https://github.com/crixqq/YouTube-Rewind.git
+cd YouTube-Rewind
+pnpm install
+
+pnpm build            # Chrome/Chromium
+pnpm build:firefox    # Firefox
+
+pnpm zip              # → .output/youtube-rewind-<ver>-chrome.zip
+pnpm zip:firefox      # → .output/youtube-rewind-<ver>-firefox.zip
+```
 
 #### Chrome — CRX via browser
 
@@ -106,22 +220,7 @@ The `.xpi` file will be in the `web-ext-artifacts/` folder. To sign it for perma
 
 </details>
 
-<details>
-<summary><b>Manual packaging (CRX / XPI)</b></summary>
-
-```bash
-git clone https://github.com/crixqq/YouTube-Rewind.git
-cd YouTube-Rewind
-pnpm install
-
-pnpm build            # Chrome/Chromium
-pnpm build:firefox    # Firefox
-
-pnpm zip              # → .output/youtube-rewind-<ver>-chrome.zip
-pnpm zip:firefox      # → .output/youtube-rewind-<ver>-firefox.zip
-```
-
-</details>
+---
 
 ## How it works
 
@@ -129,10 +228,14 @@ The extension injects CSS into YouTube and uses `data-*` attributes on `<html>` 
 
 For things CSS can't handle (like "Explore more topics"), a lightweight MutationObserver tags matching elements so CSS can hide them.
 
+---
+
 ## Tech Stack
 
 [WXT](https://wxt.dev) &middot; [Svelte 5](https://svelte.dev) &middot; CSS injection via manifest &middot; `browser.storage.local`
 
-## License
+---
 
-[GNU General Public License v3.0](LICENSE)
+<p align="center">
+  <a href="LICENSE">GPL-3.0</a> &middot; made by <a href="https://github.com/crixqq">crixqq</a>
+</p>

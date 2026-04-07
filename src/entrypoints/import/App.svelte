@@ -1,13 +1,19 @@
 <script lang="ts">
-  import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from '@/lib/settings';
+  import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings, type CustomProfile } from '@/lib/settings';
   import { t, setLocale } from '@/lib/i18n';
 
   let loaded = $state(false);
   let dragging = $state(false);
+  const isProfileMode = new URLSearchParams(window.location.search).get('mode') === 'profile';
 
   type Toast = { text: string; type: 'ok' | 'error' };
   let toast = $state<Toast | null>(null);
   let toastTimer = 0;
+
+  // Profile mode: pending file content waiting for name confirmation
+  let pendingProfileText = $state('');
+  let pendingProfileFileName = $state('');
+  let profileNameInput = $state('');
 
   function showToast(text: string, type: Toast['type'] = 'ok') {
     clearTimeout(toastTimer);
@@ -63,7 +69,48 @@
   async function processFile(file: File) {
     if (!file) return;
     const text = await file.text();
-    await applyImport(text);
+    // Validate first
+    const parsed = parseSettings(text);
+    if (!parsed) {
+      showToast(t('importError'), 'error');
+      return;
+    }
+    if (isProfileMode) {
+      // Show name input before saving profile
+      pendingProfileText = text;
+      pendingProfileFileName = file.name;
+      profileNameInput = file.name.replace(/\.(json|txt)$/i, '');
+    } else {
+      await applyImport(text);
+    }
+  }
+
+  async function confirmProfileImport() {
+    const name = profileNameInput.trim();
+    if (!name) return;
+    const parsed = parseSettings(pendingProfileText);
+    if (!parsed) {
+      showToast(t('importError'), 'error');
+      return;
+    }
+    // Strip meta-fields that shouldn't be part of a profile
+    delete (parsed as any).customProfiles;
+    delete (parsed as any).language;
+    delete (parsed as any).activeProfile;
+    const current = await loadSettings();
+    const newProfile: CustomProfile = { name, settings: parsed };
+    const profiles = [...(current.customProfiles || []), newProfile];
+    await saveSettings({ customProfiles: profiles });
+    showToast(t('profileSaved'));
+    pendingProfileText = '';
+    pendingProfileFileName = '';
+    profileNameInput = '';
+  }
+
+  function cancelProfileImport() {
+    pendingProfileText = '';
+    pendingProfileFileName = '';
+    profileNameInput = '';
   }
 
   function onFileInput(e: Event) {
@@ -91,27 +138,45 @@
 {#if loaded}
   <div class="page">
     <h1>YouTube Rewind</h1>
-    <p class="subtitle">{t('importSettings')}</p>
+    <p class="subtitle">{isProfileMode ? t('profileFromFile') : t('importSettings')}</p>
 
     <div class="card">
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <label
-        class="drop-zone"
-        class:dragging
-        ondrop={onDrop}
-        ondragover={onDragOver}
-        ondragleave={onDragLeave}
-      >
-        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="12" y1="18" x2="12" y2="12"/>
-          <polyline points="9 15 12 12 15 15"/>
-        </svg>
-        <span class="drop-text">{t('importDrop')}</span>
-        <span class="drop-hint">{t('importHint')}</span>
-        <input type="file" accept=".json,.txt" onchange={onFileInput} class="file-input" />
-      </label>
+      {#if isProfileMode && pendingProfileText}
+        <div class="profile-confirm">
+          <div class="profile-confirm-label">{t('profileNamePlaceholder')}</div>
+          <input
+            class="profile-name-input"
+            type="text"
+            placeholder={t('profileNamePlaceholder')}
+            bind:value={profileNameInput}
+            onkeydown={(e) => { if (e.key === 'Enter') confirmProfileImport(); else if (e.key === 'Escape') cancelProfileImport(); }}
+          />
+          <div class="profile-confirm-file">{pendingProfileFileName}</div>
+          <div class="profile-confirm-actions">
+            <button class="confirm-btn" onclick={confirmProfileImport}>{t('profileSaveCurrent')}</button>
+            <button class="cancel-btn" onclick={cancelProfileImport}>{t('resetCancelButton')}</button>
+          </div>
+        </div>
+      {:else}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <label
+          class="drop-zone"
+          class:dragging
+          ondrop={onDrop}
+          ondragover={onDragOver}
+          ondragleave={onDragLeave}
+        >
+          <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <polyline points="9 15 12 12 15 15"/>
+          </svg>
+          <span class="drop-text">{t('importDrop')}</span>
+          <span class="drop-hint">{t('importHint')}</span>
+          <input type="file" accept=".json,.txt" onchange={onFileInput} class="file-input" />
+        </label>
+      {/if}
     </div>
 
     {#if toast}
@@ -259,5 +324,80 @@
   @keyframes slideIn {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+
+  .profile-confirm {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    animation: slideIn 0.2s ease-out;
+  }
+
+  .profile-confirm-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--md-on-surface-variant);
+  }
+
+  .profile-name-input {
+    width: 100%;
+    font-size: 14px;
+    font-family: inherit;
+    padding: 10px 14px;
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--md-shape-sm);
+    background: var(--md-surface);
+    color: var(--md-on-surface);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .profile-name-input:focus {
+    border-color: var(--md-primary);
+    border-width: 2px;
+    padding: 9px 13px;
+  }
+
+  .profile-confirm-file {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    opacity: 0.6;
+  }
+
+  .profile-confirm-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .confirm-btn, .cancel-btn {
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 500;
+    padding: 8px 20px;
+    border: 1px solid var(--md-outline-variant);
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .confirm-btn {
+    background: var(--md-primary);
+    color: #fff;
+    border-color: var(--md-primary);
+  }
+
+  .confirm-btn:hover {
+    opacity: 0.9;
+  }
+
+  .cancel-btn {
+    background: transparent;
+    color: var(--md-on-surface-variant);
+  }
+
+  .cancel-btn:hover {
+    background: var(--md-surface-container-high);
   }
 </style>

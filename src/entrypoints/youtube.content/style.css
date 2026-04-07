@@ -334,72 +334,55 @@ ytd-browse[page-subtype="channels"] ytd-rich-grid-renderer > #contents {
 
 /* --- Adaptive Colors: Description --- */
 
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description,
-html[data-ytr-no-adaptive-desc="true"] #description.ytd-watch-metadata,
-html[data-ytr-no-adaptive-desc="true"] ytd-text-inline-expander.ytd-watch-metadata {
-  background: var(--yt-spec-badge-chip-background, #272727) !important;
-  border-radius: 12px !important;
+/* Description container background */
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata {
+  background-color: #272727 !important;
   transition: none !important;
 }
 
-/* Remove hover effect — same background as normal state */
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description:hover,
-html[data-ytr-no-adaptive-desc="true"] #description.ytd-watch-metadata:hover,
-html[data-ytr-no-adaptive-desc="true"] ytd-text-inline-expander.ytd-watch-metadata:hover {
-  background: var(--yt-spec-badge-chip-background, #272727) !important;
-}
-
-/* Kill lightsource variables on watch page */
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-flexy,
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-flexy *,
-html[data-ytr-no-adaptive-desc="true"] #above-the-fold,
-html[data-ytr-no-adaptive-desc="true"] #below,
-html[data-ytr-no-adaptive-desc="true"] #primary-inner,
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata,
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata *,
-html[data-ytr-no-adaptive-desc="true"] #bottom-row,
-html[data-ytr-no-adaptive-desc="true"] ytd-comments#comments,
-html[data-ytr-no-adaptive-desc="true"] ytd-engagement-panel-section-list-renderer {
-  --yt-lightsource-section1: transparent !important;
-  --yt-lightsource-section2: transparent !important;
-  --yt-lightsource-section3: transparent !important;
-}
-
-/* Remove ALL hover/transition effects on description and children */
-html[data-ytr-no-adaptive-desc="true"] #description,
-html[data-ytr-no-adaptive-desc="true"] #description *,
-html[data-ytr-no-adaptive-desc="true"] #description *:hover,
-html[data-ytr-no-adaptive-desc="true"] ytd-text-inline-expander,
-html[data-ytr-no-adaptive-desc="true"] ytd-text-inline-expander * {
+/* All inner elements: fixed white text, transparent bg */
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata *,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata * {
+  color: var(--yt-spec-text-primary) !important;
+  background: transparent !important;
   transition: none !important;
 }
 
-/* Fix text color — use YouTube's own text color variable */
-html[data-ytr-no-adaptive-desc="true"] #description,
-html[data-ytr-no-adaptive-desc="true"] #description span,
-html[data-ytr-no-adaptive-desc="true"] #description yt-formatted-string,
-html[data-ytr-no-adaptive-desc="true"] #description .content,
-html[data-ytr-no-adaptive-desc="true"] #description yt-attributed-string,
-html[data-ytr-no-adaptive-desc="true"] #description .yt-core-attributed-string,
-html[data-ytr-no-adaptive-desc="true"] #description .yt-core-attributed-string--link-inherit-color {
-  color: var(--yt-spec-text-primary, #f1f1f1) !important;
+/* Links, timecodes, hashtags in description body — blue */
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata #description-inline-expander a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata #description-inline-expander a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata ytd-text-inline-expander a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-text-inline-expander a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata #expanded a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata #expanded a {
+  color: #3ea6ff !important;
 }
 
-/* Raw URL links stay blue */
-html[data-ytr-no-adaptive-desc="true"] #description a[href] {
-  color: var(--yt-spec-call-to-action, #3ea6ff) !important;
+/* Truncated link chips — double-nested span with highlight decorator class */
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata .yt-core-attributed-string--highlight-text-decorator,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata .yt-core-attributed-string--highlight-text-decorator {
+  background-color: #373737 !important;
 }
 
-/* Rich link previews (embedded cards) — normal text color */
-html[data-ytr-no-adaptive-desc="true"] #description ytd-video-attribute-view-model,
-html[data-ytr-no-adaptive-desc="true"] #description ytd-video-attribute-view-model *,
-html[data-ytr-no-adaptive-desc="true"] #description ytd-horizontal-card-list-renderer,
-html[data-ytr-no-adaptive-desc="true"] #description ytd-horizontal-card-list-renderer *,
-html[data-ytr-no-adaptive-desc="true"] #description ytd-reel-shelf-renderer,
-html[data-ytr-no-adaptive-desc="true"] #description ytd-reel-shelf-renderer *,
-html[data-ytr-no-adaptive-desc="true"] #description .yt-video-attribute-view-model,
-html[data-ytr-no-adaptive-desc="true"] #description .yt-video-attribute-view-model * {
-  color: var(--yt-spec-text-primary, #f1f1f1) !important;
+/* Hashtags in info line — gray when collapsed, blue when expanded */
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata #info a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata #info a {
+  color: #a8a8a8 !important;
+}
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata ytd-text-inline-expander[is-expanded] #info a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-text-inline-expander[is-expanded] #info a {
+  color: #3ea6ff !important;
+}
+
+/* Truncated link text — white, not blue (after blue rule + extra specificity to win) */
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata #description-inline-expander .yt-core-attributed-string--highlight-text-decorator a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata #description-inline-expander .yt-core-attributed-string--highlight-text-decorator a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata ytd-text-inline-expander .yt-core-attributed-string--highlight-text-decorator a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-text-inline-expander .yt-core-attributed-string--highlight-text-decorator a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata #expanded .yt-core-attributed-string--highlight-text-decorator a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata #expanded .yt-core-attributed-string--highlight-text-decorator a {
+  color: #fff !important;
 }
 
 /* --- Videos Per Row --- */
@@ -484,7 +467,63 @@ html[data-ytr-hide-posts="true"] ytd-rich-shelf-renderer:has(ytd-post-renderer) 
 /* --- Homepage Filter: Mixes --- */
 
 html[data-ytr-hide-mixes="true"] ytd-radio-renderer,
-html[data-ytr-hide-mixes="true"] ytd-compact-radio-renderer {
+html[data-ytr-hide-mixes="true"] ytd-compact-radio-renderer,
+html[data-ytr-hide-mixes="true"] [data-ytr-mix="true"] {
+  display: none !important;
+}
+
+/* --- Homepage Filter: Filter Chips Bar (scoped to homepage only, not channel pages) --- */
+
+html[data-ytr-hide-filter-bar="true"] ytd-browse[page-subtype="home"] ytd-feed-filter-chip-bar-renderer,
+html[data-ytr-hide-filter-bar="true"] yt-chip-cloud-renderer.ytd-search-header-renderer {
+  display: none !important;
+}
+
+/* When filter bar is hidden via JS, match frosted-glass to masthead height (only on homepage) */
+html[data-ytr-hide-filter-bar="true"]:has(ytd-browse[page-subtype="home"]) div#frosted-glass.with-chipbar {
+  height: var(--ytd-masthead-height, 56px) !important;
+}
+
+html[data-ytr-hide-filter-bar="true"] ytd-browse[page-subtype="home"] #header.ytd-rich-grid-renderer {
+  display: none !important;
+}
+
+/* Pure CSS fallback: if chip bar is display:none, collapse its parent instantly.
+   This fires before JS sets data attributes, preventing the flash. */
+div#frosted-glass.with-chipbar:has(> ytd-feed-filter-chip-bar-renderer[style*="display: none"]),
+div#frosted-glass.with-chipbar:not(:has(ytd-feed-filter-chip-bar-renderer[is-visible])):has(ytd-feed-filter-chip-bar-renderer[hidden]) {
+  height: var(--ytd-masthead-height, 56px) !important;
+}
+
+/* --- Avatar: hide live ring & badge when avatar shape is changed --- */
+
+html:not([data-ytr-avatar-shape="none"]) .yt-spec-avatar-shape--live-ring,
+html:not([data-ytr-avatar-shape="none"]) .yt-spec-avatar-shape__live-ring,
+html:not([data-ytr-avatar-shape="none"]) .yt-spec-avatar-shape--live {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+html:not([data-ytr-avatar-shape="none"]) .yt-spec-avatar-shape--live-ring::before,
+html:not([data-ytr-avatar-shape="none"]) .yt-spec-avatar-shape--live-ring::after {
+  display: none !important;
+}
+
+/* --- Avatar: disable live redirect — hide LIVE badge on avatar --- */
+
+html[data-ytr-disable-avatar-live="true"] .yt-spec-avatar-shape__live-text,
+html[data-ytr-disable-avatar-live="true"] .yt-spec-avatar-shape--live-ring,
+html[data-ytr-disable-avatar-live="true"] .yt-spec-avatar-shape__live-ring,
+html[data-ytr-disable-avatar-live="true"] .yt-spec-avatar-shape--live {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+html[data-ytr-disable-avatar-live="true"] .yt-spec-avatar-shape--live-ring::before,
+html[data-ytr-disable-avatar-live="true"] .yt-spec-avatar-shape--live-ring::after,
+html[data-ytr-disable-avatar-live="true"] .yt-spec-avatar-shape__live-text {
   display: none !important;
 }
 
@@ -573,38 +612,34 @@ html[data-ytr-hide-search-people-watched="true"] ytd-search ytd-shelf-renderer:n
 
 /* --- Avatar Shapes --- */
 
-/* Reset container border-radius so only img elements get shaped */
+/* Kill YouTube's mask-image based circular clipping on ALL avatar elements.
+   YouTube uses mask-image on a div inside .yt-spec-avatar-shape to clip to circle.
+   We must remove this mask so our shapes take effect. */
+html:not([data-ytr-avatar-shape="none"]) .yt-spec-avatar-shape > div,
+html:not([data-ytr-avatar-shape="none"]) .yt-spec-avatar-shape > div > div {
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+  mask: none !important;
+  -webkit-mask: none !important;
+}
+
+/* Reset border-radius on avatar containers */
 html:not([data-ytr-avatar-shape="none"]) yt-avatar-shape,
 html:not([data-ytr-avatar-shape="none"]) yt-avatar-shape > *,
 html:not([data-ytr-avatar-shape="none"]) yt-avatar-shape > * > *,
 html:not([data-ytr-avatar-shape="none"]) yt-avatar-shape yt-img-shadow,
-html:not([data-ytr-avatar-shape="none"]) yt-avatar-shape #avatar {
+html:not([data-ytr-avatar-shape="none"]) yt-avatar-shape #avatar,
+html:not([data-ytr-avatar-shape="none"]) .yt-spec-avatar-shape,
+html:not([data-ytr-avatar-shape="none"]) .yt-spec-avatar-shape > * {
   border-radius: 0 !important;
-}
-
-/* Reset avatar stack containers for collaboration videos */
-html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model,
-html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model *,
-html:not([data-ytr-avatar-shape="none"]) #avatar-stack,
-html:not([data-ytr-avatar-shape="none"]) #avatar-stack * {
-  border-radius: 0 !important;
-}
-
-/* Ensure avatar stack and ALL children don't clip non-circle shapes */
-html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model,
-html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model *,
-html:not([data-ytr-avatar-shape="none"]) #avatar-stack,
-html:not([data-ytr-avatar-shape="none"]) #avatar-stack * {
   overflow: visible !important;
 }
 
-/* Reset individual collab avatar wrappers */
-html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model yt-avatar-shape,
-html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model yt-avatar-shape > *,
-html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model yt-img-shadow,
-html:not([data-ytr-avatar-shape="none"]) #avatar-stack yt-avatar-shape,
-html:not([data-ytr-avatar-shape="none"]) #avatar-stack yt-avatar-shape > *,
-html:not([data-ytr-avatar-shape="none"]) #avatar-stack yt-img-shadow {
+/* Reset avatar stack containers */
+html:not([data-ytr-avatar-shape="none"]) yt-avatar-stack-view-model,
+html:not([data-ytr-avatar-shape="none"]) .yt-avatar-stack-view-model__avatars,
+html:not([data-ytr-avatar-shape="none"]) .yt-avatar-stack-view-model__avatars > div,
+html:not([data-ytr-avatar-shape="none"]) #avatar-stack {
   border-radius: 0 !important;
   overflow: visible !important;
 }
@@ -1136,5 +1171,442 @@ html[data-ytr-custom-logo="true"] ytd-topbar-logo-renderer a#logo::before {
   min-width: 24px !important;
   max-width: 120px !important;
   background: var(--ytr-custom-logo) no-repeat center / contain !important;
+}
+
+/* --- Hide Logo Event Animations (Yoodle / Doodle) --- */
+
+html[data-ytr-hide-logo-animation="true"] ytd-yoodle-renderer {
+  display: none !important;
+}
+
+/* --- Hide YouTube Playables --- */
+
+html[data-ytr-hide-playables="true"] ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-playables]),
+html[data-ytr-hide-playables="true"] ytd-rich-section-renderer:has([aria-label*="Playables"]),
+html[data-ytr-hide-playables="true"] ytd-rich-section-renderer:has([aria-label*="playables"]),
+html[data-ytr-hide-playables="true"] ytd-rich-section-renderer:has(a[href*="/playables"]),
+html[data-ytr-hide-playables="true"] ytd-rich-section-renderer[data-ytr-playables="true"] {
+  display: none !important;
+}
+
+/* ============================================
+   v0.4.0 — New Features
+   ============================================ */
+
+/* --- Watch Timer --- */
+
+#ytr-watch-timer {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-family: 'Google Sans', 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 20px;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Hide timer when YouTube player is fullscreen */
+html[data-ytr-fullscreen="true"] #ytr-watch-timer {
+  display: none !important;
+}
+
+#ytr-watch-timer[data-ytr-timer-warn="true"] {
+  background: rgba(186, 26, 26, 0.85);
+  color: #ffb4ab;
+}
+
+/* --- Block Overlay (Time Limit) --- */
+
+#ytr-block-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: ytrBlockFadeIn 0.4s ease;
+}
+
+@keyframes ytrBlockFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ytr-block-content {
+  text-align: center;
+  color: #e6e1e9;
+  max-width: 420px;
+  padding: 40px;
+}
+
+.ytr-block-content svg {
+  color: #c8bfff;
+  margin-bottom: 24px;
+}
+
+.ytr-block-title {
+  font-family: 'Google Sans', 'Segoe UI', system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #fff;
+}
+
+.ytr-block-message {
+  font-family: 'Google Sans', 'Segoe UI', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #c9c5d0;
+  margin-bottom: 32px;
+}
+
+.ytr-block-close {
+  font-family: 'Google Sans', 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 24px;
+  border: 1px solid rgba(200, 191, 255, 0.3);
+  border-radius: 20px;
+  background: transparent;
+  color: #c8bfff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ytr-block-close:hover {
+  background: rgba(200, 191, 255, 0.12);
+  border-color: rgba(200, 191, 255, 0.5);
+}
+
+/* --- Download Button (Thumbnail + Video) --- */
+
+.ytr-download-btn {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  position: relative;
+  vertical-align: top;
+  height: 36px;
+  margin-left: 8px;
+}
+
+/* Match YouTube's "More actions" (···) button — tonal style */
+.ytr-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--yt-spec-text-primary, #f1f1f1);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 36px;
+}
+
+.ytr-action-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.ytr-action-btn:active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.ytr-action-btn svg {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.ytr-download-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--yt-spec-raised-background, #212121);
+  border-radius: 12px;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.4);
+  padding: 8px 0;
+  z-index: 2050;
+  width: 280px;
+  display: none;
+  animation: ytr-menu-in 0.15s ease;
+}
+
+@keyframes ytr-menu-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.ytr-download-menu.ytr-download-menu-open {
+  display: block;
+}
+
+/* --- Thumbnail Carousel --- */
+
+.ytr-carousel {
+  position: relative;
+  margin: 8px;
+  overflow: visible;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ytr-carousel-viewport {
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.ytr-carousel-track {
+  display: flex;
+  transition: transform 0.25s ease;
+}
+
+.ytr-carousel-img {
+  min-width: 100%;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.ytr-carousel-img:hover {
+  opacity: 0.9;
+}
+
+.ytr-carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: background 0.15s ease;
+}
+
+.ytr-carousel-arrow:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.ytr-carousel-prev {
+  left: 6px;
+}
+
+.ytr-carousel-next {
+  right: 6px;
+}
+
+.ytr-carousel-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 0 2px;
+}
+
+.ytr-carousel-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transition: background 0.15s ease;
+}
+
+.ytr-carousel-dot.active {
+  background: #fff;
+}
+
+/* --- Menu Items --- */
+
+.ytr-download-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: var(--yt-spec-text-primary, #f1f1f1);
+  font-size: 14px;
+  font-family: 'Roboto', 'Arial', sans-serif;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+}
+
+.ytr-download-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ytr-download-menu-item svg {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+/* --- Thumbnail fullscreen overlay --- */
+
+#ytr-thumb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: ytr-overlay-in 0.2s ease;
+}
+
+@keyframes ytr-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ytr-thumb-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(12px);
+}
+
+.ytr-thumb-overlay-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.ytr-thumb-overlay-img-wrap {
+  overflow: hidden;
+  border-radius: 12px;
+  max-width: 100%;
+  max-height: 80vh;
+  cursor: zoom-in;
+  position: relative;
+}
+
+.ytr-thumb-overlay-img {
+  max-width: 100%;
+  max-height: 80vh;
+  display: block;
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.6);
+  object-fit: contain;
+  transform-origin: center center;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.ytr-thumb-overlay-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ytr-thumb-overlay-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 20px;
+  background: #fff;
+  color: #0f0f0f;
+  font-family: 'Roboto', 'Arial', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.ytr-thumb-overlay-download:hover {
+  opacity: 0.9;
+}
+
+.ytr-thumb-overlay-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ytr-thumb-overlay-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.ytr-thumb-overlay-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.ytr-thumb-overlay-reset:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: rotate(-45deg);
+}
+
+/* --- Toast notification --- */
+
+.ytr-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: var(--yt-spec-raised-background, #212121);
+  color: var(--yt-spec-text-primary, #f1f1f1);
+  font-family: 'Roboto', 'Arial', sans-serif;
+  font-size: 14px;
+  padding: 10px 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  z-index: 99999;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
+}
+
+.ytr-toast.ytr-toast-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 

@@ -1,7 +1,12 @@
 <script lang="ts">
-  let { filters }: {
-    filters: Array<{ key: string; label: string; checked: boolean; onchange: (v: boolean) => void }>;
-  } = $props();
+  export interface ChipFilter {
+    key: string;
+    label: string;
+    checked: boolean;
+    onchange: (value: boolean) => void;
+  }
+
+  export let filters: ChipFilter[] = [];
 </script>
 
 <div class="chip-group">
@@ -12,11 +17,11 @@
       onclick={() => filter.onchange(!filter.checked)}
     >
       {#if filter.checked}
-        <svg viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="chip-check" viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="14 5 7 12 4 9"/>
         </svg>
       {/if}
-      {filter.label}
+      <span class="chip-label">{filter.label}</span>
     </button>
   {/each}
 </div>
@@ -42,21 +47,67 @@
     font-size: 13px;
     font-family: inherit;
     cursor: pointer;
-    transition: all var(--md-duration-short) var(--md-easing-standard);
+    transition: all 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
     user-select: none;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .chip::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+  }
+
+  .chip:hover::after {
+    opacity: 0.06;
   }
 
   .chip:hover {
     background: var(--md-surface-container-high);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   }
 
   .chip.active {
     background: var(--md-secondary-container);
     color: var(--md-on-secondary-container);
     border-color: transparent;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding-left: 8px;
+  }
+
+  .chip.active:hover {
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+    transform: translateY(-2px) scale(1.02);
   }
 
   .chip:active {
-    transform: scale(0.95);
+    transform: scale(0.93) translateY(0);
+    transition-duration: 0.08s;
+    box-shadow: none;
+  }
+
+  .chip-label {
+    transition: transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  }
+
+  .chip:active .chip-label {
+    transform: scale(0.96);
+  }
+
+  .chip-check {
+    flex-shrink: 0;
+    animation: chipCheckBounce 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) both;
+  }
+
+  @keyframes chipCheckBounce {
+    0% { opacity: 0; transform: scale(0) rotate(-90deg); }
+    60% { opacity: 1; transform: scale(1.2) rotate(5deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0); }
   }
 </style>
