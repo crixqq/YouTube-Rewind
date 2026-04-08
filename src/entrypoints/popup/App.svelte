@@ -30,6 +30,7 @@
 
   const CACHE_KEY = 'ytr_update_cache';
   const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+  const AMO_API_URL = 'https://addons.mozilla.org/api/v5/addons/addon/youtube-rewind/';
 
   function isNewer(remote: string, local: string): boolean {
     const r = remote.replace(/^v/, '').split('.').map(Number);
@@ -43,17 +44,48 @@
     return false;
   }
 
+  function isVideoLogo(src: string): boolean {
+    return /^data:video\//i.test(src) || /\.(mp4|webm|ogg|mov)(?:$|[?#])/i.test(src);
+  }
+
   const AMO_URL = 'https://addons.mozilla.org/firefox/addon/youtube-rewind/';
   const isFirefox = browser.runtime.getURL('').startsWith('moz-extension://');
 
+  async function fetchLatestVersionInfo(): Promise<{ version: string; url: string; source: 'amo' | 'github' }> {
+    if (isFirefox) {
+      const res = await fetch(AMO_API_URL);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const version = (data?.current_version?.version || '').replace(/^v/, '');
+      if (!version) throw new Error('Missing AMO version');
+      return {
+        version,
+        url: AMO_URL,
+        source: 'amo',
+      };
+    }
+
+    const res = await fetch('https://api.github.com/repos/crixqq/YouTube-Rewind/releases/latest');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const version = (data.tag_name || '').replace(/^v/, '');
+    if (!version) throw new Error('Missing GitHub version');
+    return {
+      version,
+      url: data.html_url || 'https://github.com/crixqq/YouTube-Rewind/releases',
+      source: 'github',
+    };
+  }
+
   async function checkForUpdates() {
     const currentVersion = browser.runtime.getManifest().version;
+    const source = isFirefox ? 'amo' : 'github';
 
     // Check cache first
     try {
       const cached = await browser.storage.local.get(CACHE_KEY);
       const cache = cached[CACHE_KEY];
-      if (cache && Date.now() - cache.timestamp < CACHE_TTL) {
+      if (cache && cache.source === source && Date.now() - cache.timestamp < CACHE_TTL) {
         latestVersion = cache.version;
         releaseUrl = cache.url;
         updateState = isNewer(cache.version, currentVersion) ? 'available' : 'up-to-date';
@@ -64,22 +96,15 @@
     updateState = 'checking';
 
     try {
-      const res = await fetch('https://api.github.com/repos/crixqq/YouTube-Rewind/releases/latest');
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      const ver = (data.tag_name || '').replace(/^v/, '');
-      // Firefox users get AMO link, Chromium users get GitHub releases
-      const url = isFirefox
-        ? AMO_URL
-        : (data.html_url || 'https://github.com/crixqq/YouTube-Rewind/releases');
+      const { version, url, source: cacheSource } = await fetchLatestVersionInfo();
 
-      latestVersion = ver;
+      latestVersion = version;
       releaseUrl = url;
-      updateState = isNewer(ver, currentVersion) ? 'available' : 'up-to-date';
+      updateState = isNewer(version, currentVersion) ? 'available' : 'up-to-date';
 
       // Cache result
       await browser.storage.local.set({
-        [CACHE_KEY]: { version: ver, url, timestamp: Date.now() },
+        [CACHE_KEY]: { version, url, source: cacheSource, timestamp: Date.now() },
       });
     } catch {
       updateState = 'error';
@@ -899,7 +924,11 @@
             <span class="inline-label">{t('settingCustomLogo')}</span>
             <div class="inline-actions">
               {#if settings.customLogo}
-                <img src={settings.customLogo} alt="" class="logo-preview" />
+                {#if isVideoLogo(settings.customLogo)}
+                  <video src={settings.customLogo} class="logo-preview" muted autoplay loop playsinline></video>
+                {:else}
+                  <img src={settings.customLogo} alt="" class="logo-preview" />
+                {/if}
               {/if}
               <button class="action-btn" onclick={openLogoPage}>{t('customLogoUpload')}</button>
               {#if settings.customLogo}
@@ -1116,6 +1145,9 @@
     color: var(--md-on-surface);
     animation: popupEnter 0.3s var(--md-easing-emphasized-decel) both;
     scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: var(--md-primary) transparent;
+    scrollbar-gutter: stable both-edges;
   }
 
   :global(#app) {
@@ -1124,28 +1156,38 @@
   }
 
   :global(body::-webkit-scrollbar) {
-    width: 6px;
+    width: 10px;
   }
 
   :global(body::-webkit-scrollbar-thumb) {
-    background: var(--md-outline-variant);
     border-radius: var(--md-shape-full);
-    border: 1px solid transparent;
+    border: 2px solid transparent;
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--md-primary) 78%, white 22%), var(--md-primary), color-mix(in srgb, var(--md-primary) 78%, white 22%));
+    background-size: 100% 220%;
     background-clip: content-box;
+    animation: popupScrollbarWave 5.6s linear infinite;
   }
 
   :global(body::-webkit-scrollbar-thumb:hover) {
-    background: var(--md-outline);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--md-primary) 72%, white 28%), color-mix(in srgb, var(--md-primary) 92%, white 8%), color-mix(in srgb, var(--md-primary) 72%, white 28%));
+    background-size: 100% 220%;
     background-clip: content-box;
+    animation-duration: 4.2s;
   }
 
   :global(body::-webkit-scrollbar-thumb:active) {
-    background: var(--md-primary);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--md-primary) 65%, white 35%), var(--md-primary), color-mix(in srgb, var(--md-primary) 65%, white 35%));
+    background-size: 100% 220%;
     background-clip: content-box;
+    animation-duration: 3s;
   }
 
   :global(body::-webkit-scrollbar-track) {
-    background: transparent;
+    background: color-mix(in srgb, var(--md-surface-container-high) 50%, transparent);
+    border-radius: var(--md-shape-full);
   }
 
   /* --- M3 Entrance Animations --- */
@@ -1173,6 +1215,11 @@
   @keyframes popupEnter {
     from { opacity: 0; transform: scale(0.98); }
     to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes popupScrollbarWave {
+    from { background-position: 50% 0%; }
+    to { background-position: 50% 220%; }
   }
 
   @keyframes searchBarSlideIn {
@@ -1236,7 +1283,7 @@
 
   .lang-button:hover {
     background: var(--md-surface-container-high);
-    transform: scale(1.1);
+    transform: scale(1.06);
     color: var(--md-primary);
   }
 
@@ -1255,26 +1302,42 @@
     max-height: 360px;
     background: var(--md-surface-container);
     border-radius: var(--md-shape-md);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 82%, transparent);
     padding: 4px 0;
     z-index: 20;
     overflow-y: auto;
     overscroll-behavior: contain;
     animation: menuFadeIn 0.12s var(--md-easing-emphasized);
     transform-origin: top right;
+    scrollbar-width: thin;
+    scrollbar-color: var(--md-primary) transparent;
   }
 
   .lang-menu::-webkit-scrollbar {
-    width: 3px;
+    width: 8px;
   }
 
   .lang-menu::-webkit-scrollbar-thumb {
-    background: var(--md-outline-variant);
     border-radius: var(--md-shape-full);
+    border: 2px solid transparent;
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--md-primary) 78%, white 22%), var(--md-primary), color-mix(in srgb, var(--md-primary) 78%, white 22%));
+    background-size: 100% 220%;
+    background-clip: content-box;
+    animation: popupScrollbarWave 5.6s linear infinite;
+  }
+
+  .lang-menu::-webkit-scrollbar-thumb:hover {
+    animation-duration: 4.2s;
+  }
+
+  .lang-menu::-webkit-scrollbar-thumb:active {
+    animation-duration: 3s;
   }
 
   .lang-menu::-webkit-scrollbar-track {
-    background: transparent;
+    background: color-mix(in srgb, var(--md-surface-container-high) 44%, transparent);
+    border-radius: var(--md-shape-full);
   }
 
   @keyframes menuFadeIn {
@@ -1314,7 +1377,7 @@
 
   .lang-menu-item:hover {
     background: var(--md-surface-container-high);
-    padding-left: 18px;
+    transform: scale(1.01);
   }
 
   .lang-menu-item:active {
@@ -1347,7 +1410,7 @@
 
   .version-button:hover {
     background: var(--md-surface-container-high);
-    transform: scale(1.05);
+    transform: scale(1.03);
   }
 
   .version-button:active {
@@ -1380,7 +1443,7 @@
     min-width: 200px;
     background: var(--md-surface-container);
     border-radius: var(--md-shape-md);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 82%, transparent);
     padding: 4px 0;
     z-index: 20;
     animation: menuFadeIn 0.12s var(--md-easing-emphasized);
@@ -1438,7 +1501,7 @@
     opacity: 0.9;
     text-decoration: none;
     transform: scale(1.02);
-    box-shadow: 0 2px 8px rgba(91, 80, 145, 0.3);
+    background: color-mix(in srgb, var(--md-primary) 92%, white 8%);
   }
 
   .update-download:active {
@@ -1469,6 +1532,7 @@
   .logo-preview {
     height: 20px;
     max-width: 80px;
+    display: block;
     object-fit: contain;
     border-radius: var(--md-shape-xs);
     border: 1px solid var(--md-outline-variant);
@@ -1476,7 +1540,7 @@
   }
 
   .logo-preview:hover {
-    transform: scale(1.12);
+    transform: scale(1.08);
   }
 
   .sub-label {
@@ -1527,13 +1591,11 @@
 
   .effect-option:hover {
     background: var(--md-surface-container-high);
-    transform: translateY(-2px) scale(1.03);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transform: scale(1.03);
   }
 
   .effect-option:active {
     transform: scale(0.91);
-    box-shadow: none;
     transition-duration: 0.06s;
   }
 
@@ -1541,7 +1603,6 @@
     background: var(--md-primary);
     color: var(--md-on-primary);
     border-color: var(--md-primary);
-    box-shadow: 0 2px 8px rgba(91, 80, 145, 0.35);
     animation: chipSelect 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
   }
 
@@ -1552,13 +1613,11 @@
   }
 
   .effect-option.active:hover {
-    box-shadow: 0 3px 12px rgba(91, 80, 145, 0.4);
-    transform: translateY(-2px) scale(1.03);
+    transform: scale(1.03);
   }
 
   .effect-option.active:active {
     transform: scale(0.93);
-    box-shadow: 0 1px 4px rgba(91, 80, 145, 0.25);
   }
 
   /* --- Search Bar --- */
@@ -1580,8 +1639,7 @@
   .search-bar.focused {
     background: var(--md-surface-container);
     border-color: var(--md-primary);
-    box-shadow: 0 0 0 2px rgba(91, 80, 145, 0.15);
-    transform: scaleX(1.01);
+    transform: scale(1.005);
   }
 
   .search-input {
@@ -1615,11 +1673,11 @@
 
   .search-clear:hover {
     background: var(--md-surface-container-highest);
-    transform: scale(1.15) rotate(90deg);
+    transform: scale(1.08);
   }
 
   .search-clear:active {
-    transform: scale(0.85) rotate(90deg);
+    transform: scale(0.9);
     transition-duration: 0.06s;
   }
 
@@ -1684,7 +1742,7 @@
 
   .info-button:hover {
     background: var(--md-surface-container-high);
-    transform: scale(1.1);
+    transform: scale(1.06);
     color: var(--md-primary);
   }
 
@@ -1755,14 +1813,13 @@
 
   .about-link:hover {
     background: var(--md-primary-container);
-    transform: translateY(-3px) scale(1.04);
-    box-shadow: 0 4px 12px rgba(91, 80, 145, 0.2);
+    transform: scale(1.03);
     border-color: var(--md-primary-container);
     text-decoration: none;
   }
 
   .about-link:hover svg {
-    transform: scale(1.15);
+    transform: scale(1.08);
   }
 
   .about-link svg {
@@ -1773,7 +1830,6 @@
   .about-link:active {
     transform: scale(0.92);
     transition-duration: 0.06s;
-    box-shadow: none;
   }
 
   .about-creator {
@@ -1877,14 +1933,12 @@
 
   .action-btn:hover {
     background: var(--md-primary-container);
-    transform: translateY(-2px) scale(1.04);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: scale(1.03);
     border-color: var(--md-primary-container);
   }
 
   .action-btn:active {
     transform: scale(0.91);
-    box-shadow: none;
     transition-duration: 0.06s;
   }
 
@@ -2047,7 +2101,7 @@
     padding: 16px;
     border-radius: var(--md-shape-lg);
     background: var(--md-surface-container-high);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 80%, transparent);
     animation: feedbackSlideIn var(--md-duration-short) var(--md-easing-emphasized-decel) both;
   }
 
@@ -2078,13 +2132,11 @@
 
   .action-btn-danger:hover {
     background: rgba(186, 26, 26, 0.08);
-    transform: translateY(-1px) scale(1.02);
-    box-shadow: 0 2px 6px rgba(186, 26, 26, 0.15);
+    transform: scale(1.02);
   }
 
   .action-btn-danger:active {
     transform: scale(0.93);
-    box-shadow: none;
     transition-duration: 0.06s;
   }
 

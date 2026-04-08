@@ -69,27 +69,23 @@
 
   .chip:hover {
     background: var(--md-surface-container-high);
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    transform: scale(1.03);
   }
 
   .chip.active {
     background: var(--md-secondary-container);
     color: var(--md-on-secondary-container);
     border-color: transparent;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     padding-left: 8px;
   }
 
   .chip.active:hover {
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
-    transform: translateY(-2px) scale(1.02);
+    transform: scale(1.03);
   }
 
   .chip:active {
-    transform: scale(0.93) translateY(0);
+    transform: scale(0.93);
     transition-duration: 0.08s;
-    box-shadow: none;
   }
 
   .chip-label {

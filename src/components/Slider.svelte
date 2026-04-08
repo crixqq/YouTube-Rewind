@@ -289,22 +289,21 @@
     height: 20px;
     border-radius: 50%;
     background: var(--md-primary);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.15);
     transition: width 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28),
                 height 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28),
-                box-shadow 0.2s ease;
+                background 0.2s ease;
   }
 
   .slider-track-container.hovering .slider-thumb-inner {
     width: 24px;
     height: 24px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 2px 8px 1px rgba(0, 0, 0, 0.2);
+    background: color-mix(in srgb, var(--md-primary) 90%, white 10%);
   }
 
   .slider-track-container.pressing .slider-thumb-inner {
     width: 28px;
     height: 28px;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4), 0 4px 12px 2px rgba(0, 0, 0, 0.2);
+    background: color-mix(in srgb, var(--md-primary) 84%, white 16%);
   }
 
   .slider-input-hidden {

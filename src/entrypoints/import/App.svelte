@@ -4,6 +4,7 @@
 
   let loaded = $state(false);
   let dragging = $state(false);
+  let pasting = $state(false);
   const isProfileMode = new URLSearchParams(window.location.search).get('mode') === 'profile';
 
   type Toast = { text: string; type: 'ok' | 'error' };
@@ -82,6 +83,40 @@
       profileNameInput = file.name.replace(/\.(json|txt)$/i, '');
     } else {
       await applyImport(text);
+    }
+  }
+
+  async function pasteFromClipboard() {
+    if (!navigator.clipboard?.readText) {
+      showToast(t('pasteClipboardError'), 'error');
+      return;
+    }
+
+    try {
+      pasting = true;
+      const text = (await navigator.clipboard.readText()).trim();
+      if (!text) {
+        showToast(t('pasteClipboardEmpty'), 'error');
+        return;
+      }
+
+      const parsed = parseSettings(text);
+      if (!parsed) {
+        showToast(t('importError'), 'error');
+        return;
+      }
+
+      if (isProfileMode) {
+        pendingProfileText = text;
+        pendingProfileFileName = 'clipboard.json';
+        profileNameInput = 'clipboard-profile';
+      } else {
+        await applyImport(text);
+      }
+    } catch {
+      showToast(t('pasteClipboardError'), 'error');
+    } finally {
+      pasting = false;
     }
   }
 
@@ -176,6 +211,11 @@
           <span class="drop-hint">{t('importHint')}</span>
           <input type="file" accept=".json,.txt" onchange={onFileInput} class="file-input" />
         </label>
+        <div class="quick-actions">
+          <button class="ghost-btn" class:is-loading={pasting} onclick={() => void pasteFromClipboard()}>
+            {t('pasteClipboard')}
+          </button>
+        </div>
       {/if}
     </div>
 
@@ -219,86 +259,220 @@
     }
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    :global(*),
+    :global(*::before),
+    :global(*::after) {
+      animation-duration: 0s !important;
+      transition-duration: 0s !important;
+    }
+  }
+
   :global(*) { margin: 0; padding: 0; box-sizing: border-box; }
   :global(body) {
-    background: var(--md-surface);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--md-surface) 94%, #17131f 6%), var(--md-surface)),
+      linear-gradient(120deg, color-mix(in srgb, var(--md-primary-container) 18%, transparent), transparent 42%);
     color: var(--md-on-surface);
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--md-primary) transparent;
+    scrollbar-gutter: stable both-edges;
+  }
+
+  :global(body::-webkit-scrollbar) {
+    width: 10px;
+  }
+
+  :global(body::-webkit-scrollbar-track) {
+    background: rgba(0, 0, 0, 0.04);
+  }
+
+  :global(body::-webkit-scrollbar-thumb) {
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background:
+      linear-gradient(180deg, rgba(200, 191, 255, 0.92), rgba(91, 80, 145, 0.82), rgba(200, 191, 255, 0.92));
+    background-size: 100% 220%;
+    background-clip: padding-box;
+    animation: scrollbarWave 5.4s linear infinite;
+  }
+
+  :global(body::-webkit-scrollbar-thumb:hover) {
+    animation-duration: 4s;
+  }
+
+  :global(body::-webkit-scrollbar-thumb:active) {
+    animation-duration: 2.8s;
   }
 
   .page {
+    position: relative;
+    isolation: isolate;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
-    padding: 32px;
+    gap: 18px;
+    padding: 40px 32px;
     max-width: 420px;
     width: 100%;
+    animation: pageEnter 0.48s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .page::before,
+  .page::after {
+    content: none;
   }
 
   h1 {
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 600;
+    letter-spacing: 0.01em;
   }
 
   .subtitle {
     font-size: 14px;
     color: var(--md-on-surface-variant);
+    text-align: center;
+    max-width: 320px;
+    line-height: 1.45;
   }
 
   .card {
+    position: relative;
     width: 100%;
-    background: var(--md-surface-container);
-    border-radius: var(--md-shape-lg);
-    padding: 8px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--md-surface-container) 86%, transparent);
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 72%, transparent);
+    border-radius: 24px;
+    padding: 10px;
+    animation: cardEnter 0.56s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .drop-zone {
+    position: relative;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+    gap: 12px;
     width: 100%;
-    min-height: 160px;
-    border: 2px dashed var(--md-outline-variant);
-    border-radius: var(--md-shape-sm);
-    padding: 24px;
+    min-height: 188px;
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 78%, transparent);
+    border-radius: 20px;
+    padding: 28px 24px;
     cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
+    transition:
+      border-color 0.24s ease,
+      background 0.24s ease;
     color: var(--md-on-surface-variant);
     text-align: center;
+    background: color-mix(in srgb, var(--md-surface) 92%, transparent);
+  }
+
+  .drop-zone::before,
+  .drop-zone::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .drop-zone::before {
+    background: linear-gradient(120deg, transparent 20%, rgba(255, 255, 255, 0.18), transparent 78%);
+    transform: translateX(-140%);
+    animation: dropSweep 5s ease-in-out infinite;
+  }
+
+  .drop-zone::after {
+    content: none;
+  }
+
+  .drop-zone > * {
+    position: relative;
+    z-index: 1;
   }
 
   .drop-zone:hover, .drop-zone.dragging {
     border-color: var(--md-primary);
-    background: var(--md-surface-container-high);
+    background: color-mix(in srgb, var(--md-surface-container-high) 90%, transparent);
+  }
+
+  .drop-zone svg {
+    color: var(--md-primary);
   }
 
   .drop-text {
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--md-on-surface);
   }
 
   .drop-hint {
     font-size: 12px;
-    opacity: 0.6;
+    opacity: 0.72;
+    line-height: 1.4;
   }
 
   .file-input {
     display: none;
   }
 
+  .quick-actions {
+    display: flex;
+    justify-content: center;
+    padding: 12px 8px 4px;
+  }
+
+  .ghost-btn {
+    min-height: 42px;
+    padding: 0 18px;
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 80%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--md-surface-container-high) 88%, transparent);
+    color: var(--md-on-surface);
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      border-color 0.2s ease,
+      background 0.2s ease,
+      opacity 0.2s ease;
+  }
+
+  .ghost-btn:hover {
+    border-color: color-mix(in srgb, var(--md-primary) 56%, transparent);
+    background: color-mix(in srgb, var(--md-primary-container) 74%, transparent);
+  }
+
+  .ghost-btn:active {
+    transform: scale(0.98);
+  }
+
+  .ghost-btn.is-loading {
+    opacity: 0.72;
+    pointer-events: none;
+  }
+
   .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
     font-size: 13px;
     font-weight: 500;
     padding: 10px 20px;
-    border-radius: var(--md-shape-sm);
+    border-radius: 999px;
     text-align: center;
-    animation: slideIn 0.2s ease-out;
+    animation: slideIn 0.24s ease-out;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
   }
 
   .toast-ok {
@@ -327,11 +501,11 @@
   }
 
   .profile-confirm {
-    padding: 20px;
+    padding: 22px 18px 18px;
     display: flex;
     flex-direction: column;
     gap: 12px;
-    animation: slideIn 0.2s ease-out;
+    animation: slideIn 0.24s ease-out;
   }
 
   .profile-confirm-label {
@@ -346,17 +520,18 @@
     font-family: inherit;
     padding: 10px 14px;
     border: 1px solid var(--md-outline-variant);
-    border-radius: var(--md-shape-sm);
-    background: var(--md-surface);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--md-surface) 92%, transparent);
     color: var(--md-on-surface);
     outline: none;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, background 0.15s;
   }
 
   .profile-name-input:focus {
     border-color: var(--md-primary);
     border-width: 2px;
     padding: 9px 13px;
+    background: color-mix(in srgb, var(--md-surface-container-high) 92%, transparent);
   }
 
   .profile-confirm-file {
@@ -379,7 +554,7 @@
     border: 1px solid var(--md-outline-variant);
     border-radius: 9999px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
   }
 
   .confirm-btn {
@@ -389,7 +564,8 @@
   }
 
   .confirm-btn:hover {
-    opacity: 0.9;
+    opacity: 0.94;
+    background: color-mix(in srgb, var(--md-primary) 92%, white 8%);
   }
 
   .cancel-btn {
@@ -400,4 +576,25 @@
   .cancel-btn:hover {
     background: var(--md-surface-container-high);
   }
+
+  @keyframes scrollbarWave {
+    from { background-position: 50% 0%; }
+    to { background-position: 50% 220%; }
+  }
+
+  @keyframes pageEnter {
+    from { opacity: 0; transform: translateY(18px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes cardEnter {
+    from { opacity: 0; transform: translateY(24px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes dropSweep {
+    0%, 18% { transform: translateX(-140%); }
+    42%, 100% { transform: translateX(140%); }
+  }
+
 </style>

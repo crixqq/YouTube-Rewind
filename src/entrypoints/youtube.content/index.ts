@@ -13,18 +13,24 @@ export default defineContentScript({
     const settings = await loadSettings();
     currentSettings = settings;
     applySettings(settings);
+    scheduleCustomLogoSync();
     startObserver();
     setupPlaybackSpeed(settings);
     setupDefaultQuality(settings);
     setupWatchTimer(settings);
     setupDownloadThumbnailButton(settings);
     setupFullscreenDetection();
+    document.addEventListener('yt-navigate-finish', () => {
+      scheduleCustomLogoSync(240);
+      scheduleCustomLogoSync(960);
+    });
 
     browser.storage.onChanged.addListener((changes) => {
       if (changes.ytr_settings?.newValue) {
         const s = changes.ytr_settings.newValue as Settings;
         currentSettings = s;
         applySettings(s);
+        scheduleCustomLogoSync();
         tagExploreSections();
         tagSidebarSections();
         tagActionButtons();
@@ -117,12 +123,59 @@ function applySettings(s: Settings): void {
     el.style.removeProperty('--ytr-custom-logo-ratio');
     d.ytrHideLogoAnimation = String(s.hideLogoAnimation);
   }
+  syncCustomLogoElement(s);
 
   // Playables
   d.ytrHidePlayables = String(s.hidePlayables);
   d.ytrHideFilterBar = String(s.hideFilterBar);
   d.ytrDisableAvatarLive = String(s.disableAvatarLiveRedirect);
 
+}
+
+function isVideoLogo(src: string): boolean {
+  return /^data:video\//i.test(src) || /\.(mp4|webm|ogg|mov)(?:$|[?#])/i.test(src);
+}
+
+function syncCustomLogoElement(settings: Settings | null = currentSettings): void {
+  const logoLink = document.querySelector('ytd-topbar-logo-renderer a#logo') as HTMLAnchorElement | null;
+  if (!logoLink) return;
+
+  logoLink.querySelector('.ytr-custom-logo-slot')?.remove();
+
+  if (!settings?.customLogo) return;
+
+  const slot = document.createElement('span');
+  slot.className = 'ytr-custom-logo-slot';
+  slot.style.setProperty('--ytr-custom-logo-ratio', String(settings.customLogoRatio || 'auto'));
+
+  if (isVideoLogo(settings.customLogo)) {
+    const video = document.createElement('video');
+    video.className = 'ytr-custom-logo-media';
+    video.src = settings.customLogo;
+    video.muted = true;
+    video.defaultMuted = true;
+    video.autoplay = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.setAttribute('aria-hidden', 'true');
+    slot.appendChild(video);
+    setTimeout(() => {
+      void video.play().catch(() => {});
+    }, 0);
+  } else {
+    const img = document.createElement('img');
+    img.className = 'ytr-custom-logo-media';
+    img.src = settings.customLogo;
+    img.alt = '';
+    img.setAttribute('aria-hidden', 'true');
+    slot.appendChild(img);
+  }
+
+  logoLink.appendChild(slot);
+}
+
+function scheduleCustomLogoSync(delay = 0): void {
+  window.setTimeout(() => syncCustomLogoElement(), delay);
 }
 
 // --- Explore More Topics: tag sections by title text ---
@@ -540,22 +593,40 @@ function showBlockOverlay(minutes: number): void {
     blockOverlay = null;
   }
 
+  const isRu = currentSettings?.language === 'ru';
+  const limit = Math.max(currentSettings?.watchTimeLimitMinutes || minutes, 1);
+  const progress = clamp(Math.round((minutes / limit) * 100), 0, 100);
+
   blockOverlay = document.createElement('div');
   blockOverlay.id = 'ytr-block-overlay';
   blockOverlay.innerHTML = `
+    <div class="ytr-block-aura"></div>
     <div class="ytr-block-content">
-      <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"/>
-        <polyline points="12 6 12 12 16 14"/>
-      </svg>
-      <h2 class="ytr-block-title">${escapeHtml(currentSettings?.language === 'ru' ? 'Дневной лимит достигнут' : 'Daily limit reached')}</h2>
+      <div class="ytr-block-icon-shell">
+        <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </div>
+      <div class="ytr-block-meta">
+        <span class="ytr-block-pill">${minutes} ${isRu ? 'мин' : 'min'}</span>
+        <span class="ytr-block-pill ytr-block-pill-progress">${progress}%</span>
+      </div>
+      <h2 class="ytr-block-title">${escapeHtml(isRu ? 'Дневной лимит достигнут' : 'Daily limit reached')}</h2>
       <p class="ytr-block-message">${escapeHtml(
-        (currentSettings?.language === 'ru'
+        (isRu
           ? `Вы смотрите YouTube уже ${minutes} минут сегодня. Сделайте перерыв!`
           : `You've been watching YouTube for ${minutes} minutes today. Take a break!`
         )
       )}</p>
-      <button class="ytr-block-close">${escapeHtml(currentSettings?.language === 'ru' ? 'Продолжить' : 'Continue anyway')}</button>
+      <div class="ytr-block-footnote">${escapeHtml(
+        isRu
+          ? 'Изменить лимит можно в popup расширения'
+          : 'You can change the limit in the extension popup'
+      )}</div>
+      <div class="ytr-block-actions">
+        <button class="ytr-block-close">${escapeHtml(isRu ? 'Продолжить' : 'Continue anyway')}</button>
+      </div>
     </div>
   `;
 
@@ -597,6 +668,90 @@ function showYtrToast(message: string): void {
   }, 3000);
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [meta, data = ''] = dataUrl.split(',');
+  const mime = meta.match(/data:([^;]+)/)?.[1] || 'image/png';
+  const decoded = atob(data);
+  const bytes = new Uint8Array(decoded.length);
+  for (let i = 0; i < decoded.length; i++) {
+    bytes[i] = decoded.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: mime });
+}
+
+async function resolveImageBlob(src: string): Promise<Blob> {
+  if (src.startsWith('data:')) {
+    return dataUrlToBlob(src);
+  }
+
+  const response = await fetch(src, {
+    credentials: 'omit',
+    cache: 'force-cache',
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  return await response.blob();
+}
+
+async function renderBlobToPng(blob: Blob): Promise<Blob> {
+  const objectUrl = URL.createObjectURL(blob);
+
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error('Could not decode image'));
+      image.src = objectUrl;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas unavailable');
+
+    ctx.drawImage(img, 0, 0);
+
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((result) => {
+        if (result) resolve(result);
+        else reject(new Error('Could not export image'));
+      }, 'image/png');
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function copyImageToClipboard(src: string): Promise<'image' | 'link' | 'failed'> {
+  if (!navigator.clipboard) return 'failed';
+
+  try {
+    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard.write) {
+      const pngBlobPromise = resolveImageBlob(src).then((sourceBlob) =>
+        sourceBlob.type === 'image/png' ? sourceBlob : renderBlobToPng(sourceBlob)
+      );
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlobPromise })]);
+      return 'image';
+    }
+  } catch {}
+
+  try {
+    await navigator.clipboard.writeText(src);
+    return 'link';
+  } catch {
+    return 'failed';
+  }
+}
+
 // --- Image overlay (shared by thumbnail preview + screenshot) ---
 
 function showImageOverlay(imgSrc: string, filename: string): void {
@@ -606,6 +761,8 @@ function showImageOverlay(imgSrc: string, filename: string): void {
   const isRu = currentSettings?.language === 'ru';
   const overlay = document.createElement('div');
   overlay.id = 'ytr-thumb-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
 
   const backdrop = document.createElement('div');
   backdrop.className = 'ytr-thumb-overlay-backdrop';
@@ -634,14 +791,46 @@ function showImageOverlay(imgSrc: string, filename: string): void {
   let startPanX = 0;
   let startPanY = 0;
 
+  const hint = document.createElement('div');
+  hint.className = 'ytr-thumb-overlay-hint';
+  hint.textContent = isRu
+    ? 'Колесо: масштаб • Перетаскивание: панорама • Двойной клик: сброс'
+    : 'Wheel: zoom • Drag: pan • Double-click: reset';
+
+  const actions = document.createElement('div');
+  actions.className = 'ytr-thumb-overlay-actions';
+
+  const viewControls = document.createElement('div');
+  viewControls.className = 'ytr-thumb-overlay-view-controls';
+
+  const zoomOutBtn = document.createElement('button');
+  zoomOutBtn.className = 'ytr-thumb-overlay-icon-btn';
+  zoomOutBtn.title = isRu ? 'Отдалить' : 'Zoom out';
+  zoomOutBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>`;
+
+  const scaleBadge = document.createElement('div');
+  scaleBadge.className = 'ytr-thumb-overlay-scale';
+
+  const zoomInBtn = document.createElement('button');
+  zoomInBtn.className = 'ytr-thumb-overlay-icon-btn';
+  zoomInBtn.title = isRu ? 'Приблизить' : 'Zoom in';
+  zoomInBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>`;
+
   function applyTransform(animate = false) {
+    const maxPanX = Math.max(img.clientWidth * scale, imgWrap.clientWidth) * 0.85;
+    const maxPanY = Math.max(img.clientHeight * scale, imgWrap.clientHeight) * 0.85;
+    panX = clamp(panX, -maxPanX, maxPanX);
+    panY = clamp(panY, -maxPanY, maxPanY);
+
     if (animate) {
       img.style.transition = 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)';
     } else {
       img.style.transition = 'none';
     }
     img.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
-    imgWrap.style.cursor = scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in';
+    imgWrap.style.cursor = scale !== 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in';
+    scaleBadge.textContent = `${Math.round(scale * 100)}%`;
+    content.dataset.zoomed = String(scale !== 1);
   }
 
   function resetTransform() {
@@ -651,11 +840,16 @@ function showImageOverlay(imgSrc: string, filename: string): void {
     applyTransform(true);
   }
 
+  function zoomBy(factor: number, animate = true) {
+    scale = clamp(scale * factor, 0.5, 8);
+    applyTransform(animate);
+  }
+
   // Scroll to zoom
   imgWrap.addEventListener('wheel', (e) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.15 : 0.15;
-    const newScale = Math.max(0.5, Math.min(8, scale + delta * scale));
+    const newScale = clamp(scale + delta * scale, 0.5, 8);
     // Zoom toward cursor position
     const rect = imgWrap.getBoundingClientRect();
     const cx = e.clientX - rect.left - rect.width / 2;
@@ -679,7 +873,7 @@ function showImageOverlay(imgSrc: string, filename: string): void {
     } else {
       clickTimer = setTimeout(() => {
         clickTimer = null;
-        if (scale < 1.5) {
+        if (scale === 1) {
           // Zoom to 2x toward click point
           const rect = imgWrap.getBoundingClientRect();
           const cx = e.clientX - rect.left - rect.width / 2;
@@ -697,7 +891,7 @@ function showImageOverlay(imgSrc: string, filename: string): void {
 
   // Drag to pan
   imgWrap.addEventListener('mousedown', (e) => {
-    if (scale <= 1) return;
+    if (scale === 1) return;
     e.preventDefault();
     isDragging = false;
     dragStartX = e.clientX;
@@ -716,7 +910,7 @@ function showImageOverlay(imgSrc: string, filename: string): void {
     const onUp = () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      imgWrap.style.cursor = scale > 1 ? 'grab' : 'zoom-in';
+      imgWrap.style.cursor = scale !== 1 ? 'grab' : 'zoom-in';
       // Delay resetting isDragging so click handler can check it
       setTimeout(() => { isDragging = false; }, 10);
     };
@@ -735,7 +929,7 @@ function showImageOverlay(imgSrc: string, filename: string): void {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       lastTouchDist = Math.hypot(dx, dy);
-    } else if (e.touches.length === 1 && scale > 1) {
+    } else if (e.touches.length === 1 && scale !== 1) {
       lastTouchX = e.touches[0].clientX;
       lastTouchY = e.touches[0].clientY;
       startPanX = panX;
@@ -754,55 +948,103 @@ function showImageOverlay(imgSrc: string, filename: string): void {
         applyTransform(false);
       }
       lastTouchDist = dist;
-    } else if (e.touches.length === 1 && scale > 1) {
+    } else if (e.touches.length === 1 && scale !== 1) {
       panX = startPanX + (e.touches[0].clientX - lastTouchX);
       panY = startPanY + (e.touches[0].clientY - lastTouchY);
       applyTransform(false);
     }
   }, { passive: false });
 
-  const actions = document.createElement('div');
-  actions.className = 'ytr-thumb-overlay-actions';
-
   const resetBtn = document.createElement('button');
-  resetBtn.className = 'ytr-thumb-overlay-reset';
+  resetBtn.className = 'ytr-thumb-overlay-icon-btn ytr-thumb-overlay-reset';
   resetBtn.title = isRu ? 'Сбросить' : 'Reset';
   resetBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.65 6.35A7.96 7.96 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>`;
   resetBtn.addEventListener('click', (e) => { e.stopPropagation(); resetTransform(); });
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'ytr-thumb-overlay-secondary';
+  copyBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v12h2V3h12V1Zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2Zm0 16H8V7h11v14Z"/></svg><span>${isRu ? 'Копировать' : 'Copy'}</span>`;
 
   const dlBtn = document.createElement('button');
   dlBtn.className = 'ytr-thumb-overlay-download';
   dlBtn.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M17 18v2H7v-2h10zm0-8h-4V4H11v6H7l5 5 5-5z"/></svg><span>${isRu ? 'Скачать' : 'Download'}</span>`;
 
+  const openBtn = document.createElement('button');
+  openBtn.className = 'ytr-thumb-overlay-icon-btn';
+  openBtn.title = isRu ? 'Открыть в новой вкладке' : 'Open in new tab';
+  openBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7ZM5 5h6v2H7v10h10v-4h2v6H5V5Z"/></svg>`;
+
   const closeBtn = document.createElement('button');
-  closeBtn.className = 'ytr-thumb-overlay-close';
+  closeBtn.className = 'ytr-thumb-overlay-icon-btn ytr-thumb-overlay-close';
   closeBtn.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
 
-  actions.appendChild(resetBtn);
+  viewControls.appendChild(zoomOutBtn);
+  viewControls.appendChild(scaleBadge);
+  viewControls.appendChild(zoomInBtn);
+  viewControls.appendChild(resetBtn);
+
+  actions.appendChild(viewControls);
+  actions.appendChild(copyBtn);
   actions.appendChild(dlBtn);
+  actions.appendChild(openBtn);
   actions.appendChild(closeBtn);
   content.appendChild(imgWrap);
+  content.appendChild(hint);
   content.appendChild(actions);
   overlay.appendChild(backdrop);
   overlay.appendChild(content);
 
-  const remove = () => { overlay.remove(); document.removeEventListener('keydown', handler); };
+  const tryCopyImage = async () => {
+    copyBtn.disabled = true;
+    copyBtn.classList.add('is-busy');
+    const result = await copyImageToClipboard(imgSrc);
+    copyBtn.classList.remove('is-busy');
+    copyBtn.disabled = false;
+
+    if (result === 'image') {
+      copyBtn.classList.add('is-success');
+      showYtrToast(isRu ? 'Изображение скопировано' : 'Image copied to clipboard');
+      setTimeout(() => copyBtn.classList.remove('is-success'), 1200);
+      return;
+    }
+
+    if (result === 'link') {
+      showYtrToast(isRu ? 'Ссылка на изображение скопирована' : 'Image link copied');
+      return;
+    }
+
+    showYtrToast(isRu ? 'Не удалось скопировать изображение' : 'Could not copy image');
+  };
+
+  const remove = () => {
+    overlay.remove();
+    document.documentElement.classList.remove('ytr-overlay-lock-scroll');
+    document.removeEventListener('keydown', handler);
+  };
   function handler(e: KeyboardEvent) {
     if (e.key === 'Escape') remove();
     if (e.key === '0' || e.key === 'r') resetTransform();
     if (e.key === '+' || e.key === '=') {
-      scale = Math.min(8, scale * 1.3);
-      applyTransform(true);
+      zoomBy(1.3);
     }
     if (e.key === '-') {
-      scale = Math.max(0.5, scale / 1.3);
-      applyTransform(true);
+      zoomBy(1 / 1.3);
     }
+    if (e.key.toLowerCase() === 'c') void tryCopyImage();
+    if (e.key.toLowerCase() === 'o') window.open(imgSrc, '_blank', 'noopener,noreferrer');
   }
 
   backdrop.addEventListener('click', remove);
   closeBtn.addEventListener('click', remove);
-  dlBtn.addEventListener('click', () => {
+  zoomOutBtn.addEventListener('click', (e) => { e.stopPropagation(); zoomBy(1 / 1.25); });
+  zoomInBtn.addEventListener('click', (e) => { e.stopPropagation(); zoomBy(1.25); });
+  copyBtn.addEventListener('click', (e) => { e.stopPropagation(); void tryCopyImage(); });
+  openBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    window.open(imgSrc, '_blank', 'noopener,noreferrer');
+  });
+  dlBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     const a = document.createElement('a');
     a.href = imgSrc;
     a.download = filename;
@@ -815,6 +1057,7 @@ function showImageOverlay(imgSrc: string, filename: string): void {
   });
 
   document.addEventListener('keydown', handler);
+  document.documentElement.classList.add('ytr-overlay-lock-scroll');
   document.body.appendChild(overlay);
   applyTransform(false);
 }

@@ -47,7 +47,8 @@
     justify-content: center;
     width: 46px;
     height: 46px;
-    border: none;
+    border: 2px solid transparent;
+    box-sizing: border-box;
     border-radius: var(--md-shape-lg);
     background: var(--md-surface-container-high);
     cursor: pointer;
@@ -76,7 +77,6 @@
   .shape-option:hover {
     background: var(--md-surface-container-highest);
     transform: scale(1.08);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
   .shape-option:active {
@@ -86,7 +86,7 @@
 
   .shape-option.active {
     background: var(--md-primary);
-    box-shadow: 0 0 0 2px var(--md-primary), 0 0 0 4px var(--md-surface);
+    border-color: color-mix(in srgb, var(--md-primary) 84%, var(--md-surface) 16%);
     transform: scale(1);
     animation: shapeSelect 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
   }
@@ -98,7 +98,6 @@
   }
 
   .shape-option.active:hover {
-    box-shadow: 0 0 0 2px var(--md-primary), 0 0 0 4px var(--md-surface), 0 3px 14px rgba(91, 80, 145, 0.35);
     transform: scale(1.08);
   }
 

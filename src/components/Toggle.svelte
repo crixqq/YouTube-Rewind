@@ -45,18 +45,18 @@
   }
 
   .toggle-row:active .toggle-track:not(.active) .toggle-thumb {
-    width: 26px;
-    height: 18px;
+    width: 28px;
+    height: 20px;
   }
 
   .toggle-row:active .toggle-track.active .toggle-thumb {
-    left: calc(100% - 30px);
-    width: 28px;
-    height: 26px;
+    left: calc(100% - 31px);
+    width: 29px;
+    height: 27px;
   }
 
   .toggle-row:active .toggle-track {
-    transform: scaleY(0.92);
+    transform: scale(1.05);
   }
 
   .toggle-label {

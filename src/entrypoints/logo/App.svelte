@@ -2,14 +2,22 @@
   import { loadSettings, saveSettings } from '@/lib/settings';
   import { t, setLocale } from '@/lib/i18n';
 
+  const MAX_LOGO_FILE_SIZE = 2 * 1024 * 1024;
+  const LOGO_ACCEPT = 'image/png,image/jpeg,image/gif,image/svg+xml,image/webp,video/mp4,video/webm,video/ogg';
+
   let logoUrl = $state('');
   let logoRatio = $state(0);
   let dragging = $state(false);
+  let pasting = $state(false);
   let loaded = $state(false);
 
   type Toast = { text: string; type: 'ok' | 'error' };
   let toast = $state<Toast | null>(null);
   let toastTimer = 0;
+
+  function isVideoLogo(src: string): boolean {
+    return /^data:video\//i.test(src) || /\.(mp4|webm|ogg|mov)(?:$|[?#])/i.test(src);
+  }
 
   function showToast(text: string, type: Toast['type'] = 'ok') {
     clearTimeout(toastTimer);
@@ -26,47 +34,99 @@
     });
   });
 
-  function processFile(file: File) {
+  function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('read_failed'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function validateRatio(width: number, height: number): number {
+    const ratio = width / height;
+    if (ratio > 6 || ratio < 0.5) {
+      throw new Error('ratio_invalid');
+    }
+    return ratio;
+  }
+
+  function loadImageRatio(dataUrl: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          resolve(validateRatio(img.naturalWidth, img.naturalHeight));
+        } catch (error) {
+          reject(error);
+        }
+      };
+      img.onerror = () => reject(new Error('type_invalid'));
+      img.src = dataUrl;
+    });
+  }
+
+  function loadVideoRatio(dataUrl: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      video.onloadedmetadata = () => {
+        try {
+          resolve(validateRatio(video.videoWidth, video.videoHeight));
+        } catch (error) {
+          reject(error);
+        }
+      };
+      video.onerror = () => reject(new Error('type_invalid'));
+      video.src = dataUrl;
+      video.load();
+    });
+  }
+
+  async function processFile(file: File) {
     if (!file) return;
-    if (file.size > 512 * 1024) {
+    if (file.size > MAX_LOGO_FILE_SIZE) {
       showToast(t('customLogoErrorSize'), 'error');
       return;
     }
-    if (!file.type.startsWith('image/')) {
+
+    const fileType = file.type.toLowerCase();
+    const isImage = fileType.startsWith('image/');
+    const isVideo = fileType.startsWith('video/');
+
+    if (!isImage && !isVideo) {
       showToast(t('customLogoErrorType'), 'error');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const img = new Image();
-      img.onload = () => {
-        const ratio = img.naturalWidth / img.naturalHeight;
-        if (ratio > 6 || ratio < 0.5) {
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const ratio = isVideo ? await loadVideoRatio(dataUrl) : await loadImageRatio(dataUrl);
+      logoUrl = dataUrl;
+      logoRatio = ratio;
+      await saveSettings({ customLogo: dataUrl, customLogoRatio: ratio });
+      showToast(t('customLogoSaved'));
+    } catch (error) {
+      if (error instanceof Error && error.message === 'ratio_invalid') {
           showToast(t('customLogoErrorRatio'), 'error');
-          return;
-        }
-        logoUrl = dataUrl;
-        logoRatio = ratio;
-        saveSettings({ customLogo: dataUrl, customLogoRatio: ratio });
-        showToast(t('customLogoSaved'));
-      };
-      img.onerror = () => showToast(t('customLogoErrorType'), 'error');
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
+      } else {
+        showToast(t('customLogoErrorType'), 'error');
+      }
+    }
   }
 
   function onFileInput(e: Event) {
     const input = e.target as HTMLInputElement;
-    if (input.files?.[0]) processFile(input.files[0]);
+    if (input.files?.[0]) void processFile(input.files[0]);
     input.value = '';
   }
 
   function onDrop(e: DragEvent) {
     e.preventDefault();
     dragging = false;
-    if (e.dataTransfer?.files?.[0]) processFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer?.files?.[0]) void processFile(e.dataTransfer.files[0]);
   }
 
   function onDragOver(e: DragEvent) {
@@ -83,6 +143,31 @@
     logoRatio = 0;
     saveSettings({ customLogo: '', customLogoRatio: 0 });
     showToast(t('customLogoRemoved'));
+  }
+
+  async function pasteFromClipboard() {
+    if (!navigator.clipboard?.read) {
+      showToast(t('pasteImageError'), 'error');
+      return;
+    }
+
+    try {
+      pasting = true;
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const mediaType = item.types.find((type) => type.startsWith('image/') || type.startsWith('video/'));
+        if (!mediaType) continue;
+        const blob = await item.getType(mediaType);
+        const ext = mediaType.split('/')[1]?.replace('jpeg', 'jpg') || (mediaType.startsWith('video/') ? 'webm' : 'png');
+        await processFile(new File([blob], `clipboard-logo.${ext}`, { type: mediaType }));
+        return;
+      }
+      showToast(t('pasteImageEmpty'), 'error');
+    } catch {
+      showToast(t('pasteImageError'), 'error');
+    } finally {
+      pasting = false;
+    }
   }
 </script>
 
@@ -102,7 +187,11 @@
         ondragleave={onDragLeave}
       >
         {#if logoUrl}
-          <img src={logoUrl} alt="Logo" class="preview" />
+          {#if isVideoLogo(logoUrl)}
+            <video src={logoUrl} class="preview" muted autoplay loop playsinline></video>
+          {:else}
+            <img src={logoUrl} alt="Logo" class="preview" />
+          {/if}
         {:else}
           <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -112,18 +201,23 @@
           <span class="drop-text">{t('customLogoDrop')}</span>
           <span class="drop-hint">{t('customLogoHint')}</span>
         {/if}
-        <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onchange={onFileInput} class="file-input" />
+        <input type="file" accept={LOGO_ACCEPT} onchange={onFileInput} class="file-input" />
       </label>
 
-      {#if logoUrl}
-        <div class="actions">
+      <div class="actions" class:actions-single={!logoUrl}>
+        {#if logoUrl}
           <label class="btn btn-tonal">
             {t('customLogoUpload')}
-            <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onchange={onFileInput} class="file-input" />
+            <input type="file" accept={LOGO_ACCEPT} onchange={onFileInput} class="file-input" />
           </label>
+        {/if}
+        <button class="btn btn-ghost" class:is-loading={pasting} onclick={() => void pasteFromClipboard()}>
+          {t('pasteClipboard')}
+        </button>
+        {#if logoUrl}
           <button class="btn btn-outline" onclick={removeLogo}>{t('customLogoRemove')}</button>
-        </div>
-      {/if}
+        {/if}
+      </div>
     </div>
 
     {#if toast}
@@ -176,91 +270,182 @@
     }
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    :global(*),
+    :global(*::before),
+    :global(*::after) {
+      animation-duration: 0s !important;
+      transition-duration: 0s !important;
+    }
+  }
+
   :global(*) { margin: 0; padding: 0; box-sizing: border-box; }
   :global(body) {
-    background: var(--md-surface);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--md-surface) 94%, #17131f 6%), var(--md-surface)),
+      linear-gradient(120deg, color-mix(in srgb, var(--md-primary-container) 18%, transparent), transparent 42%);
     color: var(--md-on-surface);
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--md-primary) transparent;
+    scrollbar-gutter: stable both-edges;
+  }
+
+  :global(body::-webkit-scrollbar) {
+    width: 10px;
+  }
+
+  :global(body::-webkit-scrollbar-track) {
+    background: rgba(0, 0, 0, 0.04);
+  }
+
+  :global(body::-webkit-scrollbar-thumb) {
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background:
+      linear-gradient(180deg, rgba(200, 191, 255, 0.92), rgba(91, 80, 145, 0.82), rgba(200, 191, 255, 0.92));
+    background-size: 100% 220%;
+    background-clip: padding-box;
+    animation: scrollbarWave 5.4s linear infinite;
+  }
+
+  :global(body::-webkit-scrollbar-thumb:hover) {
+    animation-duration: 4s;
+  }
+
+  :global(body::-webkit-scrollbar-thumb:active) {
+    animation-duration: 2.8s;
   }
 
   .page {
+    position: relative;
+    isolation: isolate;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
-    padding: 32px;
+    gap: 18px;
+    padding: 40px 32px;
     max-width: 420px;
     width: 100%;
+    animation: pageEnter 0.48s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .page::before,
+  .page::after {
+    content: none;
   }
 
   h1 {
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 600;
+    letter-spacing: 0.01em;
   }
 
   .subtitle {
     font-size: 14px;
     color: var(--md-on-surface-variant);
+    text-align: center;
+    max-width: 320px;
+    line-height: 1.45;
   }
 
   .card {
+    position: relative;
     width: 100%;
-    background: var(--md-surface-container);
-    border-radius: var(--md-shape-lg);
-    padding: 8px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--md-surface-container) 86%, transparent);
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 72%, transparent);
+    border-radius: 24px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
+    animation: cardEnter 0.56s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .drop-zone {
+    position: relative;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+    gap: 12px;
     width: 100%;
-    min-height: 160px;
-    border: 2px dashed var(--md-outline-variant);
-    border-radius: var(--md-shape-sm);
-    padding: 24px;
+    min-height: 188px;
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 78%, transparent);
+    border-radius: 20px;
+    padding: 28px 24px;
     cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
+    transition:
+      border-color 0.24s ease,
+      background 0.24s ease;
     color: var(--md-on-surface-variant);
     text-align: center;
+    background: color-mix(in srgb, var(--md-surface) 92%, transparent);
+  }
+
+  .drop-zone::before,
+  .drop-zone::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .drop-zone::before {
+    background: linear-gradient(120deg, transparent 20%, rgba(255, 255, 255, 0.18), transparent 78%);
+    transform: translateX(-140%);
+    animation: dropSweep 5s ease-in-out infinite;
+  }
+
+  .drop-zone::after {
+    content: none;
+  }
+
+  .drop-zone > * {
+    position: relative;
+    z-index: 1;
   }
 
   .drop-zone:hover, .drop-zone.dragging {
     border-color: var(--md-primary);
-    background: var(--md-surface-container-high);
+    background: color-mix(in srgb, var(--md-surface-container-high) 90%, transparent);
   }
 
   .drop-zone.has-logo {
     border-style: solid;
-    border-color: var(--md-outline-variant);
+    border-color: color-mix(in srgb, var(--md-outline-variant) 88%, transparent);
     min-height: auto;
-    padding: 16px;
+    padding: 18px 20px;
   }
 
   .drop-zone.has-logo:hover {
     border-color: var(--md-primary);
   }
 
+  .drop-zone svg {
+    color: var(--md-primary);
+  }
+
   .drop-text {
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--md-on-surface);
   }
 
   .drop-hint {
     font-size: 12px;
-    opacity: 0.6;
+    opacity: 0.72;
+    line-height: 1.4;
   }
 
   .preview {
-    max-height: 48px;
+    max-height: 54px;
     max-width: 280px;
     object-fit: contain;
   }
@@ -271,27 +456,41 @@
 
   .actions {
     display: flex;
-    gap: 8px;
+    flex-wrap: wrap;
+    gap: 10px;
     justify-content: center;
+    padding: 2px 2px 6px;
+  }
+
+  .actions.actions-single {
+    padding-top: 2px;
   }
 
   .btn {
+    min-height: 42px;
     font-size: 13px;
     font-family: inherit;
-    font-weight: 500;
+    font-weight: 600;
     padding: 8px 20px;
-    border: none;
-    border-radius: var(--md-shape-sm);
+    border: 1px solid transparent;
+    border-radius: 999px;
     cursor: pointer;
-    transition: opacity 0.15s, background 0.15s;
+    transition:
+      opacity 0.18s ease,
+      background 0.18s ease,
+      border-color 0.18s ease,
+      transform 0.18s ease;
   }
 
-  .btn:hover { opacity: 0.88; }
-  .btn:active { transform: scale(0.97); }
+  .btn:hover {
+    opacity: 0.94;
+  }
+  .btn:active { transform: scale(0.98); }
 
   .btn-tonal {
     background: var(--md-primary-container);
     color: var(--md-on-primary-container);
+    border-color: color-mix(in srgb, var(--md-primary) 28%, transparent);
   }
 
   .btn-outline {
@@ -300,17 +499,39 @@
     border: 1px solid var(--md-outline-variant);
   }
 
+  .btn-ghost {
+    background: color-mix(in srgb, var(--md-surface-container-high) 88%, transparent);
+    color: var(--md-on-surface);
+    border-color: color-mix(in srgb, var(--md-outline-variant) 80%, transparent);
+  }
+
   .btn-outline:hover {
     background: var(--md-surface-container-high);
   }
 
+  .btn-ghost:hover {
+    background: color-mix(in srgb, var(--md-primary-container) 74%, transparent);
+    border-color: color-mix(in srgb, var(--md-primary) 56%, transparent);
+  }
+
+  .btn.is-loading {
+    opacity: 0.72;
+    pointer-events: none;
+  }
+
   .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
     font-size: 13px;
     font-weight: 500;
     padding: 10px 20px;
-    border-radius: var(--md-shape-sm);
+    border-radius: 999px;
     text-align: center;
     animation: slideIn 0.2s ease-out;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
   }
 
   .toast-ok {
@@ -337,4 +558,25 @@
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
   }
+
+  @keyframes scrollbarWave {
+    from { background-position: 50% 0%; }
+    to { background-position: 50% 220%; }
+  }
+
+  @keyframes pageEnter {
+    from { opacity: 0; transform: translateY(18px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes cardEnter {
+    from { opacity: 0; transform: translateY(24px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes dropSweep {
+    0%, 18% { transform: translateX(-140%); }
+    42%, 100% { transform: translateX(140%); }
+  }
+
 </style>

@@ -43,7 +43,7 @@
   }
 
   .settings-section:hover .section-icon {
-    transform: scale(1.15);
+    transform: scale(1.08);
   }
 
   .settings-section:hover .section-title {
@@ -54,13 +54,15 @@
   .section-content {
     background: var(--md-surface-container);
     border-radius: var(--md-shape-lg);
+    border: 1px solid transparent;
     padding: 4px 0;
     overflow: hidden;
-    transition: box-shadow 0.25s cubic-bezier(0.2, 0, 0, 1),
-                transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+    transition: border-color 0.25s cubic-bezier(0.2, 0, 0, 1),
+                background 0.25s cubic-bezier(0.2, 0, 0, 1);
   }
 
   .section-content:hover {
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    background: var(--md-surface-container-high);
+    border-color: color-mix(in srgb, var(--md-outline-variant) 76%, transparent);
   }
 </style>
