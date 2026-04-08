@@ -42,12 +42,27 @@
 
 ---
 
-## Features
+## <img src="docs/icons/overview.svg" width="18" height="18" alt=""> Overview
 
 This README reflects the current `0.4.0` release line, including standalone settings, fullscreen preview tools, frame screenshots, custom logo media support, and beta toggles that can be saved into profiles.
 
+YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and more personal without losing the parts that matter.
+
+- <img src="docs/icons/bullet_filter.svg" width="16" height="16" alt=""> Hide clutter across the homepage, search results, top bar, watch page, and sidebar
+- <img src="docs/icons/bullet_profiles.svg" width="16" height="16" alt=""> Save presets and custom profiles, including beta/labs setups
+- <img src="docs/icons/bullet_preview.svg" width="16" height="16" alt=""> Preview, copy, and download thumbnails in fullscreen
+- <img src="docs/icons/bullet_screenshot.svg" width="16" height="16" alt=""> Capture clean video-frame screenshots
+- <img src="docs/icons/bullet_appearance.svg" width="16" height="16" alt=""> Customize thumbnails, avatar shapes, banners, player layout, and even the YouTube logo
+- <img src="docs/icons/bullet_languages.svg" width="16" height="16" alt=""> Use the settings UI in 11 languages
+
+> Most settings apply instantly, so you can see the result right away without reloading YouTube.
+
+---
+
+## <img src="docs/icons/features.svg" width="18" height="18" alt=""> Features
+
 <details open>
-<summary><b>Profiles</b></summary>
+<summary><b><img src="docs/icons/profiles.svg" width="16" height="16" alt=""> Profiles</b></summary>
 
 | | |
 |---|---|
@@ -58,7 +73,7 @@ This README reflects the current `0.4.0` release line, including standalone sett
 </details>
 
 <details open>
-<summary><b>Player</b></summary>
+<summary><b><img src="docs/icons/player.svg" width="16" height="16" alt=""> Player</b></summary>
 
 | | |
 |---|---|
@@ -72,7 +87,7 @@ This README reflects the current `0.4.0` release line, including standalone sett
 </details>
 
 <details open>
-<summary><b>Watch Page</b></summary>
+<summary><b><img src="docs/icons/watch_page.svg" width="16" height="16" alt=""> Watch Page</b></summary>
 
 | | |
 |---|---|
@@ -82,7 +97,7 @@ This README reflects the current `0.4.0` release line, including standalone sett
 </details>
 
 <details open>
-<summary><b>Watch Timer</b></summary>
+<summary><b><img src="docs/icons/watch_timer.svg" width="16" height="16" alt=""> Watch Timer</b></summary>
 
 | | |
 |---|---|
@@ -93,7 +108,7 @@ This README reflects the current `0.4.0` release line, including standalone sett
 </details>
 
 <details open>
-<summary><b>Homepage</b></summary>
+<summary><b><img src="docs/icons/homepage.svg" width="16" height="16" alt=""> Homepage</b></summary>
 
 | | |
 |---|---|
@@ -103,7 +118,7 @@ This README reflects the current `0.4.0` release line, including standalone sett
 </details>
 
 <details open>
-<summary><b>Search</b></summary>
+<summary><b><img src="docs/icons/search.svg" width="16" height="16" alt=""> Search</b></summary>
 
 | | |
 |---|---|
@@ -112,7 +127,7 @@ This README reflects the current `0.4.0` release line, including standalone sett
 </details>
 
 <details open>
-<summary><b>Top Bar</b></summary>
+<summary><b><img src="docs/icons/top_bar.svg" width="16" height="16" alt=""> Top Bar</b></summary>
 
 | | |
 |---|---|
@@ -124,7 +139,7 @@ This README reflects the current `0.4.0` release line, including standalone sett
 </details>
 
 <details open>
-<summary><b>Sidebar</b></summary>
+<summary><b><img src="docs/icons/sidebar.svg" width="16" height="16" alt=""> Sidebar</b></summary>
 
 | | |
 |---|---|
@@ -133,7 +148,7 @@ This README reflects the current `0.4.0` release line, including standalone sett
 </details>
 
 <details open>
-<summary><b>Appearance</b></summary>
+<summary><b><img src="docs/icons/appearance.svg" width="16" height="16" alt=""> Appearance</b></summary>
 
 | | |
 |---|---|
@@ -145,7 +160,7 @@ This README reflects the current `0.4.0` release line, including standalone sett
 </details>
 
 <details open>
-<summary><b>Settings Data</b></summary>
+<summary><b><img src="docs/icons/settings_data.svg" width="16" height="16" alt=""> Settings Data</b></summary>
 
 | | |
 |---|---|
@@ -156,7 +171,7 @@ This README reflects the current `0.4.0` release line, including standalone sett
 </details>
 
 <details open>
-<summary><b>Beta Features</b></summary>
+<summary><b><img src="docs/icons/beta_features.svg" width="16" height="16" alt=""> Beta Features</b></summary>
 
 | | |
 |---|---|
@@ -169,11 +184,9 @@ This README reflects the current `0.4.0` release line, including standalone sett
 
 </details>
 
-> All settings apply instantly — no page reload needed.
-
 ---
 
-## Languages
+## <img src="docs/icons/languages.svg" width="18" height="18" alt=""> Languages
 
 The extension UI is available in **11 languages** (auto-detected from browser, or pick manually):
 
@@ -181,7 +194,7 @@ The extension UI is available in **11 languages** (auto-detected from browser, o
 
 ---
 
-## Installation
+## <img src="docs/icons/installation.svg" width="18" height="18" alt=""> Installation
 
 ### <img src="https://cdn.simpleicons.org/firefoxbrowser/FF7139" width="16" height="16"> Firefox (Firefox, Zen, Waterfox, LibreWolf)
 
@@ -246,7 +259,7 @@ The `.xpi` file will be in the `web-ext-artifacts/` folder. To sign it for perma
 
 ---
 
-## How it works
+## <img src="docs/icons/how_it_works.svg" width="18" height="18" alt=""> How It Works
 
 The extension injects CSS into YouTube and uses `data-*` attributes on `<html>` to toggle styles. Settings are saved to `browser.storage.local` — the content script updates attributes instantly, no reload required.
 
@@ -254,7 +267,7 @@ For things CSS can't handle (like "Explore more topics"), a lightweight Mutation
 
 ---
 
-## Tech Stack
+## <img src="docs/icons/tech_stack.svg" width="18" height="18" alt=""> Tech Stack
 
 [WXT](https://wxt.dev) &middot; [Svelte 5](https://svelte.dev) &middot; CSS injection via manifest &middot; `browser.storage.local`
 
