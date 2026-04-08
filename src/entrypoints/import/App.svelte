@@ -296,18 +296,25 @@
     border-radius: 999px;
     border: 2px solid transparent;
     background:
-      linear-gradient(180deg, rgba(200, 191, 255, 0.92), rgba(91, 80, 145, 0.82), rgba(200, 191, 255, 0.92));
-    background-size: 100% 220%;
+      repeating-linear-gradient(
+        180deg,
+        rgba(200, 191, 255, 0.92) 0 10px,
+        rgba(91, 80, 145, 0.82) 10px 22px,
+        rgba(220, 214, 255, 0.94) 22px 34px
+      );
+    background-size: 100% 180%;
+    background-position: 50% 0%;
     background-clip: padding-box;
-    animation: scrollbarWave 5.4s linear infinite;
+    animation: scrollbarWave 4.8s linear infinite;
+    will-change: background-position;
   }
 
   :global(body::-webkit-scrollbar-thumb:hover) {
-    animation-duration: 4s;
+    animation-duration: 3.2s;
   }
 
   :global(body::-webkit-scrollbar-thumb:active) {
-    animation-duration: 2.8s;
+    animation-duration: 2.2s;
   }
 
   .page {
@@ -447,12 +454,13 @@
   }
 
   .ghost-btn:hover {
-    border-color: color-mix(in srgb, var(--md-primary) 56%, transparent);
-    background: color-mix(in srgb, var(--md-primary-container) 74%, transparent);
+    border-color: color-mix(in srgb, var(--md-outline) 74%, transparent);
+    background: color-mix(in srgb, var(--md-surface-container-high) 92%, transparent);
+    transform: scale(1.03);
   }
 
   .ghost-btn:active {
-    transform: scale(0.98);
+    transform: scale(0.95);
   }
 
   .ghost-btn.is-loading {
@@ -566,6 +574,7 @@
   .confirm-btn:hover {
     opacity: 0.94;
     background: color-mix(in srgb, var(--md-primary) 92%, white 8%);
+    transform: scale(1.02);
   }
 
   .cancel-btn {
@@ -575,11 +584,12 @@
 
   .cancel-btn:hover {
     background: var(--md-surface-container-high);
+    transform: scale(1.02);
   }
 
   @keyframes scrollbarWave {
     from { background-position: 50% 0%; }
-    to { background-position: 50% 220%; }
+    to { background-position: 50% 180%; }
   }
 
   @keyframes pageEnter {

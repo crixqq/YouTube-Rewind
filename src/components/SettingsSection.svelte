@@ -57,12 +57,5 @@
     border: 1px solid transparent;
     padding: 4px 0;
     overflow: hidden;
-    transition: border-color 0.25s cubic-bezier(0.2, 0, 0, 1),
-                background 0.25s cubic-bezier(0.2, 0, 0, 1);
-  }
-
-  .section-content:hover {
-    background: var(--md-surface-container-high);
-    border-color: color-mix(in srgb, var(--md-outline-variant) 76%, transparent);
   }
 </style>

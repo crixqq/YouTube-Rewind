@@ -7,6 +7,11 @@
   import ShapePicker from '@/components/ShapePicker.svelte';
   import ChipGroup from '@/components/ChipGroup.svelte';
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const isStandaloneView = urlParams.get('view') === 'page';
+  const MAX_LOGO_FILE_SIZE = 2 * 1024 * 1024;
+  const LOGO_ACCEPT = 'image/png,image/jpeg,image/gif,image/svg+xml,image/webp,video/mp4,video/webm,video/ogg';
+
   let settings = $state<Settings>({ ...DEFAULT_SETTINGS });
   let loaded = $state(false);
   let langVersion = $state(0);
@@ -20,6 +25,33 @@
   type DataFeedback = '' | 'copied' | 'imported' | 'error' | 'profile';
   let dataFeedback = $state<DataFeedback>('');
   let feedbackTimeout: ReturnType<typeof setTimeout>;
+  type SheetFeedback = { text: string; type: 'ok' | 'error' } | null;
+  type SheetKind = '' | 'import' | 'profile-import' | 'logo';
+  type SearchableFilter = { key: string; label: string; checked: boolean; onchange: (value: boolean) => void };
+  let activeSheet = $state<SheetKind>('');
+  let sheetFeedback = $state<SheetFeedback>(null);
+  let sheetFeedbackTimeout: ReturnType<typeof setTimeout>;
+  let betaConfirmOpen = $state(false);
+
+  let importDragging = $state(false);
+  let importPasting = $state(false);
+  let pendingProfileText = $state('');
+  let pendingProfileFileName = $state('');
+  let sheetProfileNameInput = $state('');
+
+  let logoDragging = $state(false);
+  let logoPasting = $state(false);
+  let logoDraftUrl = $state('');
+  let logoDraftRatio = $state(0);
+
+  function formatPercent(value: number): string {
+    return `${Math.round(value)}%`;
+  }
+
+  function parsePercent(text: string): number {
+    const numeric = parseInt(text.replace('%', '').trim(), 10);
+    return Number.isNaN(numeric) ? 100 : numeric;
+  }
 
   // Update checker
   type UpdateState = 'idle' | 'checking' | 'available' | 'up-to-date' | 'error';
@@ -133,6 +165,93 @@
     { id: 'zh', label: '中文' },
   ] as const;
 
+  const SEARCH_ALIASES: Record<string, string[]> = {
+    sectionProfiles: ['profile', 'profiles', 'preset', 'presets', 'профиль', 'профили', 'пресет', 'пресеты'],
+    sectionPlayer: ['player', 'playback', 'speed', 'quality', 'download', 'плеер', 'скорость', 'качество', 'скачивание'],
+    sectionWatchPage: ['watch page', 'video page', 'action buttons', 'buttons under video', 'страница видео', 'кнопки под видео'],
+    sectionWatchTimer: ['watch timer', 'daily limit', 'screen time', 'timeout', 'таймер', 'лимит времени', 'ограничение времени'],
+    sectionHomepageFilter: ['home', 'homepage', 'feed', 'recommendations', 'главная', 'лента', 'рекомендации'],
+    sectionSearchFilter: ['search', 'search page', 'search results', 'поиск', 'результаты поиска'],
+    sectionTopBar: ['top bar', 'header', 'masthead', 'logo', 'branding', 'верхняя панель', 'шапка', 'логотип'],
+    sectionSidebarFilter: ['sidebar', 'guide', 'left menu', 'боковая панель', 'левое меню'],
+    sectionThumbnailEffect: ['thumbnail', 'preview image', 'cover', 'миниатюра', 'превью', 'обложка'],
+    sectionAvatarShape: ['avatar', 'channel icon', 'profile picture', 'аватар', 'иконка канала', 'форма'],
+    sectionData: ['backup', 'import', 'export', 'copy', 'paste', 'reset', 'бэкап', 'импорт', 'экспорт', 'копировать', 'вставить', 'сброс'],
+    sectionBeta: ['beta', 'experimental', 'labs', 'preview features', 'бета', 'экспериментальные функции'],
+    settingCustomLogo: ['logo', 'branding', 'channel mark', 'логотип'],
+    settingCustomLogoSize: ['logo size', 'logo scale', 'размер логотипа', 'масштаб логотипа'],
+    settingHideLogoAnimation: ['logo motion', 'logo animation', 'анимация логотипа'],
+    settingVideosPerRow: ['grid', 'columns', 'videos per line', 'сетка', 'колонки', 'видео в ряд'],
+    settingWatchTimeLimit: ['limit', 'daily limit', 'screen time', 'лимит', 'ограничение'],
+    settingWatchTimerEnabled: ['watch timer', 'time counter', 'таймер', 'счетчик времени'],
+    settingBetaStandalonePage: ['tab mode', 'standalone page', 'separate tab', 'вкладка', 'отдельная вкладка'],
+    settingBetaHomepageRevealAnimation: ['feed animation', 'home animation', 'card reveal', 'анимация ленты', 'анимация карточек'],
+    settingBetaVideoFrameScreenshot: ['screenshot', 'frame capture', 'video frame', 'скриншот', 'кадр видео'],
+    settingBetaScreenshotOpenPreview: ['screenshot preview', 'open screenshot', 'предпросмотр скриншота', 'просмотр скриншота'],
+    hideJoinButton: ['join', 'membership', 'sponsor', 'спонсировать'],
+    hideSubscribeButton: ['subscribe', 'подписаться', 'подписка'],
+    hideLikeDislike: ['like', 'dislike', 'лайк', 'дизлайк'],
+    hideShareButton: ['share', 'поделиться'],
+    hideDownloadButton: ['download', 'скачать'],
+    hideClipButton: ['clip', 'remix', 'клип', 'ремикс'],
+    hideThanksButton: ['thanks', 'super thanks', 'спасибо'],
+    hideSaveButton: ['save', 'playlist', 'сохранить'],
+    hideShorts: ['shorts', 'reels', 'шортс', 'короткие видео'],
+    hidePosts: ['posts', 'community', 'посты', 'сообщество'],
+    hideMixes: ['mixes', 'playlist mixes', 'миксы'],
+    hideBreakingNews: ['breaking news', 'news shelf', 'срочные новости', 'новости'],
+    hideLatestPosts: ['latest posts', 'new posts', 'свежие посты'],
+    hideExploreTopics: ['explore topics', 'topics', 'темы'],
+    hidePlayables: ['playables', 'games', 'игры'],
+    hideFilterBar: ['chip bar', 'filter chips', 'фильтры', 'фильтр бар'],
+    disableAvatarLiveRedirect: ['avatar live redirect', 'live avatar', 'аватар стрима', 'редирект с аватара'],
+    hideSearchShorts: ['shorts in search', 'шортс в поиске'],
+    hideSearchChannels: ['channels in search', 'каналы в поиске'],
+    hideSearchPeopleWatched: ['people watched', 'watched also', 'смотрели также'],
+    hideTopbarCreate: ['create button', 'upload button', 'кнопка создать'],
+    hideTopbarVoiceSearch: ['voice search', 'голосовой поиск'],
+    hideTopbarNotifications: ['notifications', 'bell', 'уведомления'],
+    hideTopbarSearch: ['search bar', 'поисковая строка'],
+    hideCountryCode: ['country code', 'код страны'],
+    hideSidebarSubscriptions: ['subscriptions', 'подписки'],
+    hideSidebarYou: ['you section', 'ваше'],
+    hideSidebarExplore: ['explore section', 'интересное'],
+    hideSidebarMoreFromYT: ['more from youtube', 'ещё от youtube'],
+    hideSidebarReportHistory: ['report history', 'история жалоб'],
+    hideSidebarFooter: ['sidebar footer', 'footer', 'подвал'],
+  };
+
+  function capitalizeLabel(value: string): string {
+    if (!value) return value;
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+
+  function getLanguageDisplayName(langId: string, includeLocalized = true): string {
+    if (langId === 'auto') return t('langAuto');
+    const native = LANGUAGES.find((lang) => lang.id === langId)?.label ?? langId;
+    if (!includeLocalized) return native;
+
+    const localized = getLanguageLocalizedLabel(langId);
+    if (!localized) return native;
+    return `${native} (${localized})`;
+  }
+
+  function getLanguageLocalizedLabel(langId: string): string {
+    if (langId === 'auto') return '';
+    try {
+      const displayLocale = settings.language === 'auto'
+        ? browser.i18n.getUILanguage()
+        : settings.language;
+      const displayNames = new Intl.DisplayNames([displayLocale], { type: 'language' });
+      const translated = capitalizeLabel(displayNames.of(langId) || '');
+      const native = LANGUAGES.find((lang) => lang.id === langId)?.label ?? langId;
+      if (!translated || translated.toLowerCase() === native.toLowerCase()) return '';
+      return translated;
+    } catch {
+      return '';
+    }
+  }
+
   // Track whether current profile has been modified
   let profileModified = $state(false);
 
@@ -150,9 +269,69 @@
     };
   }
 
+  const PROFILE_BETA_KEYS: (keyof Settings)[] = [
+    'betaEnabled',
+    'downloadThumbnailButton',
+    'disableAvatarLiveRedirect',
+    'betaStandalonePage',
+    'betaHomepageRevealAnimation',
+    'betaVideoFrameScreenshot',
+    'betaScreenshotOpenPreview',
+  ];
+
+  function normalizeLocalSettings(next: Settings): Settings {
+    const normalized = cloneSettings(next);
+    normalized.customLogoScale = Math.min(220, Math.max(40, Math.round(normalized.customLogoScale || 100)));
+    if (!normalized.betaEnabled) {
+      normalized.downloadThumbnailButton = false;
+      normalized.disableAvatarLiveRedirect = false;
+      normalized.betaStandalonePage = false;
+      normalized.betaHomepageRevealAnimation = false;
+      normalized.betaVideoFrameScreenshot = false;
+      normalized.betaScreenshotOpenPreview = false;
+    }
+    if (!normalized.betaVideoFrameScreenshot) {
+      normalized.betaScreenshotOpenPreview = false;
+    }
+    return normalized;
+  }
+
+  function extractProfileSettings(source: Partial<Settings>): Partial<Settings> {
+    const profileSettings = { ...source };
+    delete (profileSettings as any).language;
+    delete (profileSettings as any).customProfiles;
+    delete (profileSettings as any).activeProfile;
+    return profileSettings;
+  }
+
+  function profileHasStoredBetaSettings(profileSettings: Partial<Settings>): boolean {
+    return PROFILE_BETA_KEYS.some((key) => key in profileSettings);
+  }
+
+  function resolveAppliedProfileSettings(profileSettingsInput: Partial<Settings>): Partial<Settings> {
+    const profileSettings = extractProfileSettings(profileSettingsInput);
+    if (profileHasStoredBetaSettings(profileSettings)) {
+      return profileSettings;
+    }
+    return {
+      ...profileSettings,
+      betaEnabled: settings.betaEnabled,
+      downloadThumbnailButton: settings.downloadThumbnailButton,
+      disableAvatarLiveRedirect: settings.disableAvatarLiveRedirect,
+      betaStandalonePage: settings.betaStandalonePage,
+      betaHomepageRevealAnimation: settings.betaHomepageRevealAnimation,
+      betaVideoFrameScreenshot: settings.betaVideoFrameScreenshot,
+      betaScreenshotOpenPreview: settings.betaScreenshotOpenPreview,
+    };
+  }
+
+  function settingsEqual(a: Settings, b: Settings): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+
   function patchLocalSettings(partial: Partial<Settings>): void {
     const previousLanguage = settings.language;
-    settings = cloneSettings({
+    settings = normalizeLocalSettings({
       ...settings,
       ...partial,
       customProfiles: 'customProfiles' in partial
@@ -173,15 +352,66 @@
     await saveSettings(partial);
   }
 
+  function showSheetFeedback(text: string, type: 'ok' | 'error' = 'ok') {
+    sheetFeedback = { text, type };
+    clearTimeout(sheetFeedbackTimeout);
+    sheetFeedbackTimeout = setTimeout(() => { sheetFeedback = null; }, 2500);
+  }
+
+  function clearSheetState() {
+    activeSheet = '';
+    importDragging = false;
+    importPasting = false;
+    pendingProfileText = '';
+    pendingProfileFileName = '';
+    sheetProfileNameInput = '';
+    logoDragging = false;
+    logoPasting = false;
+    logoDraftUrl = settings.customLogo;
+    logoDraftRatio = settings.customLogoRatio;
+    sheetFeedback = null;
+  }
+
   // Init once on mount — no reactive deps, so $effect runs only once
   $effect(() => {
     loadSettings().then((s) => {
       settings = cloneSettings(s);
       setLocale(s.language);
-      langVersion++;
       loaded = true;
       checkForUpdates();
     });
+  });
+
+  $effect(() => {
+    document.body.dataset.ytrLayout = isStandaloneView ? 'page' : 'popup';
+    return () => {
+      delete document.body.dataset.ytrLayout;
+    };
+  });
+
+  $effect(() => {
+    if (!isStandaloneView) return;
+
+    const handleStorageChange = (changes: Record<string, browser.storage.StorageChange>) => {
+      if (!changes.ytr_settings?.newValue) return;
+      const next = cloneSettings(changes.ytr_settings.newValue as Settings);
+      if (settingsEqual(next, settings)) return;
+      const previousLanguage = settings.language;
+      settings = next;
+      if (next.language !== previousLanguage) {
+        setLocale(next.language);
+        langVersion++;
+      }
+      if (!next.betaEnabled) {
+        betaConfirmOpen = false;
+        if (activeSheet) clearSheetState();
+      }
+    };
+
+    browser.storage.onChanged.addListener(handleStorageChange);
+    return () => {
+      browser.storage.onChanged.removeListener(handleStorageChange);
+    };
   });
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
@@ -197,7 +427,7 @@
       const profiles = [...(settings.customProfiles || [])];
       const idx = profiles.findIndex((p) => p.name === name);
       if (idx >= 0) {
-        const { language, customProfiles: _, activeProfile: __, ...profileSettings } = settings;
+        const profileSettings = extractProfileSettings(settings);
         profiles[idx] = { ...profiles[idx], settings: profileSettings };
         const nextProfiles = cloneCustomProfiles(profiles);
         patchLocalSettings({ customProfiles: nextProfiles });
@@ -206,7 +436,7 @@
     } else {
       // Built-in profile modified — save as new custom profile with the built-in name + "(modified)"
       const name = activeId + ' *';
-      const { language, customProfiles: _, activeProfile: __, ...profileSettings } = settings;
+      const profileSettings = extractProfileSettings(settings);
       const newProfile: CustomProfile = { name, settings: profileSettings };
       const profiles = cloneCustomProfiles([...(settings.customProfiles || []), newProfile]);
       patchLocalSettings({
@@ -222,24 +452,122 @@
     showFeedback('profile');
   }
 
-  /** Check if a setting key matches the search query across all languages. */
-  function matchesSearch(keys: string[]): boolean {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.trim().toLowerCase();
-    for (const key of keys) {
-      // Check all language translations for this key
-      const texts = allTranslations(key);
-      if (texts.some((txt) => txt.includes(q))) return true;
-      // Also check the key itself
-      if (key.toLowerCase().includes(q)) return true;
+  function normalizeSearchText(value: string): string {
+    return value
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/ё/g, 'е')
+      .replace(/[^a-z0-9\u0400-\u04ff]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function tokenizeSearchText(value: string): string[] {
+    return normalizeSearchText(value).split(' ').filter(Boolean);
+  }
+
+  function isSubsequenceMatch(query: string, candidate: string): boolean {
+    let queryIndex = 0;
+    for (const char of candidate) {
+      if (char === query[queryIndex]) queryIndex += 1;
+      if (queryIndex >= query.length) return true;
     }
     return false;
   }
 
-  /** Check if any key in the section matches. */
-  function sectionVisible(keys: string[]): boolean {
+  function isEditDistanceWithin(query: string, candidate: string, maxDistance: number): boolean {
+    const queryLength = query.length;
+    const candidateLength = candidate.length;
+    if (Math.abs(queryLength - candidateLength) > maxDistance) return false;
+
+    let previous = Array.from({ length: candidateLength + 1 }, (_, index) => index);
+
+    for (let i = 1; i <= queryLength; i += 1) {
+      const current = [i];
+      let rowMin = current[0];
+
+      for (let j = 1; j <= candidateLength; j += 1) {
+        const cost = query[i - 1] === candidate[j - 1] ? 0 : 1;
+        const value = Math.min(
+          previous[j] + 1,
+          current[j - 1] + 1,
+          previous[j - 1] + cost,
+        );
+        current[j] = value;
+        rowMin = Math.min(rowMin, value);
+      }
+
+      if (rowMin > maxDistance) return false;
+      previous = current;
+    }
+
+    return previous[candidateLength] <= maxDistance;
+  }
+
+  function fuzzyTokenMatch(queryToken: string, candidateToken: string): boolean {
+    if (!queryToken || !candidateToken) return false;
+    if (candidateToken.includes(queryToken) || queryToken.includes(candidateToken)) return true;
+    if (queryToken.length >= 3 && isSubsequenceMatch(queryToken, candidateToken)) return true;
+
+    const maxDistance = queryToken.length >= 8 ? 2 : queryToken.length >= 5 ? 1 : 0;
+    if (!maxDistance) return false;
+
+    return isEditDistanceWithin(queryToken, candidateToken, maxDistance);
+  }
+
+  function collectSearchTexts(keys: string[], extras: string[] = []): string[] {
+    const texts = new Set<string>();
+
+    for (const key of keys) {
+      const normalizedKey = normalizeSearchText(key);
+      if (normalizedKey) texts.add(normalizedKey);
+
+      for (const translated of allTranslations(key)) {
+        const normalizedTranslation = normalizeSearchText(translated);
+        if (normalizedTranslation) texts.add(normalizedTranslation);
+      }
+
+      for (const alias of SEARCH_ALIASES[key] || []) {
+        const normalizedAlias = normalizeSearchText(alias);
+        if (normalizedAlias) texts.add(normalizedAlias);
+      }
+    }
+
+    for (const extra of extras) {
+      const normalizedExtra = normalizeSearchText(extra);
+      if (normalizedExtra) texts.add(normalizedExtra);
+    }
+
+    return [...texts];
+  }
+
+  function matchesSearch(keys: string[], extras: string[] = []): boolean {
+    const normalizedQuery = normalizeSearchText(searchQuery);
+    if (!normalizedQuery) return true;
+
+    const candidateTexts = collectSearchTexts(keys, extras);
+    if (candidateTexts.some((candidate) => candidate.includes(normalizedQuery))) return true;
+
+    const queryTokens = tokenizeSearchText(normalizedQuery);
+    const candidateTokens = candidateTexts.flatMap(tokenizeSearchText);
+
+    return queryTokens.every((queryToken) =>
+      candidateTexts.some((candidate) => candidate.includes(queryToken)) ||
+      candidateTokens.some((candidateToken) => fuzzyTokenMatch(queryToken, candidateToken))
+    );
+  }
+
+  function sectionVisible(keys: string[], extras: string[] = []): boolean {
     if (!searchQuery.trim()) return true;
-    return keys.some((k) => matchesSearch([k]));
+    return matchesSearch(keys, extras);
+  }
+
+  function visibleFilters(filters: SearchableFilter[], extras: Record<string, string[]> = {}): SearchableFilter[] {
+    if (!searchQuery.trim()) return filters;
+    return filters.filter((filter) =>
+      matchesSearch([filter.key], [filter.label, ...(extras[filter.key] || [])])
+    );
   }
 
   function selectLanguage(lang: string) {
@@ -248,7 +576,63 @@
     langMenuOpen = false;
   }
 
+  function openStandalonePage() {
+    if (!(settings.betaEnabled && settings.betaStandalonePage)) return;
+    browser.tabs.create({ url: browser.runtime.getURL('popup.html?view=page') });
+  }
+
+  function requestBetaEnable() {
+    betaConfirmOpen = true;
+  }
+
+  function cancelBetaEnable() {
+    betaConfirmOpen = false;
+  }
+
+  function confirmBetaEnable() {
+    betaConfirmOpen = false;
+    void applySettingsPatch({ betaEnabled: true });
+  }
+
+  function toggleBetaFeatures(value: boolean) {
+    if (value) {
+      requestBetaEnable();
+      return;
+    }
+    betaConfirmOpen = false;
+    if (activeSheet) clearSheetState();
+    void applySettingsPatch({
+      betaEnabled: false,
+      downloadThumbnailButton: false,
+      disableAvatarLiveRedirect: false,
+      betaStandalonePage: false,
+      betaHomepageRevealAnimation: false,
+      betaVideoFrameScreenshot: false,
+      betaScreenshotOpenPreview: false,
+    });
+  }
+
+  function toggleBetaStandalonePage(value: boolean) {
+    if (!settings.betaEnabled) return;
+    void applySettingsPatch({ betaStandalonePage: value });
+    if (!value && activeSheet) clearSheetState();
+  }
+
+  function toggleBetaVideoFrameScreenshot(value: boolean) {
+    if (!settings.betaEnabled) return;
+    void applySettingsPatch({
+      betaVideoFrameScreenshot: value,
+      betaScreenshotOpenPreview: value ? settings.betaScreenshotOpenPreview : false,
+    });
+  }
+
   function openLogoPage() {
+    if (isStandaloneView && settings.betaEnabled && settings.betaStandalonePage) {
+      logoDraftUrl = settings.customLogo;
+      logoDraftRatio = settings.customLogoRatio;
+      activeSheet = 'logo';
+      return;
+    }
     browser.tabs.create({ url: browser.runtime.getURL('logo.html') });
   }
 
@@ -358,10 +742,21 @@
     }
     patchLocalSettings(filtered);
     await saveSettings(filtered);
+  }
+
+  function handleImportSuccess(target: 'popup' | 'sheet') {
+    if (target === 'sheet') {
+      showSheetFeedback(t('importSuccess'));
+      return;
+    }
     showFeedback('imported');
   }
 
   function openImportPage() {
+    if (isStandaloneView && settings.betaEnabled && settings.betaStandalonePage) {
+      activeSheet = 'import';
+      return;
+    }
     browser.tabs.create({ url: browser.runtime.getURL('import.html') });
   }
 
@@ -369,11 +764,247 @@
     try {
       const text = await navigator.clipboard.readText();
       const parsed = parseSettings(text);
-      if (parsed) await applyImport(parsed);
+      if (parsed) {
+        await applyImport(parsed);
+        handleImportSuccess('popup');
+      }
       else showFeedback('error');
     } catch {
       showFeedback('error');
     }
+  }
+
+  async function pasteSettingsIntoSheet() {
+    if (!navigator.clipboard?.readText) {
+      showSheetFeedback(t('pasteClipboardError'), 'error');
+      return;
+    }
+    try {
+      importPasting = true;
+      const text = (await navigator.clipboard.readText()).trim();
+      if (!text) {
+        showSheetFeedback(t('pasteClipboardEmpty'), 'error');
+        return;
+      }
+      const parsed = parseSettings(text);
+      if (!parsed) {
+        showSheetFeedback(t('importError'), 'error');
+        return;
+      }
+      await applyImport(parsed);
+      handleImportSuccess('sheet');
+    } catch {
+      showSheetFeedback(t('pasteClipboardError'), 'error');
+    } finally {
+      importPasting = false;
+    }
+  }
+
+  async function loadImportFile(file: File, mode: 'import' | 'profile-import') {
+    if (!file) return;
+    const text = await file.text();
+    const parsed = parseSettings(text);
+    if (!parsed) {
+      showSheetFeedback(t('importError'), 'error');
+      return;
+    }
+
+    if (mode === 'profile-import') {
+      pendingProfileText = text;
+      pendingProfileFileName = file.name;
+      sheetProfileNameInput = file.name.replace(/\.(json|txt)$/i, '');
+      return;
+    }
+
+    await applyImport(parsed);
+    handleImportSuccess('sheet');
+  }
+
+  async function pasteProfileIntoSheet() {
+    if (!navigator.clipboard?.readText) {
+      showSheetFeedback(t('pasteClipboardError'), 'error');
+      return;
+    }
+    try {
+      importPasting = true;
+      const text = (await navigator.clipboard.readText()).trim();
+      if (!text) {
+        showSheetFeedback(t('pasteClipboardEmpty'), 'error');
+        return;
+      }
+      const parsed = parseSettings(text);
+      if (!parsed) {
+        showSheetFeedback(t('importError'), 'error');
+        return;
+      }
+      pendingProfileText = text;
+      pendingProfileFileName = 'clipboard.json';
+      sheetProfileNameInput = 'clipboard-profile';
+    } catch {
+      showSheetFeedback(t('pasteClipboardError'), 'error');
+    } finally {
+      importPasting = false;
+    }
+  }
+
+  async function confirmSheetProfileImport() {
+    const name = sheetProfileNameInput.trim();
+    if (!name) return;
+    const parsed = parseSettings(pendingProfileText);
+    if (!parsed) {
+      showSheetFeedback(t('importError'), 'error');
+      return;
+    }
+
+    delete (parsed as any).customProfiles;
+    delete (parsed as any).language;
+    delete (parsed as any).activeProfile;
+
+    const newProfile: CustomProfile = { name, settings: parsed };
+    const profiles = cloneCustomProfiles([...(settings.customProfiles || []), newProfile]);
+    patchLocalSettings({ customProfiles: profiles });
+    await saveSettings({ customProfiles: profiles });
+    pendingProfileText = '';
+    pendingProfileFileName = '';
+    sheetProfileNameInput = '';
+    showSheetFeedback(t('profileSaved'));
+  }
+
+  function cancelSheetProfileImport() {
+    pendingProfileText = '';
+    pendingProfileFileName = '';
+    sheetProfileNameInput = '';
+  }
+
+  function validateLogoRatio(width: number, height: number): number {
+    const ratio = width / height;
+    if (ratio > 6 || ratio < 0.5) {
+      throw new Error('ratio_invalid');
+    }
+    return ratio;
+  }
+
+  function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('read_failed'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function loadImageRatio(dataUrl: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          resolve(validateLogoRatio(img.naturalWidth, img.naturalHeight));
+        } catch (error) {
+          reject(error);
+        }
+      };
+      img.onerror = () => reject(new Error('type_invalid'));
+      img.src = dataUrl;
+    });
+  }
+
+  function loadVideoRatio(dataUrl: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      video.onloadedmetadata = () => {
+        try {
+          resolve(validateLogoRatio(video.videoWidth, video.videoHeight));
+        } catch (error) {
+          reject(error);
+        }
+      };
+      video.onerror = () => reject(new Error('type_invalid'));
+      video.src = dataUrl;
+      video.load();
+    });
+  }
+
+  async function processLogoFile(file: File) {
+    if (!file) return;
+    if (file.size > MAX_LOGO_FILE_SIZE) {
+      showSheetFeedback(t('customLogoErrorSize'), 'error');
+      return;
+    }
+
+    const fileType = file.type.toLowerCase();
+    const isImage = fileType.startsWith('image/');
+    const isVideo = fileType.startsWith('video/');
+
+    if (!isImage && !isVideo) {
+      showSheetFeedback(t('customLogoErrorType'), 'error');
+      return;
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const ratio = isVideo ? await loadVideoRatio(dataUrl) : await loadImageRatio(dataUrl);
+      logoDraftUrl = dataUrl;
+      logoDraftRatio = ratio;
+      patchLocalSettings({ customLogo: dataUrl, customLogoRatio: ratio });
+      await saveSettings({ customLogo: dataUrl, customLogoRatio: ratio });
+      showSheetFeedback(t('customLogoSaved'));
+    } catch (error) {
+      if (error instanceof Error && error.message === 'ratio_invalid') {
+        showSheetFeedback(t('customLogoErrorRatio'), 'error');
+      } else {
+        showSheetFeedback(t('customLogoErrorType'), 'error');
+      }
+    }
+  }
+
+  async function pasteLogoFromClipboard() {
+    if (!navigator.clipboard?.read) {
+      showSheetFeedback(t('pasteImageError'), 'error');
+      return;
+    }
+
+    try {
+      logoPasting = true;
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const mediaType = item.types.find((type) => type.startsWith('image/') || type.startsWith('video/'));
+        if (!mediaType) continue;
+        const blob = await item.getType(mediaType);
+        const ext = mediaType.split('/')[1]?.replace('jpeg', 'jpg') || (mediaType.startsWith('video/') ? 'webm' : 'png');
+        await processLogoFile(new File([blob], `clipboard-logo.${ext}`, { type: mediaType }));
+        return;
+      }
+      showSheetFeedback(t('pasteImageEmpty'), 'error');
+    } catch {
+      showSheetFeedback(t('pasteImageError'), 'error');
+    } finally {
+      logoPasting = false;
+    }
+  }
+
+  async function removeLogoFromSheet() {
+    logoDraftUrl = '';
+    logoDraftRatio = 0;
+    patchLocalSettings({ customLogo: '', customLogoRatio: 0 });
+    await saveSettings({ customLogo: '', customLogoRatio: 0 });
+    showSheetFeedback(t('customLogoRemoved'));
+  }
+
+  function onImportFileInput(event: Event, mode: 'import' | 'profile-import') {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) void loadImportFile(file, mode);
+    input.value = '';
+  }
+
+  function onLogoFileInput(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) void processLogoFile(file);
+    input.value = '';
   }
 
   // --- Profiles ---
@@ -391,7 +1022,13 @@
     delete (resetData as any).language;
     delete (resetData as any).customLogo;
     delete (resetData as any).customLogoRatio;
+    delete (resetData as any).customLogoScale;
     delete (resetData as any).customProfiles;
+    delete (resetData as any).betaEnabled;
+    delete (resetData as any).betaStandalonePage;
+    delete (resetData as any).betaHomepageRevealAnimation;
+    delete (resetData as any).betaVideoFrameScreenshot;
+    delete (resetData as any).betaScreenshotOpenPreview;
     const merged = { ...resetData, ...profile, activeProfile: profileId };
     patchLocalSettings(merged);
     void saveSettings(merged);
@@ -426,7 +1063,7 @@
   function saveCurrentAsProfile() {
     const name = profileNameInput.trim();
     if (!name) return;
-    const { language, customProfiles: _, activeProfile: __, ...profileSettings } = settings;
+    const profileSettings = extractProfileSettings(settings);
     const newProfile: CustomProfile = { name, settings: profileSettings };
     const profiles = cloneCustomProfiles([...(settings.customProfiles || []), newProfile]);
     patchLocalSettings({ customProfiles: profiles });
@@ -437,6 +1074,10 @@
   }
 
   function importProfileFromFile() {
+    if (isStandaloneView && settings.betaEnabled && settings.betaStandalonePage) {
+      activeSheet = 'profile-import';
+      return;
+    }
     browser.tabs.create({ url: browser.runtime.getURL('import.html?mode=profile') });
   }
 
@@ -484,11 +1125,7 @@
     delete (resetData as any).language;
     delete (resetData as any).customProfiles;
     delete (resetData as any).activeProfile;
-
-    const profileSettings = { ...profile.settings };
-    delete (profileSettings as any).customProfiles;
-    delete (profileSettings as any).language;
-    delete (profileSettings as any).activeProfile;
+    const profileSettings = resolveAppliedProfileSettings(profile.settings);
 
     const merged = { ...resetData, ...profileSettings, activeProfile: 'custom:' + profile.name };
     patchLocalSettings(merged);
@@ -499,18 +1136,19 @@
 
   async function resetAllSettings() {
     const resetData = { ...DEFAULT_SETTINGS };
+    const previousLanguage = settings.language;
     settings = cloneSettings(resetData);
     setLocale(resetData.language);
-    langVersion++;
+    if (resetData.language !== previousLanguage) {
+      langVersion++;
+    }
     await saveSettings(resetData);
     profileModified = false;
     showResetConfirm = false;
     showFeedback('imported');
   }
 
-  let currentLangDisplay = $derived(
-    LANGUAGES.find((l) => l.id === settings.language)?.label ?? 'Auto'
-  );
+  let currentLangDisplay = $derived(getLanguageDisplayName(settings.language, false));
 
   let homepageFilters = $derived.by(() => {
     void langVersion;
@@ -524,7 +1162,6 @@
       { key: 'hideNewBadge', label: t('settingHideNewBadge'), checked: settings.hideNewBadge, onchange: (v: boolean) => update('hideNewBadge', v) },
       { key: 'hidePlayables', label: t('settingHidePlayables'), checked: settings.hidePlayables, onchange: (v: boolean) => update('hidePlayables', v) },
       { key: 'hideFilterBar', label: t('settingHideFilterBar'), checked: settings.hideFilterBar, onchange: (v: boolean) => update('hideFilterBar', v) },
-      { key: 'disableAvatarLiveRedirect', label: t('settingDisableAvatarLive'), checked: settings.disableAvatarLiveRedirect, onchange: (v: boolean) => update('disableAvatarLiveRedirect', v) },
     ];
   });
 
@@ -636,12 +1273,21 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
 {#if loaded}
-  <div onclick={closeMenus} role="presentation">
-    {#key langVersion}
+  <div class="app-shell" data-locale={langVersion} class:app-shell-page={isStandaloneView} onclick={closeMenus} role="presentation">
       <header class="app-header">
         <div class="header-content">
-          <img src="/logo-header.png" alt="YouTube Rewind" class="app-logo" />
+          <div class="header-brand">
+            <img src="/logo-header.png" alt="YouTube Rewind" class="app-logo" />
+          </div>
           <div class="header-actions">
+            {#if settings.betaEnabled && settings.betaStandalonePage && !isStandaloneView}
+              <button class="info-button" onclick={openStandalonePage} title={t('betaOpenStandalone')} aria-label={t('betaOpenStandalone')}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="14" rx="2"/>
+                  <path d="M8 20h8"/>
+                </svg>
+              </button>
+            {/if}
             <button class="info-button" onclick={scrollToAbout} title={t('sectionAbout')} aria-label={t('sectionAbout')}>
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"/>
@@ -651,7 +1297,7 @@
             </button>
             <div class="lang-wrapper">
               <!-- svelte-ignore a11y_consider_explicit_label -->
-              <button class="lang-button" onclick={toggleLangMenu} aria-haspopup="true" aria-expanded={langMenuOpen} title="Language">
+              <button class="lang-button" onclick={toggleLangMenu} aria-haspopup="true" aria-expanded={langMenuOpen} title={currentLangDisplay}>
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="12" cy="12" r="10"/>
                   <path d="M2 12h20"/>
@@ -668,7 +1314,12 @@
                       role="menuitem"
                       onclick={() => selectLanguage(lang.id)}
                     >
-                      {lang.label}
+                      <span class="lang-menu-item-copy">
+                        <span class="lang-menu-item-label">{getLanguageDisplayName(lang.id, false)}</span>
+                        {#if getLanguageLocalizedLabel(lang.id)}
+                          <span class="lang-menu-item-note">{getLanguageLocalizedLabel(lang.id)}</span>
+                        {/if}
+                      </span>
                       {#if settings.language === lang.id}
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                           <polyline points="20 6 9 17 4 12"/>
@@ -737,30 +1388,39 @@
         </div>
       </header>
 
-      <!-- Search bar -->
-      <div class="search-bar" class:focused={searchFocused}>
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input
-          type="text"
-          class="search-input"
-          placeholder={t('searchPlaceholder')}
-          bind:value={searchQuery}
-          onfocus={() => { searchFocused = true; }}
-          onblur={() => { searchFocused = false; }}
-        />
-        {#if searchQuery}
-          <button class="search-clear" onclick={() => { searchQuery = ''; }} aria-label="Clear">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        {/if}
-      </div>
+      {#if isStandaloneView && !(settings.betaEnabled && settings.betaStandalonePage)}
+        <div class="standalone-locked">
+          <div class="standalone-locked-card">
+            <div class="standalone-locked-badge">{t('sectionBeta')}</div>
+            <h2>{t('betaStandaloneLockedTitle')}</h2>
+            <p>{t('betaStandaloneLockedMessage')}</p>
+          </div>
+        </div>
+      {:else}
+        <!-- Search bar -->
+        <div class="search-bar" class:focused={searchFocused}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            type="text"
+            class="search-input"
+            placeholder={t('searchPlaceholder')}
+            bind:value={searchQuery}
+            onfocus={() => { searchFocused = true; }}
+            onblur={() => { searchFocused = false; }}
+          />
+          {#if searchQuery}
+            <button class="search-clear" onclick={() => { searchQuery = ''; }} aria-label="Clear">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          {/if}
+        </div>
 
-      <main class="app-body">
-        <SettingsSection title={t('sectionProfiles')} icon={ICON.tune} hidden={!!searchQuery.trim()}>
+        <main class="app-body">
+        <SettingsSection title={t('sectionProfiles')} icon={ICON.tune} hidden={!sectionVisible(['sectionProfiles', 'profileNone', 'profileFocus', 'profileMinimal', 'profileClean', 'profileSaveCurrent', 'profileFromFile'], ['custom', 'preset'])}>
           <div class="effect-picker">
             {#each PROFILE_OPTIONS as profile (profile.id)}
               <button
@@ -844,7 +1504,7 @@
           {/if}
         </SettingsSection>
 
-        <SettingsSection title={t('sectionPlayer')} icon={ICON.play_circle} hidden={!sectionVisible(['settingPlaybackSpeed', 'settingDefaultQuality', 'settingDownloadThumbnail', 'settingClassicPlayer', 'settingWidePlayer', 'settingClassicLikeIcons', 'settingAdaptiveDescription'])}>
+        <SettingsSection title={t('sectionPlayer')} icon={ICON.play_circle} hidden={!sectionVisible(['sectionPlayer', 'settingPlaybackSpeed', 'settingDefaultQuality', 'settingClassicPlayer', 'settingWidePlayer', 'settingClassicLikeIcons', 'settingAdaptiveDescription'])}>
           <Slider
             label={t('settingPlaybackSpeed')}
             value={speedToSlider(settings.playbackSpeed)}
@@ -864,15 +1524,14 @@
             formatDisplay={formatQuality}
             onchange={(v) => update('defaultQuality', sliderToQuality(v))}
           />
-          <Toggle label={t('settingDownloadThumbnail')} checked={settings.downloadThumbnailButton} onchange={(v) => update('downloadThumbnailButton', v)} />
           <Toggle label={t('settingClassicPlayer')} checked={settings.classicPlayer} onchange={(v) => update('classicPlayer', v)} />
           <Toggle label={t('settingWidePlayer')} checked={settings.widePlayer} onchange={(v) => update('widePlayer', v)} />
           <Toggle label={t('settingAdaptiveDescription')} checked={settings.adaptiveColorsDescription} onchange={(v) => update('adaptiveColorsDescription', v)} />
           <Toggle label={t('settingClassicLikeIcons')} checked={settings.classicLikeIcons} onchange={(v) => update('classicLikeIcons', v)} />
         </SettingsSection>
 
-        <SettingsSection title={t('sectionWatchPage')} icon={ICON.visibility} hidden={!sectionVisible(['settingHideJoinButton', 'settingHideSubscribeButton', 'settingHideLikeDislike', 'settingHideShareButton', 'settingHideDownloadButton', 'settingHideClipButton', 'settingHideThanksButton', 'settingHideSaveButton', 'sectionBannerStyle'])}>
-          <ChipGroup filters={videoButtonFilters} />
+        <SettingsSection title={t('sectionWatchPage')} icon={ICON.visibility} hidden={!sectionVisible(['sectionWatchPage', 'settingHideJoinButton', 'settingHideSubscribeButton', 'settingHideLikeDislike', 'settingHideShareButton', 'settingHideDownloadButton', 'settingHideClipButton', 'settingHideThanksButton', 'settingHideSaveButton', 'sectionBannerStyle'])}>
+          <ChipGroup filters={visibleFilters(videoButtonFilters)} />
           <div class="sub-label">{t('sectionBannerStyle')}</div>
           <div class="effect-picker">
             {#each BANNER_STYLES as style (style.id)}
@@ -887,7 +1546,7 @@
           </div>
         </SettingsSection>
 
-        <SettingsSection title={t('sectionWatchTimer')} icon={ICON.timer} hidden={!sectionVisible(['settingWatchTimerEnabled', 'settingWatchTimeLimit', 'settingWatchTimeLimitBlockRepeat'])}>
+        <SettingsSection title={t('sectionWatchTimer')} icon={ICON.timer} hidden={!sectionVisible(['sectionWatchTimer', 'settingWatchTimerEnabled', 'settingWatchTimeLimit', 'settingWatchTimeLimitBlockRepeat'])}>
           <Toggle label={t('settingWatchTimerEnabled')} checked={settings.watchTimerEnabled} onchange={(v) => update('watchTimerEnabled', v)} />
           <Slider
             label={t('settingWatchTimeLimit')}
@@ -902,7 +1561,7 @@
           {/if}
         </SettingsSection>
 
-        <SettingsSection title={t('sectionHomepageFilter')} icon={ICON.home} hidden={!sectionVisible(['settingVideosPerRow', 'settingHideShorts', 'settingHidePosts', 'settingHideMixes', 'settingHideBreakingNews', 'settingHideLatestPosts', 'settingHideExploreTopics', 'settingHideNewBadge', 'settingHidePlayables', 'settingHideFilterBar', 'settingDisableAvatarLive'])}>
+        <SettingsSection title={t('sectionHomepageFilter')} icon={ICON.home} hidden={!sectionVisible(['sectionHomepageFilter', 'settingVideosPerRow', 'settingHideShorts', 'settingHidePosts', 'settingHideMixes', 'settingHideBreakingNews', 'settingHideLatestPosts', 'settingHideExploreTopics', 'settingHideNewBadge', 'settingHidePlayables', 'settingHideFilterBar'])}>
           <Slider
             label={t('settingVideosPerRow')}
             value={settings.videosPerRow}
@@ -911,15 +1570,15 @@
             defaultLabel={t('settingVideosPerRowDefault')}
             onchange={(v) => update('videosPerRow', v)}
           />
-          <ChipGroup filters={homepageFilters} />
+          <ChipGroup filters={visibleFilters(homepageFilters)} />
         </SettingsSection>
 
-        <SettingsSection title={t('sectionSearchFilter')} icon={ICON.search} hidden={!sectionVisible(['settingHideSearchShorts', 'settingHideSearchChannels', 'settingHideSearchPeopleWatched'])}>
-          <ChipGroup filters={searchFilters} />
+        <SettingsSection title={t('sectionSearchFilter')} icon={ICON.search} hidden={!sectionVisible(['sectionSearchFilter', 'settingHideSearchShorts', 'settingHideSearchChannels', 'settingHideSearchPeopleWatched'])}>
+          <ChipGroup filters={visibleFilters(searchFilters)} />
         </SettingsSection>
 
-        <SettingsSection title={t('sectionTopBar')} icon={ICON.web_asset} hidden={!sectionVisible(['settingHideTopbarCreate', 'settingHideTopbarVoiceSearch', 'settingHideTopbarNotifications', 'settingHideTopbarSearch', 'settingHideCountryCode', 'settingCustomLogo', 'settingHideLogoAnimation'])}>
-          <ChipGroup filters={topbarFilters} />
+        <SettingsSection title={t('sectionTopBar')} icon={ICON.web_asset} hidden={!sectionVisible(['sectionTopBar', 'settingHideTopbarCreate', 'settingHideTopbarVoiceSearch', 'settingHideTopbarNotifications', 'settingHideTopbarSearch', 'settingHideCountryCode', 'settingCustomLogo', 'settingCustomLogoSize', 'settingHideLogoAnimation'])}>
+          <ChipGroup filters={visibleFilters(topbarFilters)} />
           <div class="inline-row">
             <span class="inline-label">{t('settingCustomLogo')}</span>
             <div class="inline-actions">
@@ -936,11 +1595,22 @@
               {/if}
             </div>
           </div>
+          {#if settings.customLogo}
+            <Slider
+              label={t('settingCustomLogoSize')}
+              value={settings.customLogoScale}
+              min={40}
+              max={220}
+              formatDisplay={formatPercent}
+              parseInput={parsePercent}
+              onchange={(v) => update('customLogoScale', v)}
+            />
+          {/if}
           <Toggle label={t('settingHideLogoAnimation')} checked={settings.hideLogoAnimation} onchange={(v) => update('hideLogoAnimation', v)} />
         </SettingsSection>
 
-        <SettingsSection title={t('sectionSidebarFilter')} icon={ICON.view_sidebar} hidden={!sectionVisible(['settingHideSidebarSubscriptions', 'settingHideSidebarYou', 'settingHideSidebarExplore', 'settingHideSidebarMoreFromYT', 'settingHideSidebarReportHistory', 'settingHideSidebarFooter'])}>
-          <ChipGroup filters={sidebarFilters} />
+        <SettingsSection title={t('sectionSidebarFilter')} icon={ICON.view_sidebar} hidden={!sectionVisible(['sectionSidebarFilter', 'settingHideSidebarSubscriptions', 'settingHideSidebarYou', 'settingHideSidebarExplore', 'settingHideSidebarMoreFromYT', 'settingHideSidebarReportHistory', 'settingHideSidebarFooter'])}>
+          <ChipGroup filters={visibleFilters(sidebarFilters)} />
         </SettingsSection>
 
         <SettingsSection title={t('sectionThumbnailEffect')} icon={ICON.image} hidden={!sectionVisible(['sectionThumbnailEffect', 'thumbnailHoverReveal', 'settingDisableHoverAnimation', 'sectionThumbnailShape'])}>
@@ -973,11 +1643,11 @@
           </div>
         </SettingsSection>
 
-        <SettingsSection title={t('sectionAvatarShape')} icon={ICON.person} hidden={!sectionVisible(['sectionAvatarShape'])}>
+        <SettingsSection title={t('sectionAvatarShape')} icon={ICON.person} hidden={!sectionVisible(['sectionAvatarShape'], ['avatar', 'shape', 'form'])}>
           <ShapePicker variant="avatar" value={settings.avatarShape} onchange={(v) => update('avatarShape', v)} />
         </SettingsSection>
 
-        <SettingsSection title={t('sectionData')} icon={ICON.database} hidden={!!searchQuery.trim()}>
+        <SettingsSection title={t('sectionData')} icon={ICON.database} hidden={!sectionVisible(['sectionData', 'exportLabel', 'importLabel', 'exportJSON', 'exportTXT', 'copyClipboard', 'importSettings', 'pasteClipboard', 'resetSettings'])}>
           <div class="data-section">
             <div class="data-group">
               <div class="data-group-label">{t('exportLabel')}</div>
@@ -1016,6 +1686,36 @@
             {/if}
           </div>
         </SettingsSection>
+
+        <SettingsSection title={t('sectionBeta')} icon={ICON.info} hidden={!sectionVisible(['sectionBeta', 'settingBetaEnabled', 'settingDownloadThumbnail', 'settingDisableAvatarLive', 'settingBetaStandalonePage', 'settingBetaHomepageRevealAnimation', 'settingBetaVideoFrameScreenshot', 'settingBetaScreenshotOpenPreview'])}>
+          <Toggle label={t('settingBetaEnabled')} checked={settings.betaEnabled} onchange={toggleBetaFeatures} />
+          {#if settings.betaEnabled}
+            <Toggle label={t('settingDownloadThumbnail')} checked={settings.downloadThumbnailButton} onchange={(v) => void applySettingsPatch({ downloadThumbnailButton: v })} />
+            <Toggle label={t('settingDisableAvatarLive')} checked={settings.disableAvatarLiveRedirect} onchange={(v) => void applySettingsPatch({ disableAvatarLiveRedirect: v })} />
+            <Toggle label={t('settingBetaStandalonePage')} checked={settings.betaStandalonePage} onchange={toggleBetaStandalonePage} />
+            <Toggle label={t('settingBetaHomepageRevealAnimation')} checked={settings.betaHomepageRevealAnimation} onchange={(v) => void applySettingsPatch({ betaHomepageRevealAnimation: v })} />
+            <Toggle label={t('settingBetaVideoFrameScreenshot')} checked={settings.betaVideoFrameScreenshot} onchange={toggleBetaVideoFrameScreenshot} />
+            {#if settings.betaVideoFrameScreenshot}
+              <Toggle label={t('settingBetaScreenshotOpenPreview')} checked={settings.betaScreenshotOpenPreview} onchange={(v) => void applySettingsPatch({ betaScreenshotOpenPreview: v })} />
+            {/if}
+            {#if settings.betaStandalonePage}
+              <div class="beta-actions">
+                <button class="action-btn" onclick={openStandalonePage}>{t('betaOpenStandalone')}</button>
+              </div>
+            {/if}
+          {/if}
+
+          {#if betaConfirmOpen}
+            <div class="beta-confirm">
+              <div class="beta-confirm-title">{t('betaEnableTitle')}</div>
+              <div class="beta-confirm-message">{t('betaEnableMessage')}</div>
+              <div class="beta-confirm-actions">
+                <button class="action-btn" onclick={cancelBetaEnable}>{t('betaEnableCancel')}</button>
+                <button class="action-btn action-btn-save" onclick={confirmBetaEnable}>{t('betaEnableConfirm')}</button>
+              </div>
+            </div>
+          {/if}
+        </SettingsSection>
       </main>
 
       <footer class="app-footer" id="ytr-about">
@@ -1039,7 +1739,173 @@
         </div>
         <a class="footer-link" href="https://github.com/crixqq/YouTube-Rewind/blob/main/LICENSE" target="_blank" rel="noopener">GPL-3.0</a>
       </footer>
-    {/key}
+      {/if}
+
+      {#if activeSheet}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="sheet-backdrop" onclick={(event) => { if (event.target === event.currentTarget) clearSheetState(); }}>
+          <div class="sheet-card" role="dialog" aria-modal="true">
+            <div class="sheet-header">
+              <div class="sheet-title-wrap">
+                <div class="sheet-kicker">{activeSheet === 'logo' ? t('settingCustomLogo') : activeSheet === 'profile-import' ? t('profileFromFile') : t('importSettings')}</div>
+                <h2 class="sheet-title">
+                  {activeSheet === 'logo'
+                    ? t('settingCustomLogo')
+                    : activeSheet === 'profile-import'
+                      ? t('profileFromFile')
+                      : t('importSettings')}
+                </h2>
+              </div>
+              <button class="sheet-close" onclick={clearSheetState} aria-label={t('resetCancelButton')}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            <div class="sheet-content">
+              {#if activeSheet === 'import'}
+                <label
+                  class="sheet-drop-zone"
+                  class:dragging={importDragging}
+                  ondrop={(event) => {
+                    event.preventDefault();
+                    importDragging = false;
+                    const file = event.dataTransfer?.files?.[0];
+                    if (file) void loadImportFile(file, 'import');
+                  }}
+                  ondragover={(event) => {
+                    event.preventDefault();
+                    importDragging = true;
+                  }}
+                  ondragleave={() => { importDragging = false; }}
+                >
+                  <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="12" y1="18" x2="12" y2="12"/>
+                    <polyline points="9 15 12 12 15 15"/>
+                  </svg>
+                  <span class="sheet-drop-title">{t('importDrop')}</span>
+                  <span class="sheet-drop-hint">{t('importHint')}</span>
+                  <input class="sheet-file-input" type="file" accept=".json,.txt" onchange={(event) => onImportFileInput(event, 'import')} />
+                </label>
+                <div class="sheet-actions-row">
+                  <button class="action-btn" class:is-loading={importPasting} onclick={() => void pasteSettingsIntoSheet()}>
+                    {t('pasteClipboard')}
+                  </button>
+                </div>
+              {:else if activeSheet === 'profile-import'}
+                {#if pendingProfileText}
+                  <div class="sheet-profile-confirm">
+                    <div class="sheet-field-label">{t('profileNamePlaceholder')}</div>
+                    <input
+                      class="profile-name-input"
+                      type="text"
+                      placeholder={t('profileNamePlaceholder')}
+                      bind:value={sheetProfileNameInput}
+                      onkeydown={(event) => {
+                        if (event.key === 'Enter') void confirmSheetProfileImport();
+                        if (event.key === 'Escape') cancelSheetProfileImport();
+                      }}
+                    />
+                    <div class="sheet-file-name">{pendingProfileFileName}</div>
+                    <div class="sheet-actions-row sheet-actions-end">
+                      <button class="action-btn" onclick={cancelSheetProfileImport}>{t('resetCancelButton')}</button>
+                      <button class="action-btn action-btn-save" onclick={() => void confirmSheetProfileImport()}>{t('profileSaveCurrent')}</button>
+                    </div>
+                  </div>
+                {:else}
+                  <label
+                    class="sheet-drop-zone"
+                    class:dragging={importDragging}
+                    ondrop={(event) => {
+                      event.preventDefault();
+                      importDragging = false;
+                      const file = event.dataTransfer?.files?.[0];
+                      if (file) void loadImportFile(file, 'profile-import');
+                    }}
+                    ondragover={(event) => {
+                      event.preventDefault();
+                      importDragging = true;
+                    }}
+                    ondragleave={() => { importDragging = false; }}
+                  >
+                    <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="12" y1="18" x2="12" y2="12"/>
+                      <polyline points="9 15 12 12 15 15"/>
+                    </svg>
+                    <span class="sheet-drop-title">{t('profileFromFile')}</span>
+                    <span class="sheet-drop-hint">{t('importHint')}</span>
+                    <input class="sheet-file-input" type="file" accept=".json,.txt" onchange={(event) => onImportFileInput(event, 'profile-import')} />
+                  </label>
+                  <div class="sheet-actions-row">
+                    <button class="action-btn" class:is-loading={importPasting} onclick={() => void pasteProfileIntoSheet()}>
+                      {t('pasteClipboard')}
+                    </button>
+                  </div>
+                {/if}
+              {:else if activeSheet === 'logo'}
+                <label
+                  class="sheet-drop-zone"
+                  class:dragging={logoDragging}
+                  class:sheet-drop-zone-media={!!logoDraftUrl}
+                  ondrop={(event) => {
+                    event.preventDefault();
+                    logoDragging = false;
+                    const file = event.dataTransfer?.files?.[0];
+                    if (file) void processLogoFile(file);
+                  }}
+                  ondragover={(event) => {
+                    event.preventDefault();
+                    logoDragging = true;
+                  }}
+                  ondragleave={() => { logoDragging = false; }}
+                >
+                  {#if logoDraftUrl}
+                    {#if isVideoLogo(logoDraftUrl)}
+                      <video src={logoDraftUrl} class="sheet-logo-preview" muted autoplay loop playsinline></video>
+                    {:else}
+                      <img src={logoDraftUrl} alt="" class="sheet-logo-preview" />
+                    {/if}
+                  {:else}
+                    <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="17 8 12 3 7 8"/>
+                      <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <span class="sheet-drop-title">{t('customLogoDrop')}</span>
+                    <span class="sheet-drop-hint">{t('customLogoHint')}</span>
+                  {/if}
+                  <input class="sheet-file-input" type="file" accept={LOGO_ACCEPT} onchange={onLogoFileInput} />
+                </label>
+                <div class="sheet-actions-row">
+                  {#if logoDraftUrl}
+                    <label class="action-btn action-btn-file">
+                      {t('customLogoUpload')}
+                      <input class="sheet-file-input" type="file" accept={LOGO_ACCEPT} onchange={onLogoFileInput} />
+                    </label>
+                  {/if}
+                  <button class="action-btn" class:is-loading={logoPasting} onclick={() => void pasteLogoFromClipboard()}>
+                    {t('pasteClipboard')}
+                  </button>
+                  {#if logoDraftUrl}
+                    <button class="action-btn action-btn-danger" onclick={() => void removeLogoFromSheet()}>{t('customLogoRemove')}</button>
+                  {/if}
+                </div>
+              {/if}
+
+              {#if sheetFeedback}
+                <div class="sheet-feedback" class:sheet-feedback-ok={sheetFeedback.type === 'ok'} class:sheet-feedback-err={sheetFeedback.type === 'error'}>
+                  {sheetFeedback.text}
+                </div>
+              {/if}
+            </div>
+          </div>
+        </div>
+      {/if}
   </div>
 {/if}
 
@@ -1150,9 +2016,16 @@
     scrollbar-gutter: stable both-edges;
   }
 
+  :global(body[data-ytr-layout="page"]) {
+    width: auto;
+    min-height: 100vh;
+    max-height: none;
+  }
+
   :global(#app) {
     display: flex;
     flex-direction: column;
+    min-height: 100vh;
   }
 
   :global(body::-webkit-scrollbar) {
@@ -1163,26 +2036,25 @@
     border-radius: var(--md-shape-full);
     border: 2px solid transparent;
     background:
-      linear-gradient(180deg, color-mix(in srgb, var(--md-primary) 78%, white 22%), var(--md-primary), color-mix(in srgb, var(--md-primary) 78%, white 22%));
-    background-size: 100% 220%;
+      repeating-linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--md-primary) 80%, white 20%) 0 10px,
+        color-mix(in srgb, var(--md-primary) 62%, white 38%) 10px 22px,
+        color-mix(in srgb, var(--md-primary) 88%, white 12%) 22px 34px
+      );
+    background-size: 100% 180%;
+    background-position: 50% 0%;
     background-clip: content-box;
-    animation: popupScrollbarWave 5.6s linear infinite;
+    animation: popupScrollbarWave 4.8s linear infinite;
+    will-change: background-position;
   }
 
   :global(body::-webkit-scrollbar-thumb:hover) {
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--md-primary) 72%, white 28%), color-mix(in srgb, var(--md-primary) 92%, white 8%), color-mix(in srgb, var(--md-primary) 72%, white 28%));
-    background-size: 100% 220%;
-    background-clip: content-box;
-    animation-duration: 4.2s;
+    animation-duration: 3.2s;
   }
 
   :global(body::-webkit-scrollbar-thumb:active) {
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--md-primary) 65%, white 35%), var(--md-primary), color-mix(in srgb, var(--md-primary) 65%, white 35%));
-    background-size: 100% 220%;
-    background-clip: content-box;
-    animation-duration: 3s;
+    animation-duration: 2.2s;
   }
 
   :global(body::-webkit-scrollbar-track) {
@@ -1219,7 +2091,7 @@
 
   @keyframes popupScrollbarWave {
     from { background-position: 50% 0%; }
-    to { background-position: 50% 220%; }
+    to { background-position: 50% 180%; }
   }
 
   @keyframes searchBarSlideIn {
@@ -1241,6 +2113,13 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
+  }
+
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
   }
 
   .app-logo {
@@ -1321,18 +2200,25 @@
     border-radius: var(--md-shape-full);
     border: 2px solid transparent;
     background:
-      linear-gradient(180deg, color-mix(in srgb, var(--md-primary) 78%, white 22%), var(--md-primary), color-mix(in srgb, var(--md-primary) 78%, white 22%));
-    background-size: 100% 220%;
+      repeating-linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--md-primary) 80%, white 20%) 0 10px,
+        color-mix(in srgb, var(--md-primary) 62%, white 38%) 10px 22px,
+        color-mix(in srgb, var(--md-primary) 88%, white 12%) 22px 34px
+      );
+    background-size: 100% 180%;
+    background-position: 50% 0%;
     background-clip: content-box;
-    animation: popupScrollbarWave 5.6s linear infinite;
+    animation: popupScrollbarWave 4.8s linear infinite;
+    will-change: background-position;
   }
 
   .lang-menu::-webkit-scrollbar-thumb:hover {
-    animation-duration: 4.2s;
+    animation-duration: 3.2s;
   }
 
   .lang-menu::-webkit-scrollbar-thumb:active {
-    animation-duration: 3s;
+    animation-duration: 2.2s;
   }
 
   .lang-menu::-webkit-scrollbar-track {
@@ -1373,6 +2259,25 @@
     transition: all 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
     text-align: left;
     position: relative;
+  }
+
+  .lang-menu-item-copy {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    align-items: flex-start;
+  }
+
+  .lang-menu-item-label {
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  .lang-menu-item-note {
+    font-size: 11px;
+    line-height: 1.2;
+    color: var(--md-on-surface-variant);
+    opacity: 0.75;
   }
 
   .lang-menu-item:hover {
@@ -1709,6 +2614,101 @@
     padding-bottom: 8px;
   }
 
+  .app-shell-page .app-header {
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--md-surface) 96%, transparent), color-mix(in srgb, var(--md-surface-container-low) 92%, transparent));
+    backdrop-filter: blur(18px);
+  }
+
+  .app-shell-page .header-content {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 18px 24px;
+  }
+
+  .app-shell-page .app-logo {
+    height: 34px;
+  }
+
+  .app-shell-page .search-bar {
+    max-width: 1440px;
+    margin: 16px auto 0;
+    padding: 10px 16px;
+  }
+
+  .app-shell-page .app-body {
+    columns: 340px;
+    column-gap: 16px;
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 16px 24px 28px;
+  }
+
+  .app-shell-page .app-body > :global(*) {
+    display: inline-block;
+    width: 100%;
+    margin: 0 0 14px;
+    break-inside: avoid;
+    vertical-align: top;
+  }
+
+  .app-shell-page .app-body :global(.settings-section) {
+    padding: 0 6px 4px;
+  }
+
+  .app-shell-page .app-body :global(.section-title) {
+    padding-top: 6px;
+  }
+
+  .app-shell-page .app-footer {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 8px 24px 28px;
+  }
+
+  .standalone-locked {
+    display: flex;
+    justify-content: center;
+    padding: 56px 24px;
+  }
+
+  .standalone-locked-card {
+    width: min(520px, 100%);
+    padding: 28px;
+    border-radius: 28px;
+    background: var(--md-surface-container-low);
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 75%, transparent);
+    text-align: center;
+  }
+
+  .standalone-locked-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+    padding: 0 12px;
+    margin-bottom: 14px;
+    border-radius: var(--md-shape-full);
+    background: color-mix(in srgb, var(--md-primary-container) 86%, transparent);
+    color: var(--md-primary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .standalone-locked-card h2 {
+    font-size: 24px;
+    margin-bottom: 10px;
+    color: var(--md-on-surface);
+  }
+
+  .standalone-locked-card p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--md-on-surface-variant);
+  }
+
   /* M3 stagger animation for sections */
   .app-body > :global(:nth-child(1)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.04s both; }
   .app-body > :global(:nth-child(2)) { animation: sectionSlideIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.07s both; }
@@ -1812,9 +2812,9 @@
   }
 
   .about-link:hover {
-    background: var(--md-primary-container);
+    background: var(--md-surface-container-high);
     transform: scale(1.03);
-    border-color: var(--md-primary-container);
+    border-color: var(--md-outline);
     text-decoration: none;
   }
 
@@ -1932,14 +2932,25 @@
   }
 
   .action-btn:hover {
-    background: var(--md-primary-container);
+    background: var(--md-surface-container-high);
     transform: scale(1.03);
-    border-color: var(--md-primary-container);
+    border-color: var(--md-outline);
   }
 
   .action-btn:active {
     transform: scale(0.91);
     transition-duration: 0.06s;
+  }
+
+  .action-btn.is-loading {
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .action-btn-file {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
 
@@ -2125,6 +3136,210 @@
     justify-content: flex-end;
   }
 
+  .beta-actions {
+    padding: 0 10px 10px;
+  }
+
+  .beta-confirm {
+    margin: 0 10px 10px;
+    padding: 16px;
+    border-radius: var(--md-shape-lg);
+    background: var(--md-surface-container-low);
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 75%, transparent);
+    animation: feedbackSlideIn var(--md-duration-short) var(--md-easing-emphasized-decel) both;
+  }
+
+  .beta-confirm-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--md-on-surface);
+    margin-bottom: 8px;
+  }
+
+  .beta-confirm-message {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--md-on-surface-variant);
+  }
+
+  .beta-confirm-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 14px;
+  }
+
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(17, 16, 20, 0.56);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .sheet-card {
+    width: min(720px, 100%);
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+    border-radius: 32px;
+    background: var(--md-surface);
+    color: var(--md-on-surface);
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 72%, transparent);
+  }
+
+  .sheet-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 22px 0;
+  }
+
+  .sheet-title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .sheet-kicker {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--md-primary);
+  }
+
+  .sheet-title {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--md-on-surface);
+  }
+
+  .sheet-close {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: var(--md-shape-full);
+    background: transparent;
+    color: var(--md-on-surface-variant);
+    cursor: pointer;
+    transition: background var(--md-duration-short) var(--md-easing-standard), transform var(--md-duration-short) var(--md-easing-standard);
+  }
+
+  .sheet-close:hover {
+    background: var(--md-surface-container-high);
+    transform: scale(1.03);
+  }
+
+  .sheet-close:active {
+    transform: scale(0.94);
+  }
+
+  .sheet-content {
+    padding: 18px 22px 22px;
+  }
+
+  .sheet-drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 220px;
+    padding: 24px;
+    border-radius: 28px;
+    background: var(--md-surface-container-low);
+    border: 1px dashed color-mix(in srgb, var(--md-outline-variant) 80%, transparent);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color var(--md-duration-short) var(--md-easing-standard), background var(--md-duration-short) var(--md-easing-standard), transform var(--md-duration-short) var(--md-easing-standard);
+  }
+
+  .sheet-drop-zone.dragging {
+    border-color: var(--md-primary);
+    background: color-mix(in srgb, var(--md-primary-container) 55%, var(--md-surface-container-low));
+    transform: scale(1.01);
+  }
+
+  .sheet-drop-zone-media {
+    min-height: 170px;
+  }
+
+  .sheet-drop-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--md-on-surface);
+  }
+
+  .sheet-drop-hint {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--md-on-surface-variant);
+  }
+
+  .sheet-logo-preview {
+    max-width: min(100%, 340px);
+    max-height: 84px;
+    object-fit: contain;
+    border-radius: 14px;
+  }
+
+  .sheet-file-input {
+    display: none;
+  }
+
+  .sheet-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 14px;
+  }
+
+  .sheet-actions-end {
+    justify-content: flex-end;
+  }
+
+  .sheet-profile-confirm {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 4px 0 0;
+  }
+
+  .sheet-field-label {
+    font-size: 13px;
+    color: var(--md-on-surface-variant);
+  }
+
+  .sheet-file-name {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    opacity: 0.72;
+  }
+
+  .sheet-feedback {
+    margin-top: 14px;
+    padding: 10px 14px;
+    border-radius: var(--md-shape-md);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .sheet-feedback-ok {
+    color: #2e7d32;
+    background: #e8f5e9;
+  }
+
+  .sheet-feedback-err {
+    color: var(--md-error);
+    background: rgba(186, 26, 26, 0.08);
+  }
+
   .action-btn-danger {
     color: var(--md-error);
     border-color: var(--md-error);
@@ -2141,8 +3356,53 @@
   }
 
   @media (prefers-color-scheme: dark) {
+    .sheet-feedback-ok {
+      color: #81c784;
+      background: rgba(129, 199, 132, 0.12);
+    }
     .action-btn-danger:hover {
       background: rgba(255, 180, 171, 0.08);
+    }
+  }
+
+  @media (max-width: 760px) {
+    .app-shell-page .header-content,
+    .app-shell-page .app-body,
+    .app-shell-page .app-footer {
+      padding-left: 16px;
+      padding-right: 16px;
+    }
+
+    .app-shell-page .app-body {
+      columns: 1;
+    }
+
+    .sheet-backdrop {
+      padding: 12px;
+      align-items: flex-end;
+    }
+
+    .sheet-card {
+      width: 100%;
+      max-height: min(88vh, 760px);
+      border-radius: 28px 28px 0 0;
+    }
+
+    .sheet-header,
+    .sheet-content {
+      padding-left: 16px;
+      padding-right: 16px;
+    }
+
+    .sheet-actions-row,
+    .beta-confirm-actions {
+      flex-direction: column;
+    }
+
+    .sheet-actions-row > *,
+    .beta-confirm-actions > * {
+      width: 100%;
+      justify-content: center;
     }
   }
 

@@ -11,6 +11,10 @@
 </p>
 
 <p align="center">
+  Current release: <b>v0.4.0</b>
+</p>
+
+<p align="center">
   <a href="../../releases"><img src="https://img.shields.io/github/v/release/crixqq/YouTube-Rewind?style=flat-square&color=c8bfff&labelColor=1c1b20&label=version" alt="Version"></a>
   <a href="../../releases"><img src="https://img.shields.io/github/downloads/crixqq/YouTube-Rewind/total?style=flat-square&color=c8bfff&labelColor=1c1b20&label=downloads" alt="Downloads"></a>
   <a href="https://addons.mozilla.org/firefox/addon/youtube-rewind/"><img src="https://img.shields.io/amo/users/youtube-rewind?style=flat-square&color=c8bfff&labelColor=1c1b20&label=firefox%20users" alt="Firefox Users"></a>
@@ -32,9 +36,15 @@
   </a>
 </p>
 
+<p align="center">
+  <img src="docs/interface-example-rounded.png" alt="YouTube Rewind interface example" width="920">
+</p>
+
 ---
 
 ## Features
+
+This README reflects the current `0.4.0` release line, including standalone settings, fullscreen preview tools, frame screenshots, custom logo media support, and beta toggles that can be saved into profiles.
 
 <details open>
 <summary><b>Profiles</b></summary>
@@ -43,6 +53,7 @@
 |---|---|
 | **Built-in Profiles** | Instantly apply a preset: Focus (grayscale thumbnails, watch timer), Minimal (aggressive clutter removal), or Clean (light declutter) |
 | **Custom Profiles** | Save your current settings as a named profile, import profiles from file, switch between them with one click |
+| **Profile Scope** | Custom profiles now remember beta/labs options too, so experimental setups can be restored in one tap |
 
 </details>
 
@@ -53,7 +64,6 @@
 |---|---|
 | **Playback Speed** | Set a default playback speed (0.25x–5.0x) applied to every video |
 | **Default Quality** | Force a preferred video quality (144p–8K) — YouTube will use the closest available |
-| **Download Thumbnail** | Adds a button next to the video actions to preview and download the full-resolution thumbnail with zoom/pan support |
 | **Classic Player** | Brings back the classic gradient under player controls, removes pill-shaped backgrounds, hides quick action buttons above the progress bar |
 | **Wide Player** | Removes width limits — player, metadata, and recommendations fill the full page |
 | **Disable Description Color** | Removes the adaptive color tint and hover effects from the description area |
@@ -89,7 +99,6 @@
 |---|---|
 | **Videos Per Row** | Set how many videos appear per row (1–8), or keep YouTube's default |
 | **Content Filter** | Hide Shorts, Posts, Mixes, Breaking News, Latest Posts, Playables, "Explore more topics", "New" badges, and the filter chips bar |
-| **Disable Avatar Live Redirect** | Prevents clicking a channel avatar from opening a live stream |
 
 </details>
 
@@ -108,7 +117,8 @@
 | | |
 |---|---|
 | **Hide Elements** | Hide Create button, voice search, search bar, notifications, and country code from the top bar |
-| **Custom Logo** | Replace the YouTube logo with your own image via a dedicated upload page — drag & drop or pick a file, with instant preview |
+| **Custom Logo** | Replace the YouTube logo with your own image, GIF, or video via a dedicated upload page — drag & drop or pick a file, with instant preview |
+| **Logo Size** | Adjust the custom logo scale directly in settings without re-uploading the media |
 | **Hide Logo Animations** | Disable YouTube's event/holiday logo animations (Yoodle) — auto-enabled when custom logo is set |
 
 </details>
@@ -142,6 +152,20 @@
 | **Export / Import** | Export settings as JSON or TXT file, copy to clipboard — import from file (drag & drop) or paste from clipboard |
 | **Reset** | Reset all settings to defaults with confirmation |
 | **Update Checker** | Click the version badge — the extension checks for updates from the source it was installed from |
+
+</details>
+
+<details open>
+<summary><b>Beta Features</b></summary>
+
+| | |
+|---|---|
+| **Thumbnail Download Control** | Adds a native-style action next to the watch page buttons to open a thumbnail menu, preview the image fullscreen, copy it, zoom/pan it, and download it |
+| **Thumbnail Carousel Preview** | Fullscreen thumbnail preview now supports switching between available thumbnail variants without leaving the overlay |
+| **Frame Screenshot Button** | Capture the current video frame without the player UI, then either download it instantly or open it in the same fullscreen preview interface |
+| **Standalone Settings Tab** | Open the extension in a responsive full-page workspace for easier editing on large screens |
+| **Homepage Reveal Animation** | Replays a lightweight entrance animation for homepage cards on load, SPA navigation, and when cards re-enter the viewport |
+| **Disable Avatar Live Redirect** | Prevent channel avatar clicks on the homepage from sending you into a live stream |
 
 </details>
 

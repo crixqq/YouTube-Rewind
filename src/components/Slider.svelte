@@ -142,10 +142,6 @@
     class:hovering
     class:pressing
     bind:clientWidth={trackWidth}
-    onmouseenter={() => { hovering = true; }}
-    onmouseleave={() => { hovering = false; pressing = false; }}
-    onmousedown={() => { pressing = true; }}
-    onmouseup={() => { pressing = false; }}
   >
     <svg class="slider-wave-svg" width={trackWidth} height="24">
       {#if wavePath}
@@ -180,6 +176,10 @@
       {max}
       step="1"
       {value}
+      onmouseenter={() => { hovering = true; }}
+      onmouseleave={() => { hovering = false; pressing = false; }}
+      onmousedown={() => { pressing = true; }}
+      onmouseup={() => { pressing = false; }}
       oninput={handleInput}
     />
   </div>

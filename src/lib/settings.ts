@@ -46,6 +46,7 @@ export interface Settings {
   hideNewBadge: boolean;
   customLogo: string;
   customLogoRatio: number;
+  customLogoScale: number;
   hideLogoAnimation: boolean;
   hidePlayables: boolean;
   hideFilterBar: boolean;
@@ -60,6 +61,11 @@ export interface Settings {
   downloadThumbnailButton: boolean;
   watchTimeLimitBlockRepeat: boolean;
   customProfiles: CustomProfile[];
+  betaEnabled: boolean;
+  betaStandalonePage: boolean;
+  betaHomepageRevealAnimation: boolean;
+  betaVideoFrameScreenshot: boolean;
+  betaScreenshotOpenPreview: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -105,6 +111,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideNewBadge: false,
   customLogo: '',
   customLogoRatio: 0,
+  customLogoScale: 100,
   hideLogoAnimation: false,
   hidePlayables: false,
   hideFilterBar: false,
@@ -119,6 +126,11 @@ export const DEFAULT_SETTINGS: Settings = {
   downloadThumbnailButton: false,
   watchTimeLimitBlockRepeat: true,
   customProfiles: [],
+  betaEnabled: false,
+  betaStandalonePage: false,
+  betaHomepageRevealAnimation: false,
+  betaVideoFrameScreenshot: false,
+  betaScreenshotOpenPreview: false,
 };
 
 const STORAGE_KEY = 'ytr_settings';
@@ -150,10 +162,28 @@ export const PROFILES: Record<string, Partial<Settings>> = {
     hidePlayables: true,
     hideFilterBar: true,
     hideTopbarCreate: true,
+    hideTopbarVoiceSearch: true,
     hideTopbarNotifications: true,
+    hideCountryCode: true,
+    hideSearchShorts: true,
+    hideSearchPeopleWatched: true,
+    hideSidebarExplore: true,
+    hideSidebarMoreFromYT: true,
+    hideSidebarFooter: true,
+    hideJoinButton: true,
+    hideClipButton: true,
+    hideThanksButton: true,
+    hideSaveButton: true,
+    hideNewBadge: true,
     thumbnailEffect: 'grayscale',
+    thumbnailHoverReveal: false,
+    disableHoverAnimation: true,
+    widePlayer: true,
     watchTimerEnabled: true,
-    watchTimeLimitMinutes: 60,
+    watchTimeLimitMinutes: 45,
+    watchTimeLimitBlockRepeat: true,
+    downloadThumbnailButton: true,
+    disableAvatarLiveRedirect: true,
   },
   minimal: {
     hideShorts: true,
@@ -167,14 +197,29 @@ export const PROFILES: Record<string, Partial<Settings>> = {
     hideTopbarCreate: true,
     hideTopbarVoiceSearch: true,
     hideTopbarNotifications: true,
+    hideTopbarSearch: true,
+    hideCountryCode: true,
+    hideSearchShorts: true,
+    hideSearchChannels: true,
+    hideSearchPeopleWatched: true,
+    hideSidebarSubscriptions: true,
+    hideSidebarYou: true,
     hideSidebarExplore: true,
     hideSidebarMoreFromYT: true,
     hideSidebarReportHistory: true,
     hideSidebarFooter: true,
     hideNewBadge: true,
     hideJoinButton: true,
+    hideDownloadButton: true,
     hideThanksButton: true,
     hideClipButton: true,
+    hideSaveButton: true,
+    hideLogoAnimation: true,
+    disableHoverAnimation: true,
+    bannerStyle: 'sharp',
+    thumbnailShape: 'sharp',
+    avatarShape: 'superellipse',
+    classicLikeIcons: true,
   },
   clean: {
     hideShorts: true,
@@ -183,10 +228,20 @@ export const PROFILES: Record<string, Partial<Settings>> = {
     hideBreakingNews: true,
     hideLatestPosts: true,
     hideNewBadge: true,
+    hidePlayables: true,
     hideFilterBar: true,
     hideTopbarCreate: true,
     hideCountryCode: true,
-    disableHoverAnimation: true,
+    hideTopbarNotifications: true,
+    avatarShape: 'superellipse',
+    thumbnailShape: 'rounded',
+    bannerStyle: 'sharp',
+    classicLikeIcons: true,
+    classicPlayer: true,
+    widePlayer: true,
+    downloadThumbnailButton: true,
+    hideLogoAnimation: true,
+    disableAvatarLiveRedirect: true,
   },
 };
 
@@ -200,6 +255,21 @@ function normalizeSettings(input: Partial<Settings> = {}): Settings {
   }
   if (!Array.isArray(normalized.customProfiles)) {
     normalized.customProfiles = [];
+  }
+  if (!Number.isFinite(normalized.customLogoScale)) {
+    normalized.customLogoScale = 100;
+  }
+  normalized.customLogoScale = Math.min(220, Math.max(40, Math.round(normalized.customLogoScale)));
+  if (!normalized.betaEnabled) {
+    normalized.downloadThumbnailButton = false;
+    normalized.disableAvatarLiveRedirect = false;
+    normalized.betaStandalonePage = false;
+    normalized.betaHomepageRevealAnimation = false;
+    normalized.betaVideoFrameScreenshot = false;
+    normalized.betaScreenshotOpenPreview = false;
+  }
+  if (!normalized.betaVideoFrameScreenshot) {
+    normalized.betaScreenshotOpenPreview = false;
   }
   return normalized;
 }

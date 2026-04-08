@@ -7,8 +7,9 @@ export default defineConfig({
     name: '__MSG_extensionName__',
     description: '__MSG_extensionDescription__',
     default_locale: 'en',
-    permissions: ['storage', 'clipboardRead', 'clipboardWrite'],
+    permissions: ['storage', 'clipboardRead', 'clipboardWrite', 'activeTab', 'tabs'],
     host_permissions: [
+      '<all_urls>',
       'https://img.youtube.com/*',
       'https://i.ytimg.com/*',
       'https://api.github.com/*',
@@ -18,9 +19,6 @@ export default defineConfig({
       gecko: {
         id: '{e0f1a5b2-7c3d-4e8f-9a6b-1d2c3e4f5a6b}',
         strict_min_version: '140.0',
-        data_collection_permissions: {
-          required: ['none'],
-        },
       },
     },
   },

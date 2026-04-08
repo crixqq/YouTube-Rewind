@@ -4,6 +4,16 @@
 
 # Claude
 .claude
+CLAUDE.md
+**/CLAUDE.md
+
+# Codex / AI assistant workspace files
+.codex
+.cursor
+.windsurf
+.roo
+.aider*
+Interface example.jpg
 
 # Logs
 logs
