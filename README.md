@@ -11,10 +11,6 @@
 </p>
 
 <p align="center">
-  Current release: <b>v0.4.0</b>
-</p>
-
-<p align="center">
   <a href="../../releases"><img src="https://img.shields.io/github/v/release/crixqq/YouTube-Rewind?style=flat-square&color=c8bfff&labelColor=1c1b20&label=version" alt="Version"></a>
   <a href="../../releases"><img src="https://img.shields.io/github/downloads/crixqq/YouTube-Rewind/total?style=flat-square&color=c8bfff&labelColor=1c1b20&label=downloads" alt="Downloads"></a>
   <a href="https://addons.mozilla.org/firefox/addon/youtube-rewind/"><img src="https://img.shields.io/amo/users/youtube-rewind?style=flat-square&color=c8bfff&labelColor=1c1b20&label=firefox%20users" alt="Firefox Users"></a>
@@ -44,18 +40,20 @@
 
 ## <img src="docs/icons/overview.svg" width="18" height="18" alt=""> Overview
 
-This README reflects the current `0.4.0` release line, including standalone settings, fullscreen preview tools, frame screenshots, custom logo media support, and beta toggles that can be saved into profiles.
+This README has been rechecked against the current `0.5.0` release line, including auto theme mode, linked light/dark palette behavior, fullscreen preview tools, frame screenshots, custom logo media support, hover-preview controls, and beta toggles that can be saved into profiles.
+
+All current features, supported UI languages, installation formats, and release-facing usage notes are listed in this `README.md`.
 
 YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and more personal without losing the parts that matter.
 
 - <img src="docs/icons/bullet_filter.svg" width="16" height="16" alt=""> Hide clutter across the homepage, search results, top bar, watch page, and sidebar
 - <img src="docs/icons/bullet_profiles.svg" width="16" height="16" alt=""> Save presets and custom profiles, including beta/labs setups
-- <img src="docs/icons/bullet_preview.svg" width="16" height="16" alt=""> Preview, copy, and download thumbnails in fullscreen
+- <img src="docs/icons/bullet_preview.svg" width="16" height="16" alt=""> Preview thumbnails fullscreen, copy the image or its link, and download it
 - <img src="docs/icons/bullet_screenshot.svg" width="16" height="16" alt=""> Capture clean video-frame screenshots
 - <img src="docs/icons/bullet_appearance.svg" width="16" height="16" alt=""> Customize thumbnails, avatar shapes, banners, player layout, and even the YouTube logo
-- <img src="docs/icons/bullet_languages.svg" width="16" height="16" alt=""> Use the settings UI in 11 languages
+- <img src="docs/icons/bullet_languages.svg" width="16" height="16" alt=""> Use the settings UI in 14 languages
 
-> Most settings apply instantly, so you can see the result right away without reloading YouTube.
+> Most settings apply instantly. Changing the language now reloads open YouTube pages so the extension controls and labels refresh consistently.
 
 ---
 
@@ -68,7 +66,8 @@ YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and 
 |---|---|
 | **Built-in Profiles** | Instantly apply a preset: Focus (grayscale thumbnails, watch timer), Minimal (aggressive clutter removal), or Clean (light declutter) |
 | **Custom Profiles** | Save your current settings as a named profile, import profiles from file, switch between them with one click |
-| **Profile Scope** | Custom profiles now remember beta/labs options too, so experimental setups can be restored in one tap |
+| **Safe Editing** | If you tweak a built-in profile, the extension automatically forks it into a custom profile so the original preset stays intact |
+| **Profile Scope** | Custom profiles remember beta/labs options too, so experimental setups can be restored in one tap |
 
 </details>
 
@@ -78,7 +77,6 @@ YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and 
 | | |
 |---|---|
 | **Playback Speed** | Set a default playback speed (0.25x–5.0x) applied to every video |
-| **Default Quality** | Force a preferred video quality (144p–8K) — YouTube will use the closest available |
 | **Classic Player** | Brings back the classic gradient under player controls, removes pill-shaped backgrounds, hides quick action buttons above the progress bar |
 | **Wide Player** | Removes width limits — player, metadata, and recommendations fill the full page |
 | **Disable Description Color** | Removes the adaptive color tint and hover effects from the description area |
@@ -92,6 +90,8 @@ YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and 
 | | |
 |---|---|
 | **Video Buttons** | Hide individual video action buttons: Join, Subscribe, Like/Dislike, Share, Download, Clip/Remix, Thanks, Save |
+| **Download Control** | Adds a native-style action near the YouTube buttons to open a thumbnail menu, preview the image fullscreen, copy it, copy its link, and download it |
+| **Frame Screenshot** | Capture the current video frame without player chrome, then preview, annotate, copy, or download it |
 | **Banner Style** | Change channel banner appearance: default or sharp (no rounding) |
 
 </details>
@@ -132,9 +132,9 @@ YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and 
 | | |
 |---|---|
 | **Hide Elements** | Hide Create button, voice search, search bar, notifications, and country code from the top bar |
-| **Custom Logo** | Replace the YouTube logo with your own image, GIF, or video via a dedicated upload page — drag & drop or pick a file, with instant preview |
-| **Logo Size** | Adjust the custom logo scale directly in settings without re-uploading the media |
-| **Hide Logo Animations** | Disable YouTube's event/holiday logo animations (Yoodle) — auto-enabled when custom logo is set |
+| **Logo Variants** | Switch between the native YouTube logo, the built-in YouTube Rewind logo, or your own uploaded image, GIF, or video |
+| **Per-Variant Size** | Each logo variant keeps its own size value, so switching presets does not overwrite the others |
+| **Hide Logo Animations** | Disable YouTube's event/holiday logo animations (Yoodle) — enabled by default for Rewind and uploaded logos |
 
 </details>
 
@@ -152,19 +152,32 @@ YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and 
 
 | | |
 |---|---|
-| **Avatar Shapes** | 9 shapes: circle (default), squircle, rounded square, square, diamond, hexagon, octagon, clover, flower |
-| **Thumbnail Effects** | Reduce distractions: pixelate, blur, grayscale, or hide video thumbnails everywhere (hover reveal is optional) |
-| **Thumbnail Shapes** | Change the shape of video thumbnails: sharp, rounded, scallop, notched, slanted, arch, or fan |
-| **Disable Hover Glow** | Remove the ripple/glow animation on thumbnail hover and prevent metadata text color changes |
+| **Avatar Shapes** | 12 shapes: circle (default), squircle, rounded square, notched, slanted, arch, square, diamond, hexagon, octagon, clover, flower |
+| **Thumbnail Effects** | Reduce distractions: pixelate, blur, grayscale, or hide video thumbnails everywhere (hover reveal is optional, and hover preview can be disabled separately) |
+| **Thumbnail Shapes** | Change the shape of video thumbnails: sharp, rounded, squircle, notched, slanted, arch, diamond, hexagon, or octagon |
+| **Disable Hover Glow** | Remove the ripple/glow animation on thumbnail hover |
 
 </details>
 
 <details open>
-<summary><b><img src="docs/icons/settings_data.svg" width="16" height="16" alt=""> Settings Data</b></summary>
+<summary><b><img src="docs/icons/appearance.svg" width="16" height="16" alt=""> Interface</b></summary>
 
 | | |
 |---|---|
-| **Export / Import** | Export settings as JSON or TXT file, copy to clipboard — import from file (drag & drop) or paste from clipboard |
+| **Theme Mode** | Switch between auto, dark, and light settings themes — auto is the default |
+| **Theme Presets & Accent Color** | Pick a built-in palette preset or tune the accent with a custom Material 3 color picker that keeps linked light/dark alternatives coherent |
+| **Standalone Workspace** | Open the extension in a responsive full-page workspace from the popup header for easier editing on large screens |
+
+</details>
+
+<details open>
+<summary><b><img src="docs/icons/settings_data.svg" width="16" height="16" alt=""> Developer</b></summary>
+
+| | |
+|---|---|
+| **Developer Tools** | Optional guarded section for advanced maintenance, with a warning before it is enabled |
+| **Export / Import** | Export settings as JSON or TXT file with config name metadata, copy to clipboard — import from file (drag & drop) or paste from clipboard |
+| **Debug Utilities** | Copy a debug snapshot, clear the update cache, reset watch timer storage, and reload the extension |
 | **Reset** | Reset all settings to defaults with confirmation |
 | **Update Checker** | Click the version badge — the extension checks for updates from the source it was installed from |
 
@@ -175,10 +188,7 @@ YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and 
 
 | | |
 |---|---|
-| **Thumbnail Download Control** | Adds a native-style action next to the watch page buttons to open a thumbnail menu, preview the image fullscreen, copy it, zoom/pan it, and download it |
-| **Thumbnail Carousel Preview** | Fullscreen thumbnail preview now supports switching between available thumbnail variants without leaving the overlay |
-| **Frame Screenshot Button** | Capture the current video frame without the player UI, then either download it instantly or open it in the same fullscreen preview interface |
-| **Standalone Settings Tab** | Open the extension in a responsive full-page workspace for easier editing on large screens |
+| **Default Quality** | Experimental preferred video quality override (144p–8K). It is still being tuned because YouTube can ignore or reset quality decisions unexpectedly |
 | **Homepage Reveal Animation** | Replays a lightweight entrance animation for homepage cards on load, SPA navigation, and when cards re-enter the viewport |
 | **Disable Avatar Live Redirect** | Prevent channel avatar clicks on the homepage from sending you into a live stream |
 
@@ -188,9 +198,9 @@ YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and 
 
 ## <img src="docs/icons/languages.svg" width="18" height="18" alt=""> Languages
 
-The extension UI is available in **11 languages** (auto-detected from browser, or pick manually):
+The extension UI is available in **14 languages** (auto-detected from browser, or pick manually):
 
-`English` `Русский` `Українська` `Español` `Português` `Français` `Deutsch` `Türkçe` `日本語` `한국어` `中文`
+`English` `Русский` `Українська` `Español` `Português` `Français` `Deutsch` `Türkçe` `Italiano` `Polski` `Nederlands` `日本語` `한국어` `中文`
 
 ---
 
@@ -222,7 +232,7 @@ Download the `.zip` from [Releases](../../releases).
 
 The extension stays active across restarts. Chrome may show a warning on startup — just dismiss it.
 
-> The `.crx` file is included for Chromium forks that support self-signed extensions (e.g. ungoogled-chromium).
+> If you need a `.crx` for Chromium forks that support self-signed extensions, you can pack it manually with the browser step below.
 
 <details>
 <summary><b>Build from source</b></summary>

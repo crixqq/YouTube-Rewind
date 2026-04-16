@@ -1,15 +1,19 @@
 <script lang="ts">
-  import { loadSettings, saveSettings } from '@/lib/settings';
+  import Slider from '@/components/Slider.svelte';
+  import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from '@/lib/settings';
   import { t, setLocale } from '@/lib/i18n';
 
-  const MAX_LOGO_FILE_SIZE = 2 * 1024 * 1024;
+  const MAX_LOGO_IMAGE_FILE_SIZE = 2 * 1024 * 1024;
+  const MAX_LOGO_VIDEO_FILE_SIZE = 16 * 1024 * 1024;
   const LOGO_ACCEPT = 'image/png,image/jpeg,image/gif,image/svg+xml,image/webp,video/mp4,video/webm,video/ogg';
 
+  let activeLogoVariant = $state<Settings['logoVariant']>(DEFAULT_SETTINGS.logoVariant);
   let logoUrl = $state('');
-  let logoRatio = $state(0);
+  let logoScale = $state(DEFAULT_SETTINGS.customLogoScale);
   let dragging = $state(false);
   let pasting = $state(false);
   let loaded = $state(false);
+  let currentLanguage = $state('en');
 
   type Toast = { text: string; type: 'ok' | 'error' };
   let toast = $state<Toast | null>(null);
@@ -17,6 +21,15 @@
 
   function isVideoLogo(src: string): boolean {
     return /^data:video\//i.test(src) || /\.(mp4|webm|ogg|mov)(?:$|[?#])/i.test(src);
+  }
+
+  function formatPercent(value: number): string {
+    return `${Math.round(value)}%`;
+  }
+
+  function parsePercent(text: string): number {
+    const numeric = parseInt(text.replace('%', '').trim(), 10);
+    return Number.isNaN(numeric) ? DEFAULT_SETTINGS.customLogoScale : numeric;
   }
 
   function showToast(text: string, type: Toast['type'] = 'ok') {
@@ -28,8 +41,10 @@
   $effect(() => {
     loadSettings().then((s) => {
       setLocale(s.language);
+      currentLanguage = s.language;
+      activeLogoVariant = s.logoVariant;
       logoUrl = s.customLogo;
-      logoRatio = s.customLogoRatio;
+      logoScale = s.customLogoScale;
       loaded = true;
     });
   });
@@ -85,13 +100,15 @@
     });
   }
 
+  function getLogoSizeError(isVideo: boolean): string {
+    if (!isVideo) return t('customLogoErrorSize');
+    return currentLanguage === 'ru'
+      ? 'Видео слишком большое (макс. 16 МБ)'
+      : 'Video is too large (max 16 MB)';
+  }
+
   async function processFile(file: File) {
     if (!file) return;
-    if (file.size > MAX_LOGO_FILE_SIZE) {
-      showToast(t('customLogoErrorSize'), 'error');
-      return;
-    }
-
     const fileType = file.type.toLowerCase();
     const isImage = fileType.startsWith('image/');
     const isVideo = fileType.startsWith('video/');
@@ -101,12 +118,18 @@
       return;
     }
 
+    const sizeLimit = isVideo ? MAX_LOGO_VIDEO_FILE_SIZE : MAX_LOGO_IMAGE_FILE_SIZE;
+    if (file.size > sizeLimit) {
+      showToast(getLogoSizeError(isVideo), 'error');
+      return;
+    }
+
     try {
       const dataUrl = await readFileAsDataUrl(file);
       const ratio = isVideo ? await loadVideoRatio(dataUrl) : await loadImageRatio(dataUrl);
+      activeLogoVariant = 'custom';
       logoUrl = dataUrl;
-      logoRatio = ratio;
-      await saveSettings({ customLogo: dataUrl, customLogoRatio: ratio });
+      await saveSettings({ logoVariant: 'custom', customLogo: dataUrl, customLogoRatio: ratio, hideLogoAnimation: true });
       showToast(t('customLogoSaved'));
     } catch (error) {
       if (error instanceof Error && error.message === 'ratio_invalid') {
@@ -140,9 +163,25 @@
 
   function removeLogo() {
     logoUrl = '';
-    logoRatio = 0;
-    saveSettings({ customLogo: '', customLogoRatio: 0 });
+    const nextVariant = activeLogoVariant === 'custom' ? 'rewind' : activeLogoVariant;
+    activeLogoVariant = nextVariant;
+    void saveSettings({
+      logoVariant: nextVariant,
+      customLogo: '',
+      customLogoRatio: 0,
+      hideLogoAnimation: nextVariant === 'youtube' ? false : true,
+    });
     showToast(t('customLogoRemoved'));
+  }
+
+  async function updateCustomLogoScale(value: number) {
+    const nextScale = Math.min(220, Math.max(40, Math.round(value)));
+    logoScale = nextScale;
+    await saveSettings({ customLogoScale: nextScale });
+  }
+
+  function resetCustomLogoScale() {
+    void updateCustomLogoScale(100);
   }
 
   async function pasteFromClipboard() {
@@ -217,6 +256,19 @@
         {#if logoUrl}
           <button class="btn btn-outline" onclick={removeLogo}>{t('customLogoRemove')}</button>
         {/if}
+      </div>
+
+      <Slider
+        label={t('settingCustomLogoSize')}
+        value={logoScale}
+        min={40}
+        max={220}
+        formatDisplay={formatPercent}
+        parseInput={parsePercent}
+        onchange={(value) => void updateCustomLogoScale(value)}
+      />
+      <div class="actions">
+        <button class="btn btn-outline" onclick={resetCustomLogoScale}>{t('resetSettings')}</button>
       </div>
     </div>
 
@@ -317,15 +369,17 @@
     background-position: 50% 0%;
     background-clip: padding-box;
     animation: scrollbarWave 4.8s linear infinite;
-    will-change: background-position;
+    transition: filter 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
   }
 
   :global(body::-webkit-scrollbar-thumb:hover) {
-    animation-duration: 3.2s;
+    filter: brightness(1.04);
+    box-shadow: inset 0 0 0 1px rgba(200, 191, 255, 0.28);
   }
 
   :global(body::-webkit-scrollbar-thumb:active) {
-    animation-duration: 2.2s;
+    filter: brightness(1.08);
+    box-shadow: inset 0 0 0 1px rgba(200, 191, 255, 0.36);
   }
 
   .page {

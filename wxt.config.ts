@@ -7,13 +7,28 @@ export default defineConfig({
     name: '__MSG_extensionName__',
     description: '__MSG_extensionDescription__',
     default_locale: 'en',
-    permissions: ['storage', 'clipboardRead', 'clipboardWrite', 'activeTab', 'tabs'],
+    action: {
+      default_icon: {
+        '16': 'icon/16.png',
+        '32': 'icon/32.png',
+        '48': 'icon/48.png',
+        '96': 'icon/96.png',
+        '128': 'icon/128.png',
+      },
+    },
+    permissions: ['storage', 'unlimitedStorage', 'clipboardRead', 'clipboardWrite', 'activeTab', 'tabs'],
     host_permissions: [
       '<all_urls>',
       'https://img.youtube.com/*',
       'https://i.ytimg.com/*',
       'https://api.github.com/*',
       'https://addons.mozilla.org/*',
+    ],
+    web_accessible_resources: [
+      {
+        resources: ['default-quality-bridge.js', 'logo-header.png'],
+        matches: ['*://*.youtube.com/*'],
+      },
     ],
     browser_specific_settings: {
       gecko: {

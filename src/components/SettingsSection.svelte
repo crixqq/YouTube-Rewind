@@ -54,8 +54,8 @@
   .section-content {
     background: var(--md-surface-container);
     border-radius: var(--md-shape-lg);
-    border: 1px solid transparent;
-    padding: 4px 0;
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 46%, transparent);
+    padding: 6px 0;
     overflow: hidden;
   }
 </style>

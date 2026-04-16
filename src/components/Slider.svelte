@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
 
   export let label = '';
   export let value = 0;
@@ -20,14 +20,28 @@
   let animating = false;
   let rafId = 0;
   let lastTime = 0;
+  let animationNeeded = false;
+  let hoverLevel = 0;
+  let pressLevel = 0;
+  let speed = 30;
   let currentAmp = 3;
   let targetAmp = 3;
+  let strokeWidth = 4;
+  let targetStrokeWidth = 4;
+  let thumbSize = 20;
+  let targetThumbSize = 20;
+  let thumbLift = 0;
+  let currentWaveLength = 38;
+  let targetWaveLength = 38;
+  let reducedMotion = false;
+  let reducedMotionQuery: MediaQueryList | null = null;
 
   let editable = true;
   let displayValue = '';
   let percent = 0;
   let wavePath = '';
   let inactiveStart = 14;
+  const waveThumbGap = 7;
 
   function tick(time: number): void {
     if (!animating) return;
@@ -35,9 +49,16 @@
     const dt = lastTime ? (time - lastTime) / 1000 : 0.016;
     lastTime = time;
 
-    const speed = pressing ? 80 : hovering ? 50 : 30;
+    const hoverTarget = hovering ? 1 : 0;
+    const pressTarget = pressing ? 1 : 0;
+
+    hoverLevel += (hoverTarget - hoverLevel) * Math.min(1, dt * 14);
+    pressLevel += (pressTarget - pressLevel) * Math.min(1, dt * 18);
     phase += speed * dt;
     currentAmp += (targetAmp - currentAmp) * Math.min(1, dt * 8);
+    strokeWidth += (targetStrokeWidth - strokeWidth) * Math.min(1, dt * 14);
+    thumbSize += (targetThumbSize - thumbSize) * Math.min(1, dt * 16);
+    currentWaveLength += (targetWaveLength - currentWaveLength) * Math.min(1, dt * 12);
 
     rafId = requestAnimationFrame(tick);
   }
@@ -77,16 +98,21 @@
   $: editable = !formatDisplay || !!parseInput;
   $: displayValue = formatDisplay ? formatDisplay(value) : (value === 0 && defaultLabel ? defaultLabel : String(value));
   $: percent = max === min ? 0 : ((value - min) / (max - min)) * 100;
-  $: targetAmp = pressing ? 6 : hovering ? 5 : 3;
+  $: speed = reducedMotion ? 0 : 7 + hoverLevel * 8 + pressLevel * 16;
+  $: targetAmp = 2.2 + hoverLevel * 0.95 + pressLevel * 1.35;
+  $: targetStrokeWidth = 3.7 + hoverLevel * 0.45 + pressLevel * 1.05;
+  $: targetThumbSize = 20 + hoverLevel * 2 + pressLevel * 4;
+  $: targetWaveLength = 38;
+  $: thumbLift = Math.round(hoverLevel * 6 + pressLevel * 10);
+  $: animationNeeded = !reducedMotion && trackWidth > 0;
 
   $: {
-    const shouldAnimate = hovering || pressing;
-    if (shouldAnimate && !animating) {
+    if (animationNeeded && !animating) {
       animating = true;
       lastTime = 0;
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(tick);
-    } else if (!shouldAnimate && animating) {
+    } else if (!animationNeeded && animating) {
       animating = false;
       cancelAnimationFrame(rafId);
     }
@@ -94,28 +120,43 @@
 
   $: {
     const cy = 12;
-    const activeWidth = Math.max(0, (percent / 100) * trackWidth - 14);
+    const centerX = (percent / 100) * trackWidth;
+    const thumbRadius = thumbSize / 2;
+    const activeWidth = Math.max(0, centerX - thumbRadius - waveThumbGap);
     const amplitude = currentAmp;
-    const waveLength = pressing ? 26 : hovering ? 30 : 34;
+    const startX = 3;
 
-    if (activeWidth < 4) {
+    if (activeWidth < startX + 1) {
       wavePath = '';
     } else {
-      const points: string[] = [`M 3 ${cy}`];
-      for (let x = 1; x <= activeWidth; x += 1.5) {
-        const y = cy + amplitude * Math.sin(((x + phase) / waveLength) * Math.PI * 2);
-        points.push(`L ${x.toFixed(1)} ${y.toFixed(1)}`);
+      const points: string[] = [];
+      for (let x = startX; x <= activeWidth; x += 1.5) {
+        const y = cy + amplitude * Math.sin(((x + phase) / currentWaveLength) * Math.PI * 2);
+        points.push(`${points.length === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`);
       }
-      const endY = cy + amplitude * Math.sin(((activeWidth + phase) / waveLength) * Math.PI * 2);
+      const endY = cy + amplitude * Math.sin(((activeWidth + phase) / currentWaveLength) * Math.PI * 2);
       points.push(`L ${activeWidth.toFixed(1)} ${endY.toFixed(1)}`);
       wavePath = points.join(' ');
     }
 
-    inactiveStart = Math.min(trackWidth, (percent / 100) * trackWidth + 14);
+    inactiveStart = Math.min(trackWidth, centerX + thumbRadius + waveThumbGap);
   }
 
   onDestroy(() => {
+    if (reducedMotionQuery) {
+      reducedMotionQuery.removeEventListener('change', handleReducedMotionChange);
+    }
     cancelAnimationFrame(rafId);
+  });
+
+  function handleReducedMotionChange(event: MediaQueryListEvent): void {
+    reducedMotion = event.matches;
+  }
+
+  onMount(() => {
+    reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    reducedMotion = reducedMotionQuery.matches;
+    reducedMotionQuery.addEventListener('change', handleReducedMotionChange);
   });
 </script>
 
@@ -149,7 +190,7 @@
           d={wavePath}
           fill="none"
           stroke="var(--md-primary)"
-          stroke-width={pressing ? 6 : 4}
+          stroke-width={strokeWidth}
           stroke-linecap="round"
           stroke-linejoin="round"
         />
@@ -166,7 +207,7 @@
     </svg>
 
     <div class="slider-thumb" style={`left: ${percent}%`}>
-      <div class="slider-thumb-inner"></div>
+      <div class="slider-thumb-inner" style={`width:${thumbSize}px;height:${thumbSize}px;--slider-thumb-lift:${thumbLift}%;`}></div>
     </div>
 
     <input
@@ -264,7 +305,7 @@
   }
 
   .slider-wave-svg path {
-    transition: stroke-width 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    transition: stroke 0.18s ease;
   }
 
   .slider-wave-svg line {
@@ -285,25 +326,9 @@
   }
 
   .slider-thumb-inner {
-    width: 20px;
-    height: 20px;
     border-radius: 50%;
-    background: var(--md-primary);
-    transition: width 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28),
-                height 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28),
-                background 0.2s ease;
-  }
-
-  .slider-track-container.hovering .slider-thumb-inner {
-    width: 24px;
-    height: 24px;
-    background: color-mix(in srgb, var(--md-primary) 90%, white 10%);
-  }
-
-  .slider-track-container.pressing .slider-thumb-inner {
-    width: 28px;
-    height: 28px;
-    background: color-mix(in srgb, var(--md-primary) 84%, white 16%);
+    background: color-mix(in srgb, var(--md-primary) calc(100% - var(--slider-thumb-lift, 0%)), white var(--slider-thumb-lift, 0%));
+    transition: background 0.18s ease;
   }
 
   .slider-input-hidden {

@@ -2,6 +2,7 @@ import { DEFAULT_SETTINGS } from '@/lib/settings';
 
 export default defineBackground(() => {
   const STORAGE_KEY = 'ytr_settings';
+  const LEGACY_VIDEO_INSIGHTS_KEY = ['ytr', 'video', 'insights'].join('_');
   type CaptureTabMessage = { type?: string };
   type RuntimeSender = { tab?: { windowId?: number } };
 
@@ -12,6 +13,7 @@ export default defineBackground(() => {
         await browser.storage.local.set({ [STORAGE_KEY]: DEFAULT_SETTINGS });
       }
     }
+    await browser.storage.local.remove(LEGACY_VIDEO_INSIGHTS_KEY).catch(() => {});
   });
 
   browser.runtime.onMessage.addListener((message: unknown, sender: RuntimeSender) => {

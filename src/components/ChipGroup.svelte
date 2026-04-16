@@ -37,6 +37,7 @@
   .chip {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
     height: 32px;
     padding: 0 12px;
@@ -46,11 +47,19 @@
     color: var(--md-on-surface-variant);
     font-size: 13px;
     font-family: inherit;
+    line-height: 1.1;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    transition:
+      transform 0.2s cubic-bezier(0.2, 0, 0, 1),
+      background-color 0.2s cubic-bezier(0.2, 0, 0, 1),
+      color 0.2s cubic-bezier(0.2, 0, 0, 1),
+      border-color 0.2s cubic-bezier(0.2, 0, 0, 1),
+      box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1);
     user-select: none;
     position: relative;
     overflow: hidden;
+    transform-origin: center;
+    backface-visibility: hidden;
   }
 
   .chip::after {
@@ -72,10 +81,15 @@
     transform: scale(1.03);
   }
 
+  .chip:hover .chip-label {
+    transform: translateY(-1px);
+  }
+
   .chip.active {
     background: var(--md-secondary-container);
     color: var(--md-on-secondary-container);
     border-color: transparent;
+    box-shadow: none;
     padding-left: 8px;
   }
 
@@ -84,7 +98,7 @@
   }
 
   .chip:active {
-    transform: scale(0.93);
+    transform: scale(0.97);
     transition-duration: 0.08s;
   }
 
@@ -93,12 +107,21 @@
   }
 
   .chip:active .chip-label {
-    transform: scale(0.96);
+    transform: translateY(0) scale(0.96);
   }
 
   .chip-check {
     flex-shrink: 0;
     animation: chipCheckBounce 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) both;
+  }
+
+  :global(body[data-ytr-theme-mode="light"]) .chip.active {
+    background: color-mix(in srgb, var(--md-secondary-container) 76%, var(--md-primary-container) 24%);
+    color: var(--md-on-secondary-container);
+    border-color: color-mix(in srgb, var(--md-primary) 58%, var(--md-secondary-container));
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--md-primary) 18%, transparent) inset,
+      0 1px 2px rgba(0, 0, 0, 0.06);
   }
 
   @keyframes chipCheckBounce {

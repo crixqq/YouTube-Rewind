@@ -1,11 +1,77 @@
 import type { Settings } from '@/lib/settings';
-import { loadSettings, addWatchTime, getWatchTime, getBlockDismissed, setBlockDismissed, QUALITY_MAP } from '@/lib/settings';
+import { BUILTIN_REWIND_LOGO_RATIO, DEFAULT_SETTINGS, loadSettings, addWatchTime, getWatchTime, getBlockDismissed, setBlockDismissed } from '@/lib/settings';
 import './style.css';
 
 let currentSettings: Settings | null = null;
-type OverlayGalleryItem = { src: string; filename: string; label: string };
+const BUILTIN_REWIND_LOGO_URL = browser.runtime.getURL('logo-header.png');
+type ManagedLogoKind = 'rewind' | 'custom';
+type ResolvedThemeMode = 'light' | 'dark';
+type OverlayGalleryItem = {
+  src: string;
+  filename: string;
+  label: string;
+  kind?: 'original' | 'creator-test' | 'youtube-test' | 'history';
+  metaLabel?: string;
+  hash?: string | null;
+  timestamp?: number | null;
+  status?: 'published' | 'first-seen' | 'observed' | 'archived' | 'current';
+};
+type OverlayOptions = { drawing?: boolean };
+type ContentLocale = 'ru' | 'en';
+type OverlayDrawTool = 'none' | 'pencil' | 'eraser';
+type OverlayStroke = {
+  tool: Exclude<OverlayDrawTool, 'none'>;
+  color: string;
+  sizeRatio: number;
+  points: { x: number; y: number }[];
+};
 type CaptureVisibleTabResponse = { dataUrl?: string; error?: string };
+type IdleWindow = Window & typeof globalThis & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+};
 let feedRevealObserver: IntersectionObserver | null = null;
+let qualityBridgeInjected = false;
+let logoStateObserver: MutationObserver | null = null;
+let observedLogoRenderer: HTMLElement | null = null;
+let youtubeThemeObserver: MutationObserver | null = null;
+let youtubeThemeSyncRaf = 0;
+let playerFullscreenObserver: MutationObserver | null = null;
+let observedFullscreenPlayer: Element | null = null;
+let customLogoSyncTimers: number[] = [];
+let youtubeLogoMetricSyncTimers: number[] = [];
+let feedRevealSyncTimers: number[] = [];
+let fullScanTimers: number[] = [];
+let prefetchMutationObserver: MutationObserver | null = null;
+let prefetchObservedRoot: Element | null = null;
+let prefetchRaf = 0;
+let prefetchRetryTimer: number | null = null;
+let prefetchLastFeedCount = 0;
+let prefetchBurstCount = 0;
+let prefetchLastResizeSignal = 0;
+let prefetchLastRequestedCount = 0;
+let prefetchLastViewportResizeAt = 0;
+let prefetchScrollHandler: (() => void) | null = null;
+let prefetchResizeHandler: (() => void) | null = null;
+let prefetchNavigateHandler: (() => void) | null = null;
+let documentScanObserver: MutationObserver | null = null;
+let activeOverlayCleanup: (() => void) | null = null;
+const MIN_FALLBACK_THUMBNAIL_WIDTH = 120;
+const MIN_FALLBACK_THUMBNAIL_HEIGHT = 90;
+const OBSERVER_IGNORED_REGION_SELECTOR = [
+  '#movie_player',
+  '#player',
+  '.html5-video-player',
+  '#player-container',
+  '.ytp-tooltip',
+  '.ytp-popup',
+  '.ytp-settings-menu',
+  '.ytp-progress-bar-container',
+  '#previewbar',
+  '.sponsorBlockChapterBar',
+  '.sponsorSkipNoticeContainer',
+  '.sponsorSkipNoticeParent',
+  '.sponsorSkipNotice',
+].join(', ');
 
 export default defineContentScript({
   matches: ['*://*.youtube.com/*'],
@@ -15,28 +81,59 @@ export default defineContentScript({
   async main() {
     const settings = await loadSettings();
     currentSettings = settings;
+    ensureYoutubeThemeObserver();
     applySettings(settings);
-    scheduleCustomLogoSync();
-    startObserver();
-    setupPlaybackSpeed(settings);
-    setupDefaultQuality(settings);
-    setupWatchTimer(settings);
-    setupDownloadThumbnailButton(settings);
-    setupFullscreenDetection();
+    syncPageContextFlags();
+    if (needsWatchPageEnhancements(settings)) {
+      setupPlaybackSpeed(settings);
+      setupDefaultQuality(settings);
+      setupDownloadThumbnailButton(settings);
+    }
+    if (needsFullscreenTracking(settings)) {
+      setupFullscreenDetection();
+    }
+    queueInitialEnhancements(settings);
     document.addEventListener('yt-navigate-finish', () => {
-      scheduleCustomLogoSync(240);
-      scheduleCustomLogoSync(960);
-      setTimeout(syncFeedRevealObserver, 180);
-      setTimeout(syncFeedRevealObserver, 560);
+      syncPageContextFlags();
+      if (currentSettings && needsWatchPageEnhancements(currentSettings)) {
+        setupPlaybackSpeed(currentSettings);
+        setupDefaultQuality(currentSettings);
+        setupDownloadThumbnailButton(currentSettings);
+      }
+      if (hasResolvedCustomLogo(currentSettings)) {
+        scheduleCustomLogoSync([240, 960]);
+      }
+      if (currentSettings?.logoVariant === 'rewind') {
+        window.setTimeout(() => syncRewindLogoTheme(), 240);
+        window.setTimeout(() => syncRewindLogoTheme(), 960);
+      }
+      if (currentSettings?.logoVariant === 'youtube') {
+        scheduleYouTubeLogoMetricSync([240, 960]);
+      }
+      scheduleFeedRevealSync([180, 560]);
     });
 
     browser.storage.onChanged.addListener((changes) => {
       if (changes.ytr_settings?.newValue) {
+        const previousLocale = getContentLocale(currentSettings);
         const s = changes.ytr_settings.newValue as Settings;
+        const nextLocale = getContentLocale(s);
+        if (nextLocale !== previousLocale) {
+          window.location.reload();
+          return;
+        }
         currentSettings = s;
         applySettings(s);
+        syncPageContextFlags();
+        if (getActiveScanFlags()) {
+          startObserver();
+          refreshObservedScanRoots();
+        } else {
+          refreshObservedScanRoots();
+        }
         scheduleCustomLogoSync();
-        syncFeedRevealObserver();
+        scheduleYouTubeLogoMetricSync();
+        scheduleFeedRevealSync();
         tagExploreSections();
         tagSidebarSections();
         tagActionButtons();
@@ -45,10 +142,227 @@ export default defineContentScript({
         setupDefaultQuality(s);
         setupWatchTimer(s);
         setupDownloadThumbnailButton(s);
+        setupFullscreenDetection();
       }
     });
   },
 });
+
+function getContentLocale(settings: Settings | null = currentSettings): ContentLocale {
+  const rawLocale = (settings?.language === 'auto'
+    ? browser.i18n.getUILanguage()
+    : settings?.language || 'en'
+  ).toLowerCase();
+  return rawLocale.startsWith('ru') ? 'ru' : 'en';
+}
+
+function scheduleLowPriorityTask(task: () => void, timeout = 1200, fallbackDelay = 120): number {
+  const idleWindow = window as IdleWindow;
+  if (typeof idleWindow.requestIdleCallback === 'function') {
+    return idleWindow.requestIdleCallback(task, { timeout });
+  }
+
+  return window.setTimeout(task, fallbackDelay);
+}
+
+function needsWatchPageEnhancements(settings: Settings): boolean {
+  return settings.playbackSpeed > 0
+    || getEffectiveDefaultQuality(settings) !== 'auto'
+    || settings.downloadThumbnailButton
+    || settings.betaVideoFrameScreenshot;
+}
+
+function needsFullscreenTracking(settings: Settings): boolean {
+  return settings.watchTimerEnabled || settings.watchTimeLimitMinutes > 0;
+}
+
+function getResolvedLogoKind(settings: Settings | null): ManagedLogoKind | null {
+  if (!settings) return null;
+  if (settings.logoVariant === 'rewind') return 'rewind';
+  if (settings.logoVariant === 'custom' && settings.customLogo) return 'custom';
+  return null;
+}
+
+function getResolvedLogoSource(settings: Settings | null): string | null {
+  if (!settings) return null;
+  if (settings.logoVariant === 'rewind') return BUILTIN_REWIND_LOGO_URL;
+  if (settings.logoVariant === 'custom' && settings.customLogo) return settings.customLogo;
+  return null;
+}
+
+function getResolvedLogoRatio(settings: Settings | null): number | 'auto' {
+  if (!settings) return 'auto';
+  if (settings.logoVariant === 'rewind') {
+    return BUILTIN_REWIND_LOGO_RATIO;
+  }
+  if (settings.logoVariant === 'custom') {
+    return settings.customLogoRatio || 'auto';
+  }
+  return 'auto';
+}
+
+function hasResolvedCustomLogo(settings: Settings | null): boolean {
+  return !!getResolvedLogoKind(settings);
+}
+
+function getLogoScale(settings: Settings | null, variant = settings?.logoVariant || 'youtube'): number {
+  if (!settings) {
+    if (variant === 'rewind') return DEFAULT_SETTINGS.rewindLogoScale;
+    if (variant === 'custom') return DEFAULT_SETTINGS.customLogoScale;
+    return DEFAULT_SETTINGS.youtubeLogoScale;
+  }
+
+  if (variant === 'rewind') return settings.rewindLogoScale || DEFAULT_SETTINGS.rewindLogoScale;
+  if (variant === 'custom') return settings.customLogoScale || DEFAULT_SETTINGS.customLogoScale;
+  return settings.youtubeLogoScale || DEFAULT_SETTINGS.youtubeLogoScale;
+}
+
+function queueInitialEnhancements(settings: Settings): void {
+  if (hasResolvedCustomLogo(settings)) {
+    scheduleLowPriorityTask(() => scheduleCustomLogoSync(), 900, 80);
+  }
+  if (settings.logoVariant === 'rewind') {
+    scheduleLowPriorityTask(() => syncRewindLogoTheme(settings), 900, 80);
+  }
+  if (settings.logoVariant === 'youtube') {
+    scheduleLowPriorityTask(() => scheduleYouTubeLogoMetricSync([0, 240, 960]), 900, 80);
+  }
+
+  if (getActiveScanFlags()) {
+    scheduleLowPriorityTask(() => startObserver(), 1200, 160);
+  }
+
+  if (needsWatchPageEnhancements(settings)) {
+    scheduleLowPriorityTask(() => {
+      setupPlaybackSpeed(settings);
+      setupDefaultQuality(settings);
+      setupDownloadThumbnailButton(settings);
+    }, 1400, 220);
+  }
+
+  if (settings.watchTimerEnabled || settings.watchTimeLimitMinutes > 0) {
+    scheduleLowPriorityTask(() => setupWatchTimer(settings), 1600, 280);
+  }
+
+  if (needsFullscreenTracking(settings)) {
+    scheduleLowPriorityTask(() => setupFullscreenDetection(), 1800, 360);
+  }
+}
+
+function injectDefaultQualityBridge(): void {
+  if (qualityBridgeInjected) return;
+  qualityBridgeInjected = true;
+
+  const scriptId = 'ytr-default-quality-bridge';
+  if (document.getElementById(scriptId)) return;
+
+  const script = document.createElement('script');
+  script.id = scriptId;
+  const bridgePath = 'default-quality-bridge.js' as Parameters<typeof browser.runtime.getURL>[0];
+  script.src = browser.runtime.getURL(bridgePath);
+  script.async = false;
+  script.onload = () => {
+    dispatchDefaultQualityBridge(getEffectiveDefaultQuality(currentSettings));
+    script.remove();
+  };
+  (document.head || document.documentElement).appendChild(script);
+}
+
+function dispatchDefaultQualityBridge(quality: string): void {
+  const targets: Array<Window | Document | HTMLElement | null> = [
+    window,
+    document,
+    document.documentElement,
+  ];
+
+  for (const target of targets) {
+    target?.dispatchEvent(new CustomEvent('ytr:set-default-quality', {
+      detail: { quality },
+    }));
+  }
+}
+
+function getEffectiveDefaultQuality(settings: Settings | null): string {
+  if (!settings?.betaEnabled) return 'auto';
+  return settings.defaultQuality || 'auto';
+}
+
+function isObserverIgnoredNode(node: Node | null): boolean {
+  if (!(node instanceof Element)) return false;
+  return !!node.closest(OBSERVER_IGNORED_REGION_SELECTOR);
+}
+
+function getMainVideoElement(): HTMLVideoElement | null {
+  const selectors = [
+    '#movie_player video.html5-main-video',
+    '#movie_player .html5-video-player video',
+    'ytd-player #movie_player video',
+    '#player video.html5-main-video',
+    '#player video',
+  ];
+
+  for (const selector of selectors) {
+    const video = document.querySelector(selector);
+    if (video instanceof HTMLVideoElement) return video;
+  }
+
+  const candidates = [...document.querySelectorAll('video')].filter((video): video is HTMLVideoElement => video instanceof HTMLVideoElement);
+  return candidates.find((video) => video.classList.contains('html5-main-video'))
+    ?? candidates.find((video) => !!video.closest('#movie_player, ytd-player, #player'))
+    ?? null;
+}
+
+function setElementFlag(element: Element, name: string, enabled: boolean): void {
+  if (enabled) {
+    element.setAttribute(name, 'true');
+    return;
+  }
+
+  element.removeAttribute(name);
+}
+
+function syncPageContextFlags(): void {
+  document.documentElement.dataset.ytrHomePage = String(!!document.querySelector('ytd-browse[page-subtype="home"]'));
+}
+
+function needsExploreTags(): boolean {
+  const d = document.documentElement.dataset;
+  return d.ytrHideShorts === 'true'
+    || d.ytrHidePosts === 'true'
+    || d.ytrHideBreakingNews === 'true'
+    || d.ytrHideLatestPosts === 'true'
+    || d.ytrHideExploreTopics === 'true'
+    || d.ytrHidePlayables === 'true';
+}
+
+function needsSidebarTags(): boolean {
+  const d = document.documentElement.dataset;
+  return d.ytrHideShorts === 'true'
+    || d.ytrHideSidebarSubscriptions === 'true'
+    || d.ytrHideSidebarYou === 'true'
+    || d.ytrHideSidebarExplore === 'true'
+    || d.ytrHideSidebarMoreFromYt === 'true'
+    || d.ytrHideSidebarReportHistory === 'true';
+}
+
+function needsFeedTags(): boolean {
+  const d = document.documentElement.dataset;
+  return d.ytrHideMixes === 'true'
+    || d.ytrBetaFeedMotion === 'true'
+    || d.ytrDisableAvatarLive === 'true'
+    || d.ytrHideSearchShorts === 'true'
+    || d.ytrHideSearchPeopleWatched === 'true'
+    || d.ytrHideNewBadge === 'true';
+}
+
+function needsActionTags(): boolean {
+  const d = document.documentElement.dataset;
+  return d.ytrHideShareButton === 'true'
+    || d.ytrHideDownloadButton === 'true'
+    || d.ytrHideClipButton === 'true'
+    || d.ytrHideThanksButton === 'true'
+    || d.ytrHideSaveButton === 'true';
+}
 
 function applySettings(s: Settings): void {
   const el = document.documentElement;
@@ -66,6 +380,7 @@ function applySettings(s: Settings): void {
   // Thumbnail effect
   d.ytrThumbnailEffect = s.thumbnailEffect || 'none';
   d.ytrThumbnailNoReveal = String(!s.thumbnailHoverReveal);
+  d.ytrDisableThumbnailPreview = String(s.disableThumbnailPreview);
 
   // Inject pixel filter SVG only when needed
   if (s.thumbnailEffect === 'pixelate') injectPixelFilter();
@@ -73,10 +388,11 @@ function applySettings(s: Settings): void {
   if (s.videosPerRow > 0) {
     d.ytrVideosPerRow = String(s.videosPerRow);
     el.style.setProperty('--ytr-videos-per-row', String(s.videosPerRow));
-    setupPrefetch();
+    scheduleLowPriorityTask(() => setupPrefetch(), 1400, 260);
   } else {
     delete d.ytrVideosPerRow;
     el.style.removeProperty('--ytr-videos-per-row');
+    teardownPrefetch();
   }
 
   d.ytrHideShorts = String(s.hideShorts);
@@ -116,33 +432,128 @@ function applySettings(s: Settings): void {
   d.ytrHideThanksButton = String(s.hideThanksButton);
   d.ytrHideSaveButton = String(s.hideSaveButton);
 
-  // Custom logo
-  if (s.customLogo) {
+  // Logo presentation
+  const resolvedLogoKind = getResolvedLogoKind(s);
+  const resolvedLogoSource = getResolvedLogoSource(s);
+  const resolvedLogoRatio = getResolvedLogoRatio(s);
+  d.ytrLogoVariant = s.logoVariant;
+  el.style.setProperty('--ytr-youtube-logo-scale', String(getLogoScale(s, 'youtube') / 100));
+  el.style.setProperty('--ytr-rewind-logo-scale', String(getLogoScale(s, 'rewind') / 100));
+  el.style.setProperty('--ytr-custom-logo-scale', String(getLogoScale(s, 'custom') / 100));
+  el.style.setProperty('--ytr-rewind-logo-ratio', String(BUILTIN_REWIND_LOGO_RATIO));
+  el.style.setProperty('--ytr-rewind-logo-mask', `url("${BUILTIN_REWIND_LOGO_URL}")`);
+  el.style.setProperty('--ytr-rewind-logo-color', getRewindLogoColor(s, getYoutubeThemeMode()));
+  if (resolvedLogoKind) {
     d.ytrCustomLogo = 'true';
-    el.style.setProperty('--ytr-custom-logo', `url("${s.customLogo}")`);
-    el.style.setProperty('--ytr-custom-logo-ratio', String(s.customLogoRatio || 'auto'));
-    el.style.setProperty('--ytr-custom-logo-scale', String((s.customLogoScale || 100) / 100));
-    // Auto-hide logo animation when custom logo is set, unless user explicitly disabled this
-    d.ytrHideLogoAnimation = String(s.hideLogoAnimation !== false);
+    d.ytrCustomLogoKind = resolvedLogoKind;
+    el.style.setProperty('--ytr-custom-logo-ratio', String(resolvedLogoRatio));
+    if (resolvedLogoKind === 'custom' && resolvedLogoSource) {
+      el.style.setProperty('--ytr-custom-logo', `url("${resolvedLogoSource}")`);
+    } else {
+      el.style.removeProperty('--ytr-custom-logo');
+    }
   } else {
     delete d.ytrCustomLogo;
+    delete d.ytrCustomLogoKind;
     el.style.removeProperty('--ytr-custom-logo');
     el.style.removeProperty('--ytr-custom-logo-ratio');
-    el.style.removeProperty('--ytr-custom-logo-scale');
-    d.ytrHideLogoAnimation = String(s.hideLogoAnimation);
+    delete d.ytrCustomLogoState;
   }
+  d.ytrHideLogoAnimation = String(s.hideLogoAnimation);
   syncCustomLogoElement(s);
+  if (s.logoVariant === 'youtube') {
+    scheduleYouTubeLogoMetricSync([0, 180, 720]);
+  }
 
   // Playables
   d.ytrHidePlayables = String(s.hidePlayables);
   d.ytrHideFilterBar = String(s.hideFilterBar);
   d.ytrDisableAvatarLive = String(!!(s.betaEnabled && s.disableAvatarLiveRedirect));
   d.ytrBetaFeedMotion = String(!!(s.betaEnabled && s.betaHomepageRevealAnimation));
-
 }
 
 function isVideoLogo(src: string): boolean {
   return /^data:video\//i.test(src) || /\.(mp4|webm|ogg|mov)(?:$|[?#])/i.test(src);
+}
+
+function disconnectLogoStateObserver(): void {
+  logoStateObserver?.disconnect();
+  logoStateObserver = null;
+  observedLogoRenderer = null;
+}
+
+function ensureYoutubeThemeObserver(): void {
+  if (youtubeThemeObserver) return;
+
+  youtubeThemeObserver = new MutationObserver(() => {
+    if (youtubeThemeSyncRaf) return;
+    youtubeThemeSyncRaf = requestAnimationFrame(() => {
+      youtubeThemeSyncRaf = 0;
+      syncRewindLogoTheme();
+    });
+  });
+
+  youtubeThemeObserver.observe(document.documentElement, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['dark', 'class', 'style'],
+  });
+}
+
+function hasActiveEventLogo(): boolean {
+  const yoodle = document.querySelector('ytd-topbar-logo-renderer ytd-yoodle-renderer:not([hidden])') as HTMLElement | null;
+  if (!yoodle) return false;
+
+  const style = window.getComputedStyle(yoodle);
+  if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+    return false;
+  }
+
+  const rect = yoodle.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+function ensureLogoStateObserver(): void {
+  const renderer = document.querySelector('ytd-topbar-logo-renderer') as HTMLElement | null;
+  if (!renderer) {
+    disconnectLogoStateObserver();
+    return;
+  }
+
+  if (observedLogoRenderer === renderer && logoStateObserver) return;
+
+  disconnectLogoStateObserver();
+  observedLogoRenderer = renderer;
+  logoStateObserver = new MutationObserver(() => {
+    requestAnimationFrame(() => syncCustomLogoState());
+  });
+  logoStateObserver.observe(renderer, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['hidden', 'style', 'class'],
+  });
+}
+
+function syncCustomLogoState(settings: Settings | null = currentSettings): void {
+  const root = document.documentElement;
+  if (!hasResolvedCustomLogo(settings)) {
+    delete root.dataset.ytrCustomLogoState;
+    disconnectLogoStateObserver();
+    return;
+  }
+
+  if (settings.hideLogoAnimation) {
+    root.dataset.ytrCustomLogoState = 'custom';
+    syncCustomLogoMediaPlayback('custom');
+    disconnectLogoStateObserver();
+    return;
+  }
+
+  ensureLogoStateObserver();
+  const nextState = hasActiveEventLogo() ? 'event' : 'custom';
+  root.dataset.ytrCustomLogoState = nextState;
+  syncCustomLogoMediaPlayback(nextState);
 }
 
 function syncCustomLogoElement(settings: Settings | null = currentSettings): void {
@@ -150,26 +561,47 @@ function syncCustomLogoElement(settings: Settings | null = currentSettings): voi
   if (!logoLink) return;
 
   const existingSlot = logoLink.querySelector('.ytr-custom-logo-slot') as HTMLSpanElement | null;
+  const resolvedLogoKind = getResolvedLogoKind(settings);
+  const resolvedLogoSource = getResolvedLogoSource(settings);
+  const resolvedLogoRatio = getResolvedLogoRatio(settings);
 
-  if (!settings?.customLogo) {
+  if (!resolvedLogoKind) {
     existingSlot?.remove();
+    syncCustomLogoState(settings);
+    return;
+  }
+
+  if (existingSlot) {
+    existingSlot.style.setProperty('--ytr-custom-logo-ratio', String(resolvedLogoRatio));
+  }
+  if (resolvedLogoKind === 'rewind' && existingSlot?.dataset.ytrLogoKind === 'rewind') {
+    syncCustomLogoState(settings);
     return;
   }
 
   const currentMedia = existingSlot?.querySelector('.ytr-custom-logo-media') as (HTMLImageElement | HTMLVideoElement) | null;
-  if (currentMedia?.dataset.src === settings.customLogo) return;
+  if (resolvedLogoKind === 'custom' && currentMedia?.dataset.src === resolvedLogoSource) {
+    syncCustomLogoState(settings);
+    return;
+  }
 
   existingSlot?.remove();
 
   const slot = document.createElement('span');
   slot.className = 'ytr-custom-logo-slot';
-  slot.style.setProperty('--ytr-custom-logo-ratio', String(settings.customLogoRatio || 'auto'));
+  slot.dataset.ytrLogoKind = resolvedLogoKind;
+  slot.style.setProperty('--ytr-custom-logo-ratio', String(resolvedLogoRatio));
 
-  if (isVideoLogo(settings.customLogo)) {
+  if (resolvedLogoKind === 'rewind') {
+    const rewindLogo = document.createElement('span');
+    rewindLogo.className = 'ytr-custom-logo-rewind';
+    rewindLogo.setAttribute('aria-hidden', 'true');
+    slot.appendChild(rewindLogo);
+  } else if (resolvedLogoSource && isVideoLogo(resolvedLogoSource)) {
     const video = document.createElement('video');
     video.className = 'ytr-custom-logo-media';
-    video.dataset.src = settings.customLogo;
-    video.src = settings.customLogo;
+    video.dataset.src = resolvedLogoSource;
+    video.src = resolvedLogoSource;
     video.muted = true;
     video.defaultMuted = true;
     video.autoplay = true;
@@ -180,21 +612,94 @@ function syncCustomLogoElement(settings: Settings | null = currentSettings): voi
     setTimeout(() => {
       void video.play().catch(() => {});
     }, 0);
-  } else {
+  } else if (resolvedLogoSource) {
     const img = document.createElement('img');
     img.className = 'ytr-custom-logo-media';
-    img.dataset.src = settings.customLogo;
-    img.src = settings.customLogo;
+    img.dataset.src = resolvedLogoSource;
+    img.src = resolvedLogoSource;
     img.alt = '';
     img.setAttribute('aria-hidden', 'true');
     slot.appendChild(img);
   }
 
   logoLink.appendChild(slot);
+  syncCustomLogoState(settings);
 }
 
-function scheduleCustomLogoSync(delay = 0): void {
-  window.setTimeout(() => syncCustomLogoElement(), delay);
+function syncCustomLogoMediaPlayback(state: 'custom' | 'event'): void {
+  const media = document.querySelector('ytd-topbar-logo-renderer a#logo .ytr-custom-logo-media') as HTMLVideoElement | HTMLImageElement | null;
+  if (!(media instanceof HTMLVideoElement)) return;
+
+  if (state === 'event') {
+    media.pause();
+    return;
+  }
+
+  void media.play().catch(() => {});
+}
+
+function clearScheduledTimers(timers: number[]): void {
+  timers.forEach((timer) => clearTimeout(timer));
+}
+
+function scheduleCustomLogoSync(delays: number | number[] = 0): void {
+  clearScheduledTimers(customLogoSyncTimers);
+  if (!hasResolvedCustomLogo(currentSettings)) {
+    customLogoSyncTimers = [];
+    syncCustomLogoElement();
+    return;
+  }
+  const queue = Array.isArray(delays) ? delays : [delays];
+  customLogoSyncTimers = queue.map((delay) => window.setTimeout(() => syncCustomLogoElement(), delay));
+}
+
+function syncYouTubeLogoMetrics(): void {
+  if (currentSettings?.logoVariant !== 'youtube') return;
+
+  const logoLink = document.querySelector('ytd-topbar-logo-renderer a#logo') as HTMLElement | null;
+  const logoIcon = logoLink?.querySelector('yt-icon#logo-icon, #logo-icon') as HTMLElement | null;
+  if (!logoLink || !logoIcon) return;
+
+  const linkRect = logoLink.getBoundingClientRect();
+  const iconRect = logoIcon.getBoundingClientRect();
+  const rootStyle = document.documentElement.style;
+
+  if (linkRect.width > 0) {
+    rootStyle.setProperty('--ytr-youtube-logo-base-link-width', `${linkRect.width}px`);
+  }
+  if (iconRect.width > 0) {
+    rootStyle.setProperty('--ytr-youtube-logo-base-width', `${iconRect.width}px`);
+  }
+  if (iconRect.height > 0) {
+    rootStyle.setProperty('--ytr-youtube-logo-base-height', `${iconRect.height}px`);
+  }
+}
+
+function scheduleYouTubeLogoMetricSync(delays: number | number[] = 0): void {
+  clearScheduledTimers(youtubeLogoMetricSyncTimers);
+  if (currentSettings?.logoVariant !== 'youtube') {
+    youtubeLogoMetricSyncTimers = [];
+    return;
+  }
+
+  const queue = Array.isArray(delays) ? delays : [delays];
+  youtubeLogoMetricSyncTimers = queue.map((delay) => window.setTimeout(syncYouTubeLogoMetrics, delay));
+}
+
+function syncRewindLogoTheme(settings: Settings | null = currentSettings): void {
+  if (!settings) return;
+  document.documentElement.style.setProperty('--ytr-rewind-logo-color', getRewindLogoColor(settings, getYoutubeThemeMode()));
+}
+
+function scheduleFeedRevealSync(delays: number | number[] = 0): void {
+  clearScheduledTimers(feedRevealSyncTimers);
+  if (document.documentElement.dataset.ytrBetaFeedMotion !== 'true') {
+    feedRevealSyncTimers = [];
+    syncFeedRevealObserver();
+    return;
+  }
+  const queue = Array.isArray(delays) ? delays : [delays];
+  feedRevealSyncTimers = queue.map((delay) => window.setTimeout(syncFeedRevealObserver, delay));
 }
 
 // --- Explore More Topics: tag sections by title text ---
@@ -213,36 +718,45 @@ const PLAYABLES_KEYWORDS = [
 ];
 
 function tagExploreSections(): void {
-  document.querySelectorAll('ytd-rich-section-renderer:not([data-ytr-explore-topics]):not([data-ytr-playables])').forEach((section) => {
+  if (!needsExploreTags()) return;
+  document.querySelectorAll('ytd-rich-section-renderer').forEach((section) => {
     const text = (section.textContent || '').toLowerCase();
-    if (EXPLORE_KEYWORDS.some((kw) => text.includes(kw))) {
-      section.setAttribute('data-ytr-explore-topics', 'true');
-    } else if (PLAYABLES_KEYWORDS.some((kw) => text.includes(kw))) {
-      section.setAttribute('data-ytr-playables', 'true');
-    }
+    setElementFlag(section, 'data-ytr-shorts-section', !!section.querySelector('ytd-rich-shelf-renderer[is-shorts], a[href^="/shorts"]'));
+    setElementFlag(section, 'data-ytr-posts-section', !!section.querySelector('ytd-post-renderer'));
+    setElementFlag(section, 'data-ytr-breaking-news-section', !!section.querySelector('ytd-breaking-news-section-renderer'));
+    setElementFlag(section, 'data-ytr-latest-posts-section', !!section.querySelector('ytd-rich-shelf-renderer:not([is-shorts]) ytd-post-renderer'));
+    setElementFlag(section, 'data-ytr-explore-topics',
+      EXPLORE_KEYWORDS.some((kw) => text.includes(kw)) ||
+      !!section.querySelector('ytd-feed-nudge-renderer, yt-chip-cloud-renderer, iron-selector#chips, yt-related-chip-cloud-renderer'));
+    setElementFlag(section, 'data-ytr-playables',
+      PLAYABLES_KEYWORDS.some((kw) => text.includes(kw)) ||
+      !!section.querySelector('ytd-rich-shelf-renderer[is-playables], [aria-label*="Playables"], [aria-label*="playables"], a[href*="/playables"]'));
   });
 }
 
 // --- Sidebar: tag sections by content ---
 
 function tagSidebarSections(): void {
-  document.querySelectorAll('ytd-guide-section-renderer:not([data-ytr-sidebar-subscriptions]):not([data-ytr-sidebar-you]):not([data-ytr-sidebar-more-yt]):not([data-ytr-sidebar-explore])').forEach((section) => {
-    if (section.querySelector('ytd-guide-collapsible-section-entry-renderer')) {
-      section.setAttribute('data-ytr-sidebar-subscriptions', 'true');
-      return;
-    }
-    if (section.querySelector('a[href="/feed/history"], a[href="/feed/library"], a[href*="list=WL"], a[href*="list=LL"]')) {
-      section.setAttribute('data-ytr-sidebar-you', 'true');
-      return;
-    }
-    if (section.querySelector('a[href*="youtube.com/premium"], a[href*="/premium"], a[href*="music.youtube.com"], a[href*="/kids"]')) {
-      section.setAttribute('data-ytr-sidebar-more-yt', 'true');
-      return;
-    }
+  if (!needsSidebarTags()) return;
+  document.querySelectorAll('ytd-guide-section-renderer').forEach((section) => {
+    const isSubscriptions = !!section.querySelector('ytd-guide-collapsible-section-entry-renderer');
+    const isYou = !!section.querySelector('a[href="/feed/history"], a[href="/feed/library"], a[href*="list=WL"], a[href*="list=LL"]');
+    const isMoreYt = !!section.querySelector('a[href*="youtube.com/premium"], a[href*="/premium"], a[href*="music.youtube.com"], a[href*="/kids"]');
     const title = section.querySelector('#guide-section-title');
-    if (title && title.textContent?.trim()) {
-      section.setAttribute('data-ytr-sidebar-explore', 'true');
-    }
+    const isExplore = !!title?.textContent?.trim() && !isSubscriptions && !isYou && !isMoreYt;
+
+    setElementFlag(section, 'data-ytr-sidebar-subscriptions', isSubscriptions);
+    setElementFlag(section, 'data-ytr-sidebar-you', isYou);
+    setElementFlag(section, 'data-ytr-sidebar-more-yt', isMoreYt);
+    setElementFlag(section, 'data-ytr-sidebar-explore', isExplore);
+  });
+
+  document.querySelectorAll('ytd-guide-entry-renderer, ytd-mini-guide-entry-renderer').forEach((entry) => {
+    const link = entry.querySelector('a');
+    const title = (link?.getAttribute('title') || link?.textContent || '').trim().toLowerCase();
+    const href = link?.getAttribute('href') || '';
+    setElementFlag(entry, 'data-ytr-shorts-entry', href === '/shorts' || title === 'shorts');
+    setElementFlag(entry, 'data-ytr-report-history-entry', href === '/reporthistory');
   });
 }
 
@@ -257,6 +771,7 @@ const ACTION_BUTTON_KEYWORDS: Record<string, string[]> = {
 };
 
 function tagActionButtons(): void {
+  if (!needsActionTags()) return;
   const containers = document.querySelectorAll('#top-level-buttons-computed, ytd-menu-renderer.ytd-watch-metadata');
   containers.forEach((container) => {
     container.querySelectorAll('yt-button-view-model:not([data-ytr-action]), ytd-button-renderer:not([data-ytr-action]), ytd-download-button-renderer:not([data-ytr-action])').forEach((btn) => {
@@ -287,19 +802,20 @@ function ensureFeedRevealObserver(): IntersectionObserver {
     entries.forEach((entry) => {
       const item = entry.target as HTMLElement;
       if (entry.isIntersecting) {
+        if (item.getAttribute('data-ytr-feed-reveal') === 'visible') {
+          feedRevealObserver?.unobserve(item);
+          return;
+        }
         item.setAttribute('data-ytr-feed-reveal', 'pending');
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            item.setAttribute('data-ytr-feed-reveal', 'visible');
-          });
+          item.setAttribute('data-ytr-feed-reveal', 'visible');
+          feedRevealObserver?.unobserve(item);
         });
-      } else {
-        item.setAttribute('data-ytr-feed-reveal', 'pending');
       }
     });
   }, {
     threshold: 0.04,
-    rootMargin: '18% 0px 18% 0px',
+    rootMargin: '10% 0px 10% 0px',
   });
 
   return feedRevealObserver;
@@ -332,7 +848,8 @@ function syncFeedRevealObserver(): void {
   const observer = ensureFeedRevealObserver();
   items.forEach((item, index) => {
     const element = item as HTMLElement;
-    element.style.setProperty('--ytr-feed-reveal-delay', `${Math.min(index, 6) * 28}ms`);
+    if (element.getAttribute('data-ytr-feed-reveal') === 'visible') return;
+    element.style.setProperty('--ytr-feed-reveal-delay', `${Math.min(index % 5, 4) * 18}ms`);
     if (!element.hasAttribute('data-ytr-feed-reveal')) {
       element.setAttribute('data-ytr-feed-reveal', 'pending');
     }
@@ -340,9 +857,33 @@ function syncFeedRevealObserver(): void {
   });
 }
 
+function tagSearchShelves(): void {
+  const d = document.documentElement.dataset;
+  if (d.ytrHideSearchPeopleWatched !== 'true') return;
+  if (!document.querySelector('ytd-search')) return;
+  document.querySelectorAll('ytd-search ytd-shelf-renderer').forEach((shelf) => {
+    const hasChannelLink = !!shelf.querySelector('a[href*="/@"], a[href*="/channel/"]');
+    setElementFlag(shelf, 'data-ytr-search-people-watched', !hasChannelLink);
+  });
+}
+
+function tagSimpleBadges(): void {
+  if (document.documentElement.dataset.ytrHideNewBadge !== 'true') return;
+  if (!document.querySelector('ytd-badge-supported-renderer')) return;
+  document.querySelectorAll('ytd-badge-supported-renderer').forEach((badge) => {
+    setElementFlag(badge, 'data-ytr-simple-badge', !!badge.querySelector('.badge-style-type-simple'));
+  });
+}
+
 function tagFeedItems(): void {
+  if (!needsFeedTags()) {
+    syncFeedRevealObserver();
+    return;
+  }
   const items = document.querySelectorAll(FEED_ITEM_SELECTOR);
   if (items.length === 0) {
+    tagSearchShelves();
+    tagSimpleBadges();
     syncFeedRevealObserver();
     fixAvatarLiveLinks();
     return;
@@ -369,8 +910,13 @@ function tagFeedItems(): void {
       item.setAttribute('data-ytr-mix', 'true');
     }
 
+    if (item.matches('ytd-video-renderer')) {
+      setElementFlag(item, 'data-ytr-short-result', !!item.querySelector('a[href^="/shorts"]'));
+    }
   });
 
+  tagSearchShelves();
+  tagSimpleBadges();
   syncFeedRevealObserver();
   fixAvatarLiveLinks();
 }
@@ -378,15 +924,16 @@ function tagFeedItems(): void {
 // --- Avatar: fix live redirect on avatar clicks ---
 
 let avatarClickListenerAdded = false;
+const AVATAR_LIVE_LINK_SELECTOR = 'a[href*="/watch?v="]:not([data-ytr-live-fixed]), a[href*="/live/"]:not([data-ytr-live-fixed])';
 
 function fixAvatarLiveLinks(): void {
   if (document.documentElement.dataset.ytrDisableAvatarLive !== 'true') return;
 
   // Fix href attributes on avatar links pointing to streams
-  document.querySelectorAll('a:not([data-ytr-live-fixed])').forEach((link) => {
+  document.querySelectorAll(AVATAR_LIVE_LINK_SELECTOR).forEach((link) => {
+    if (!link.querySelector('yt-avatar-shape, yt-img-shadow, img.yt-core-image')) return;
     const href = link.getAttribute('href') || '';
     if (!href.includes('/watch?v=') && !href.includes('/live/')) return;
-    if (!link.querySelector('yt-avatar-shape, yt-img-shadow, img.yt-core-image')) return;
 
     link.setAttribute('data-ytr-live-fixed', 'true');
 
@@ -440,24 +987,170 @@ function fixAvatarLiveLinks(): void {
 
 let prefetchActive = false;
 
+function isBalancedPrefetchEnabled(): boolean {
+  return getHomeFeedColumns() > 0;
+}
+
+function getHomeGridRoot(): HTMLElement | null {
+  return document.querySelector('ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:not(ytd-rich-section-renderer *) > #contents') as HTMLElement | null;
+}
+
+function getHomeFeedColumns(): number {
+  const value = Number.parseInt(document.documentElement.dataset.ytrVideosPerRow || '', 10);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function getHomeFeedItemCount(): number {
+  return document.querySelectorAll('ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:not(ytd-rich-section-renderer *) > #contents > ytd-rich-item-renderer').length;
+}
+
+function getContinuationItem(): HTMLElement | null {
+  return document.querySelector('ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:not(ytd-rich-section-renderer *) > #contents > ytd-continuation-item-renderer') as HTMLElement | null
+    ?? document.querySelector('ytd-continuation-item-renderer') as HTMLElement | null;
+}
+
+function ensurePrefetchObserverRoot(): void {
+  const root = getHomeGridRoot();
+  if (root === prefetchObservedRoot) return;
+  prefetchMutationObserver?.disconnect();
+  prefetchObservedRoot = root;
+  if (root && prefetchMutationObserver) {
+    prefetchMutationObserver.observe(root, { childList: true });
+  }
+}
+
+function resetPrefetchTracking(): void {
+  prefetchBurstCount = 0;
+  prefetchLastFeedCount = 0;
+  prefetchLastResizeSignal = 0;
+  prefetchLastRequestedCount = 0;
+  prefetchLastViewportResizeAt = 0;
+}
+
+function teardownPrefetch(): void {
+  prefetchMutationObserver?.disconnect();
+  prefetchMutationObserver = null;
+  prefetchObservedRoot = null;
+
+  if (prefetchRetryTimer !== null) {
+    window.clearTimeout(prefetchRetryTimer);
+    prefetchRetryTimer = null;
+  }
+
+  if (prefetchRaf) {
+    window.cancelAnimationFrame(prefetchRaf);
+    prefetchRaf = 0;
+  }
+
+  if (prefetchScrollHandler) {
+    window.removeEventListener('scroll', prefetchScrollHandler);
+    prefetchScrollHandler = null;
+  }
+
+  if (prefetchResizeHandler) {
+    window.removeEventListener('resize', prefetchResizeHandler);
+    prefetchResizeHandler = null;
+  }
+
+  if (prefetchNavigateHandler) {
+    document.removeEventListener('yt-navigate-finish', prefetchNavigateHandler);
+    prefetchNavigateHandler = null;
+  }
+
+  prefetchActive = false;
+  resetPrefetchTracking();
+}
+
+function schedulePrefetchCheck(delay = 0): void {
+  if (!isBalancedPrefetchEnabled()) return;
+  if (prefetchRetryTimer !== null) {
+    window.clearTimeout(prefetchRetryTimer);
+  }
+  prefetchRetryTimer = window.setTimeout(() => {
+    prefetchRetryTimer = null;
+    runPrefetchCheck();
+  }, delay);
+}
+
+function queuePrefetchCheck(): void {
+  if (!isBalancedPrefetchEnabled()) return;
+  if (!document.querySelector('ytd-browse[page-subtype="home"]')) return;
+  if (prefetchRaf) return;
+  prefetchRaf = window.requestAnimationFrame(() => {
+    prefetchRaf = 0;
+    runPrefetchCheck();
+  });
+}
+
+function runPrefetchCheck(): void {
+  if (document.hidden) return;
+  if (!isBalancedPrefetchEnabled()) return;
+  if (!document.querySelector('ytd-browse[page-subtype="home"]')) return;
+  if (Date.now() - prefetchLastViewportResizeAt < 1400) return;
+  ensurePrefetchObserverRoot();
+  if (!prefetchObservedRoot) return;
+  const columns = getHomeFeedColumns();
+  if (columns <= 0) return;
+
+  const continuation = getContinuationItem();
+  if (!continuation) return;
+
+  const feedCount = getHomeFeedItemCount();
+  const needsBalancedBatch = feedCount > 0 && feedCount % columns !== 0;
+  const rect = continuation.getBoundingClientRect();
+  const nearViewport = rect.top < window.innerHeight * (needsBalancedBatch ? 6 : 3.5);
+
+  if (!nearViewport) return;
+
+  const now = Date.now();
+  const sameFeedCount = feedCount === prefetchLastRequestedCount;
+  if (sameFeedCount && now - prefetchLastResizeSignal < 1200) return;
+
+  prefetchLastResizeSignal = now;
+  prefetchLastRequestedCount = feedCount;
+  window.dispatchEvent(new Event('resize'));
+
+  if (!needsBalancedBatch) {
+    prefetchBurstCount = 0;
+    prefetchLastFeedCount = feedCount;
+    return;
+  }
+
+  prefetchBurstCount = feedCount === prefetchLastFeedCount ? prefetchBurstCount + 1 : 0;
+  prefetchLastFeedCount = feedCount;
+
+  if (prefetchBurstCount < 4) {
+    schedulePrefetchCheck(140 + (prefetchBurstCount * 90));
+  }
+}
+
 function setupPrefetch(): void {
+  if (!isBalancedPrefetchEnabled()) return;
   if (prefetchActive) return;
   prefetchActive = true;
+  prefetchMutationObserver = new MutationObserver(() => {
+    schedulePrefetchCheck(120);
+  });
 
-  const triggerLoad = () => {
-    const cont = document.querySelector('ytd-continuation-item-renderer');
-    if (!cont) return;
-    const rect = cont.getBoundingClientRect();
-    // If the continuation sentinel is within 3x viewport height, force a resize
-    // event which causes YouTube to re-evaluate its IntersectionObserver
-    if (rect.top < window.innerHeight * 3) {
-      window.dispatchEvent(new Event('resize'));
-    }
+  const resetPrefetchState = () => {
+    resetPrefetchTracking();
+    ensurePrefetchObserverRoot();
+    schedulePrefetchCheck(220);
   };
 
-  window.addEventListener('scroll', () => requestAnimationFrame(triggerLoad), { passive: true });
-  // Also trigger on initial load
-  setTimeout(triggerLoad, 1500);
+  prefetchScrollHandler = () => queuePrefetchCheck();
+  prefetchResizeHandler = () => {
+    prefetchLastViewportResizeAt = Date.now();
+  };
+  prefetchNavigateHandler = resetPrefetchState;
+
+  window.addEventListener('scroll', prefetchScrollHandler, { passive: true });
+  window.addEventListener('resize', prefetchResizeHandler, { passive: true });
+  document.addEventListener('yt-navigate-finish', prefetchNavigateHandler);
+
+  ensurePrefetchObserverRoot();
+  schedulePrefetchCheck(900);
+  schedulePrefetchCheck(1600);
 }
 
 // --- Thumbnail: inject SVG pixelation filter ---
@@ -482,17 +1175,22 @@ function injectPixelFilter(): void {
   document.documentElement.appendChild(svg);
 }
 
-// --- v0.4.0: Playback Speed Memory ---
+// --- v0.5.0: Playback Speed Memory ---
 
 let speedListenersSetup = false;
 let speedAppliedForNav = false;
+let playbackSpeedTimers: number[] = [];
+let qualityListenersSetup = false;
+let qualityDispatchTimers: number[] = [];
 
 function setupPlaybackSpeed(s: Settings): void {
+  playbackSpeedTimers.forEach((timer) => clearTimeout(timer));
+  playbackSpeedTimers = [];
   if (s.playbackSpeed <= 0) return;
 
   const applySpeed = () => {
     if (speedAppliedForNav) return; // Already applied for this navigation — let user change freely
-    const video = document.querySelector('video') as HTMLVideoElement | null;
+    const video = getMainVideoElement();
     if (!video || !currentSettings) return;
     const target = currentSettings.playbackSpeed;
     if (target > 0) {
@@ -505,155 +1203,51 @@ function setupPlaybackSpeed(s: Settings): void {
   if (!speedListenersSetup) {
     speedListenersSetup = true;
     document.addEventListener('yt-navigate-finish', () => {
+      playbackSpeedTimers.forEach((timer) => clearTimeout(timer));
+      playbackSpeedTimers = [];
       speedAppliedForNav = false;
-      setTimeout(applySpeed, 1000);
-      setTimeout(applySpeed, 3000);
+      playbackSpeedTimers.push(window.setTimeout(applySpeed, 900));
+      playbackSpeedTimers.push(window.setTimeout(applySpeed, 2200));
     });
   }
 
   // Apply on initial load / settings change (reset flag so it applies once)
   speedAppliedForNav = false;
-  setTimeout(applySpeed, 500);
-  setTimeout(applySpeed, 2000);
+  playbackSpeedTimers.push(window.setTimeout(applySpeed, 360));
+  playbackSpeedTimers.push(window.setTimeout(applySpeed, 1400));
 }
 
-// --- v0.4.0: Default Video Quality ---
-
-let qualitySetup = false;
-let qualityRetryTimer: number | null = null;
-let qualityAttemptToken = 0;
-const QUALITY_LABELS_BY_HEIGHT: Record<number, string> = {
-  4320: 'highres',
-  2160: 'hd2160',
-  1440: 'hd1440',
-  1080: 'hd1080',
-  720: 'hd720',
-  480: 'large',
-  360: 'medium',
-  240: 'small',
-  144: 'tiny',
-};
-const QUALITY_HEIGHT_BY_LABEL = Object.fromEntries(
-  Object.entries(QUALITY_LABELS_BY_HEIGHT).map(([height, label]) => [label, Number(height)]),
-) as Record<string, number>;
-
-function clearQualityRetry(): void {
-  if (qualityRetryTimer) {
-    clearTimeout(qualityRetryTimer);
-    qualityRetryTimer = null;
-  }
-}
-
-function getPreferredQualityLabel(targetQuality: string, available: string[]): string | null {
-  const targetHeight = QUALITY_MAP[targetQuality] || 0;
-  if (!targetHeight) return null;
-
-  const candidates = available
-    .map((label) => ({
-      label,
-      height: QUALITY_HEIGHT_BY_LABEL[label] ?? 0,
-    }))
-    .filter((candidate) => candidate.height > 0);
-
-  if (!candidates.length) return null;
-
-  candidates.sort((a, b) => {
-    const distanceDiff = Math.abs(a.height - targetHeight) - Math.abs(b.height - targetHeight);
-    if (distanceDiff !== 0) return distanceDiff;
-
-    const overshootPenaltyA = a.height >= targetHeight ? 1 : 0;
-    const overshootPenaltyB = b.height >= targetHeight ? 1 : 0;
-    if (overshootPenaltyA !== overshootPenaltyB) return overshootPenaltyA - overshootPenaltyB;
-
-    return b.height - a.height;
-  });
-
-  return candidates[0]?.label || null;
-}
-
-function applyDefaultQualityOnce(): boolean {
-  const settings = currentSettings;
-  if (!settings || settings.defaultQuality === 'auto') return true;
-
-  const player = document.querySelector('#movie_player') as {
-    getAvailableQualityLevels?: () => string[];
-    getPlaybackQuality?: () => string;
-    setPlaybackQuality?: (quality: string) => void;
-    setPlaybackQualityRange?: (minQuality: string, maxQuality?: string) => void;
-  } | null;
-
-  if (!player?.getAvailableQualityLevels) return false;
-
-  const available = player.getAvailableQualityLevels().filter(Boolean);
-  if (!available.length) return false;
-
-  const preferredLabel = getPreferredQualityLabel(settings.defaultQuality, available);
-  if (!preferredLabel) return false;
-
-  try {
-    player.setPlaybackQualityRange?.(preferredLabel, preferredLabel);
-    player.setPlaybackQuality?.(preferredLabel);
-    return player.getPlaybackQuality?.() === preferredLabel || true;
-  } catch {
-    return false;
-  }
-}
-
-function scheduleDefaultQualityEnforcement(delay = 0): void {
-  clearQualityRetry();
-  qualityAttemptToken += 1;
-  const token = qualityAttemptToken;
-
-  window.setTimeout(() => {
-    let attempts = 0;
-
-    const tick = () => {
-      if (token !== qualityAttemptToken) return;
-      if (!currentSettings || currentSettings.defaultQuality === 'auto') return;
-
-      applyDefaultQualityOnce();
-      attempts += 1;
-
-      if (attempts >= 12) {
-        qualityRetryTimer = null;
-        return;
-      }
-
-      const nextDelay = attempts < 4 ? 450 : 950;
-      qualityRetryTimer = window.setTimeout(tick, nextDelay);
-    };
-
-    tick();
-  }, delay);
+function scheduleDefaultQualityDispatch(quality: string, delays: number[]): void {
+  qualityDispatchTimers.forEach((timer) => clearTimeout(timer));
+  qualityDispatchTimers = delays.map((delay) => window.setTimeout(() => {
+    injectDefaultQualityBridge();
+    dispatchDefaultQualityBridge(getEffectiveDefaultQuality(currentSettings) || quality);
+  }, delay));
 }
 
 function setupDefaultQuality(s: Settings): void {
-  if (!qualitySetup) {
-    qualitySetup = true;
-    document.addEventListener('yt-navigate-finish', () => {
-      scheduleDefaultQualityEnforcement(200);
-    });
-    document.addEventListener('loadedmetadata', (event) => {
-      if (event.target instanceof HTMLVideoElement) {
-        scheduleDefaultQualityEnforcement(120);
-      }
-    }, true);
-    document.addEventListener('canplay', (event) => {
-      if (event.target instanceof HTMLVideoElement) {
-        scheduleDefaultQualityEnforcement(80);
-      }
-    }, true);
-  }
+  const quality = getEffectiveDefaultQuality(s);
+  if (quality === 'auto' && !qualityBridgeInjected) return;
+  injectDefaultQualityBridge();
+  scheduleDefaultQualityDispatch(quality, [40, 420, 1200, 2400]);
 
-  if (s.defaultQuality === 'auto') {
-    clearQualityRetry();
-    return;
-  }
+  if (qualityListenersSetup) return;
+  qualityListenersSetup = true;
 
-  scheduleDefaultQualityEnforcement(150);
+  const reapplyQuality = () => {
+    const nextQuality = getEffectiveDefaultQuality(currentSettings);
+    if (nextQuality === 'auto' && !qualityBridgeInjected) return;
+    injectDefaultQualityBridge();
+    scheduleDefaultQualityDispatch(nextQuality, [80, 560, 1500, 2600]);
+  };
+
+  document.addEventListener('yt-navigate-finish', reapplyQuality);
+  document.addEventListener('yt-player-updated', reapplyQuality, true);
+  document.addEventListener('yt-page-data-updated', reapplyQuality, true);
+  document.addEventListener('play', reapplyQuality, true);
 }
 
-// --- v0.4.0: Watch Timer & Time Limit ---
+// --- v0.5.0: Watch Timer & Time Limit ---
 
 let timerInterval: ReturnType<typeof setInterval> | null = null;
 let timerElement: HTMLElement | null = null;
@@ -723,7 +1317,7 @@ function setupWatchTimer(s: Settings): void {
     timerInterval = setInterval(async () => {
       if (!currentSettings?.watchTimerEnabled && !(currentSettings && currentSettings.watchTimeLimitMinutes > 0)) return;
       // Track time if tab is visible OR if a video is playing (background playback)
-      const video = document.querySelector('video') as HTMLVideoElement | null;
+      const video = getMainVideoElement();
       const isVideoPlaying = video && !video.paused && !video.ended && video.readyState > 2;
       if (document.hidden && !isVideoPlaying) return;
       await addWatchTime(1);
@@ -750,7 +1344,7 @@ function showBlockOverlay(minutes: number): void {
     blockOverlay = null;
   }
 
-  const isRu = currentSettings?.language === 'ru';
+  const isRu = getContentLocale() === 'ru';
   const limit = Math.max(currentSettings?.watchTimeLimitMinutes || minutes, 1);
   const progress = clamp(Math.round((minutes / limit) * 100), 0, 100);
 
@@ -825,8 +1419,293 @@ function showYtrToast(message: string): void {
   }, 3000);
 }
 
+const GOOGLE_ICON_SVGS = {
+  photoCamera: `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M0 0h24v24H0V0z" fill="none"/><circle cx="12" cy="12" r="3" fill="currentColor"/><path d="M20 4h-3.17l-1.24-1.35c-.37-.41-.91-.65-1.47-.65H9.88c-.56 0-1.1.24-1.48.65L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z" fill="currentColor"/></svg>`,
+  palette: `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10c1.38 0 2.5-1.12 2.5-2.5 0-.61-.23-1.2-.64-1.67-.08-.1-.13-.21-.13-.33 0-.28.22-.5.5-.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9zm5.5 11c-.83 0-1.5-.67-1.5-1.5S16.67 10 17.5 10 19 10.67 19 11.5 18.33 13 17.5 13zm-3-4C13.67 9 13 8.33 13 7.5S13.67 6 14.5 6 16 6.67 16 7.5 15.33 9 14.5 9zm-8 4C5.67 13 5 12.33 5 11.5S5.67 10 6.5 10 8 10.67 8 11.5 7.33 13 6.5 13zm3-4C8.67 9 8 8.33 8 7.5S8.67 6 9.5 6 11 6.67 11 7.5 10.33 9 9.5 9z" fill="currentColor"/></svg>`,
+  colorize: `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20.71 5.63 18.37 3.29c-.39-.39-1.02-.39-1.41 0l-3.12 3.12-1.23-1.21c-.39-.39-1.02-.38-1.41 0-.39.39-.39 1.02 0 1.41l.72.72-8.77 8.77c-.1.1-.15.22-.15.36v4.04c0 .28.22.5.5.5h4.04c.13 0 .26-.05.35-.15l8.77-8.77.72.72c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.22-1.22 3.12-3.12c.41-.4.41-1.03.02-1.42zM6.92 19 5 17.08l8.06-8.06 1.92 1.92L6.92 19z" fill="currentColor"/></svg>`,
+} as const;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+type RgbColor = { r: number; g: number; b: number };
+type HsvColor = { h: number; s: number; v: number };
+
+function normalizeHexColor(value: string, fallback = '#ffffff'): string {
+  const normalized = value.trim().replace(/^#?/, '#').toLowerCase();
+  return /^#[0-9a-f]{6}$/i.test(normalized) ? normalized : fallback;
+}
+
+function componentToHex(value: number): string {
+  return Math.round(clamp(value, 0, 255)).toString(16).padStart(2, '0');
+}
+
+function rgbToHex(color: RgbColor): string {
+  return `#${componentToHex(color.r)}${componentToHex(color.g)}${componentToHex(color.b)}`;
+}
+
+function hexToRgb(hex: string): RgbColor | null {
+  const normalized = normalizeHexColor(hex, '');
+  if (!normalized) return null;
+
+  const parsed = Number.parseInt(normalized.slice(1), 16);
+  if (Number.isNaN(parsed)) return null;
+
+  return {
+    r: (parsed >> 16) & 255,
+    g: (parsed >> 8) & 255,
+    b: parsed & 255,
+  };
+}
+
+function parseRgbChannels(value: string): RgbColor | null {
+  const match = value.match(/rgba?\(([^)]+)\)/i);
+  if (!match) return null;
+
+  const parts = match[1]
+    .split(',')
+    .slice(0, 3)
+    .map((part) => Number.parseFloat(part.trim()));
+
+  if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) return null;
+
+  return {
+    r: clamp(parts[0], 0, 255),
+    g: clamp(parts[1], 0, 255),
+    b: clamp(parts[2], 0, 255),
+  };
+}
+
+function rgbToHsl(color: RgbColor): { h: number; s: number; l: number } {
+  const red = clamp(color.r / 255, 0, 1);
+  const green = clamp(color.g / 255, 0, 1);
+  const blue = clamp(color.b / 255, 0, 1);
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const delta = max - min;
+  let hue = 0;
+  const lightness = (max + min) / 2;
+  const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
+
+  if (delta !== 0) {
+    if (max === red) hue = ((green - blue) / delta) % 6;
+    else if (max === green) hue = (blue - red) / delta + 2;
+    else hue = (red - green) / delta + 4;
+  }
+
+  return {
+    h: ((hue * 60) + 360) % 360,
+    s: saturation,
+    l: lightness,
+  };
+}
+
+function hueToRgb(p: number, q: number, t: number): number {
+  let normalized = t;
+  if (normalized < 0) normalized += 1;
+  if (normalized > 1) normalized -= 1;
+  if (normalized < 1 / 6) return p + (q - p) * 6 * normalized;
+  if (normalized < 1 / 2) return q;
+  if (normalized < 2 / 3) return p + (q - p) * (2 / 3 - normalized) * 6;
+  return p;
+}
+
+function hexFromHsl(hue: number, saturation: number, lightness: number): string {
+  const normalizedHue = ((hue % 360) + 360) % 360 / 360;
+  const normalizedSaturation = clamp(saturation, 0, 100) / 100;
+  const normalizedLightness = clamp(lightness, 0, 100) / 100;
+
+  if (normalizedSaturation === 0) {
+    const channel = normalizedLightness * 255;
+    return rgbToHex({ r: channel, g: channel, b: channel });
+  }
+
+  const q = normalizedLightness < 0.5
+    ? normalizedLightness * (1 + normalizedSaturation)
+    : normalizedLightness + normalizedSaturation - normalizedLightness * normalizedSaturation;
+  const p = 2 * normalizedLightness - q;
+
+  return rgbToHex({
+    r: hueToRgb(p, q, normalizedHue + 1 / 3) * 255,
+    g: hueToRgb(p, q, normalizedHue) * 255,
+    b: hueToRgb(p, q, normalizedHue - 1 / 3) * 255,
+  });
+}
+
+function mixHexColors(first: string, second: string, ratio = 0.5): string {
+  const a = hexToRgb(first);
+  const b = hexToRgb(second);
+  if (!a || !b) return first;
+
+  const weight = clamp(ratio, 0, 1);
+  return rgbToHex({
+    r: a.r * weight + b.r * (1 - weight),
+    g: a.g * weight + b.g * (1 - weight),
+    b: a.b * weight + b.b * (1 - weight),
+  });
+}
+
+function normalizeThemeSeedColor(color: string): string {
+  const rgb = hexToRgb(normalizeHexColor(color, DEFAULT_SETTINGS.interfaceThemeColor));
+  if (!rgb) return DEFAULT_SETTINGS.interfaceThemeColor;
+
+  const original = rgbToHex(rgb).toLowerCase();
+  const hsl = rgbToHsl(rgb);
+  if (hsl.s >= 0.06 && hsl.l >= 0.22 && hsl.l <= 0.92) {
+    return original;
+  }
+
+  const saturation = hsl.s < 0.06 ? 0.08 : hsl.s;
+  const lightness = clamp(hsl.l, 0.22, 0.92);
+  return hexFromHsl(hsl.h, saturation * 100, lightness * 100);
+}
+
+function sanitizeThemeSeedColor(mode: ResolvedThemeMode, color: string): string {
+  const rgb = hexToRgb(normalizeThemeSeedColor(color));
+  if (!rgb) return DEFAULT_SETTINGS.interfaceThemeColor;
+
+  const hsl = rgbToHsl(rgb);
+  const saturation = hsl.s < 0.08 ? 0.18 : hsl.s;
+  const lightness = mode === 'dark'
+    ? clamp(hsl.l, 0.58, 0.92)
+    : clamp(hsl.l, 0.16, 0.9);
+
+  return hexFromHsl(hsl.h, saturation * 100, lightness * 100);
+}
+
+function getThemePrimaryColor(mode: ResolvedThemeMode, seedColor: string): string {
+  const rgb = hexToRgb(seedColor) || hexToRgb(DEFAULT_SETTINGS.interfaceThemeColor);
+  if (!rgb) return DEFAULT_SETTINGS.interfaceThemeColor;
+
+  const { h, s } = rgbToHsl(rgb);
+  if (mode === 'light') {
+    return hexFromHsl(h, clamp(s * 100 * 0.46, 34, 56), 40);
+  }
+
+  return sanitizeThemeSeedColor('dark', seedColor);
+}
+
+function getRelativeLuminance(color: RgbColor): number {
+  const normalizeChannel = (value: number): number => {
+    const channel = clamp(value, 0, 255) / 255;
+    return channel <= 0.03928
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4;
+  };
+
+  return (
+    0.2126 * normalizeChannel(color.r) +
+    0.7152 * normalizeChannel(color.g) +
+    0.0722 * normalizeChannel(color.b)
+  );
+}
+
+function getYoutubeThemeMode(): ResolvedThemeMode {
+  const html = document.documentElement;
+  if (html.hasAttribute('dark')) return 'dark';
+
+  const app = document.querySelector('ytd-app') as HTMLElement | null;
+  if (app?.hasAttribute('dark')) return 'dark';
+
+  const elements = [app, document.body, html].filter(Boolean) as HTMLElement[];
+  for (const element of elements) {
+    const styles = window.getComputedStyle(element);
+    const candidates = [
+      styles.getPropertyValue('--yt-spec-base-background'),
+      styles.getPropertyValue('--yt-spec-brand-background-primary'),
+      styles.getPropertyValue('--yt-spec-general-background-a'),
+      styles.backgroundColor,
+    ];
+
+    for (const candidate of candidates) {
+      if (/rgba\([^)]*,\s*0(?:\.0+)?\s*\)$/i.test(candidate.trim())) {
+        continue;
+      }
+      const parsed = parseRgbChannels(candidate) || hexToRgb(candidate.trim());
+      if (!parsed) continue;
+      return getRelativeLuminance(parsed) < 0.42 ? 'dark' : 'light';
+    }
+  }
+
+  return window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light';
+}
+
+function getRewindLogoColor(settings: Settings | null, mode: ResolvedThemeMode): string {
+  const seedColor = normalizeHexColor(settings?.interfaceThemeColor || DEFAULT_SETTINGS.interfaceThemeColor, DEFAULT_SETTINGS.interfaceThemeColor);
+  const accentSeed = sanitizeThemeSeedColor(mode, seedColor);
+  const primary = getThemePrimaryColor(mode, accentSeed);
+  return mode === 'light'
+    ? mixHexColors(primary, '#6a6675', 0.44)
+    : mixHexColors(accentSeed, '#d7d3e5', 0.42);
+}
+
+function rgbToHsv(color: RgbColor): HsvColor {
+  const r = clamp(color.r / 255, 0, 1);
+  const g = clamp(color.g / 255, 0, 1);
+  const b = clamp(color.b / 255, 0, 1);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+
+  let hue = 0;
+  if (delta > 0) {
+    if (max === r) {
+      hue = 60 * (((g - b) / delta) % 6);
+    } else if (max === g) {
+      hue = 60 * (((b - r) / delta) + 2);
+    } else {
+      hue = 60 * (((r - g) / delta) + 4);
+    }
+  }
+
+  if (hue < 0) hue += 360;
+
+  return {
+    h: hue,
+    s: max === 0 ? 0 : delta / max,
+    v: max,
+  };
+}
+
+function hsvToRgb(color: HsvColor): RgbColor {
+  const hue = ((color.h % 360) + 360) % 360;
+  const saturation = clamp(color.s, 0, 1);
+  const value = clamp(color.v, 0, 1);
+  const chroma = value * saturation;
+  const segment = hue / 60;
+  const x = chroma * (1 - Math.abs((segment % 2) - 1));
+  const match = value - chroma;
+
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+
+  if (segment >= 0 && segment < 1) {
+    red = chroma;
+    green = x;
+  } else if (segment < 2) {
+    red = x;
+    green = chroma;
+  } else if (segment < 3) {
+    green = chroma;
+    blue = x;
+  } else if (segment < 4) {
+    green = x;
+    blue = chroma;
+  } else if (segment < 5) {
+    red = x;
+    blue = chroma;
+  } else {
+    red = chroma;
+    blue = x;
+  }
+
+  return {
+    r: Math.round((red + match) * 255),
+    g: Math.round((green + match) * 255),
+    b: Math.round((blue + match) * 255),
+  };
 }
 
 function dataUrlToBlob(dataUrl: string): Blob {
@@ -923,25 +1802,82 @@ function buildScreenshotFilename(videoId: string): string {
   return `frame-${videoId}-${stamp}.png`;
 }
 
-function triggerDownload(src: string, filename: string): void {
-  const link = document.createElement('a');
-  link.href = src;
-  link.download = filename;
-  if (src.startsWith('data:') || src.startsWith('blob:')) {
-    link.click();
-    return;
+async function triggerDownload(src: string, filename: string): Promise<void> {
+  let downloadUrl = src;
+  let shouldRevoke = false;
+
+  try {
+    if (src.startsWith('data:')) {
+      downloadUrl = URL.createObjectURL(dataUrlToBlob(src));
+      shouldRevoke = true;
+    } else {
+      const response = await fetch(src);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      downloadUrl = URL.createObjectURL(blob);
+      shouldRevoke = true;
+    }
+  } catch {
+    if (!(src.startsWith('data:') || src.startsWith('blob:'))) {
+      const fallbackLink = document.createElement('a');
+      fallbackLink.href = src;
+      fallbackLink.download = filename;
+      fallbackLink.rel = 'noopener';
+      fallbackLink.click();
+      return;
+    }
   }
-  link.target = '_blank';
+
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = filename;
+  link.rel = 'noopener';
+  link.style.display = 'none';
+  document.body.appendChild(link);
   link.click();
+  requestAnimationFrame(() => {
+    link.remove();
+    if (shouldRevoke) {
+      URL.revokeObjectURL(downloadUrl);
+    }
+  });
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
+    if (/^https?:\/\//.test(src)) {
+      image.crossOrigin = 'anonymous';
+    }
     image.onload = () => resolve(image);
     image.onerror = () => reject(new Error('Could not decode image'));
     image.src = src;
   });
+}
+
+function getImageFingerprint(image: HTMLImageElement): string | null {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 12;
+    canvas.height = 12;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const luminance: number[] = [];
+    let total = 0;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const value = Math.round(data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+      luminance.push(value);
+      total += value;
+    }
+
+    const threshold = total / luminance.length;
+    return luminance.map((value) => (value >= threshold ? '1' : '0')).join('');
+  } catch {
+    return null;
+  }
 }
 
 function waitForAnimationFrame(): Promise<void> {
@@ -1022,7 +1958,7 @@ async function cropDataUrlToRect(dataUrl: string, rect: DOMRect): Promise<string
 }
 
 async function captureCurrentVideoFrame(videoId: string): Promise<{ dataUrl: string; filename: string }> {
-  const video = document.querySelector('video') as HTMLVideoElement | null;
+  const video = getMainVideoElement();
   if (!video) {
     throw new Error('Video element not found');
   }
@@ -1060,14 +1996,157 @@ async function captureCurrentVideoFrame(videoId: string): Promise<{ dataUrl: str
 
 // --- Image overlay (shared by thumbnail preview + screenshot) ---
 
-function showImageOverlay(imgSrc: string, filename: string, galleryItems: OverlayGalleryItem[] = [{ src: imgSrc, filename, label: '1' }], startIndex = 0): void {
-  const existing = document.querySelector('#ytr-thumb-overlay');
+function renderOverlayStrokes(
+  ctx: CanvasRenderingContext2D,
+  strokes: OverlayStroke[],
+  width: number,
+  height: number,
+): void {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  for (const stroke of strokes) {
+    if (!stroke.points.length) continue;
+
+    const size = Math.max(1, stroke.sizeRatio * Math.min(width, height));
+    ctx.save();
+    ctx.globalCompositeOperation = stroke.tool === 'eraser' ? 'destination-out' : 'source-over';
+    ctx.strokeStyle = stroke.color;
+    ctx.fillStyle = stroke.color;
+    ctx.lineWidth = size;
+
+    const first = {
+      x: stroke.points[0].x * width,
+      y: stroke.points[0].y * height,
+    };
+
+    if (stroke.points.length === 1) {
+      ctx.beginPath();
+      ctx.arc(first.x, first.y, size / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      continue;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(first.x, first.y);
+    for (const point of stroke.points.slice(1)) {
+      ctx.lineTo(point.x * width, point.y * height);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+async function buildOverlayExportDataUrl(item: OverlayGalleryItem, strokes: OverlayStroke[]): Promise<string> {
+  if (!strokes.length) return item.src;
+
+  const image = await loadImage(item.src);
+  const canvas = document.createElement('canvas');
+  canvas.width = image.naturalWidth || image.width;
+  canvas.height = image.naturalHeight || image.height;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas unavailable');
+
+  const overlayCanvas = document.createElement('canvas');
+  overlayCanvas.width = canvas.width;
+  overlayCanvas.height = canvas.height;
+  const overlayCtx = overlayCanvas.getContext('2d');
+  if (!overlayCtx) throw new Error('Canvas unavailable');
+
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  renderOverlayStrokes(overlayCtx, strokes, canvas.width, canvas.height);
+  ctx.drawImage(overlayCanvas, 0, 0);
+  return canvas.toDataURL('image/png');
+}
+
+type ConfirmDialogOptions = {
+  title: string;
+  message: string;
+  confirmText: string;
+  cancelText: string;
+};
+
+function showYtrConfirmDialog(options: ConfirmDialogOptions): Promise<boolean> {
+  const existing = document.querySelector('.ytr-confirm');
   if (existing) existing.remove();
+
+  return new Promise((resolve) => {
+    const root = document.createElement('div');
+    root.className = 'ytr-confirm';
+    root.innerHTML = `
+      <div class="ytr-confirm-backdrop"></div>
+      <div class="ytr-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="ytr-confirm-title" aria-describedby="ytr-confirm-message">
+        <div class="ytr-confirm-title" id="ytr-confirm-title">${escapeHtml(options.title)}</div>
+        <div class="ytr-confirm-message" id="ytr-confirm-message">${escapeHtml(options.message)}</div>
+        <div class="ytr-confirm-actions">
+          <button type="button" class="ytr-confirm-btn ytr-confirm-btn-secondary">${escapeHtml(options.cancelText)}</button>
+          <button type="button" class="ytr-confirm-btn ytr-confirm-btn-primary">${escapeHtml(options.confirmText)}</button>
+        </div>
+      </div>
+    `;
+
+    const finish = (value: boolean) => {
+      root.remove();
+      document.removeEventListener('keydown', onKeyDown, true);
+      resolve(value);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        finish(false);
+      }
+      if (event.key === 'Enter') {
+        const target = document.activeElement as HTMLElement | null;
+        if (target?.classList.contains('ytr-confirm-btn-secondary')) return;
+        event.preventDefault();
+        finish(true);
+      }
+    };
+
+    root.querySelector('.ytr-confirm-backdrop')?.addEventListener('click', () => finish(false));
+    root.querySelector('.ytr-confirm-btn-secondary')?.addEventListener('click', () => finish(false));
+    root.querySelector('.ytr-confirm-btn-primary')?.addEventListener('click', () => finish(true));
+
+    document.body.appendChild(root);
+    document.addEventListener('keydown', onKeyDown, true);
+    (root.querySelector('.ytr-confirm-btn-primary') as HTMLButtonElement | null)?.focus();
+  });
+}
+
+function showImageOverlay(
+  imgSrc: string,
+  filename: string,
+  galleryItems: OverlayGalleryItem[] = [{ src: imgSrc, filename, label: '1' }],
+  startIndex = 0,
+  options: OverlayOptions = {},
+): void {
+  activeOverlayCleanup?.();
+  const existing = document.querySelector('#ytr-thumb-overlay');
+  if (existing) {
+    existing.remove();
+    document.documentElement.classList.remove('ytr-overlay-lock-scroll');
+  }
   closeAllYtrMenus();
 
-  const isRu = currentSettings?.language === 'ru';
+  const isRu = getContentLocale() === 'ru';
+  const allowDrawing = !!options.drawing;
   const items = galleryItems.length ? galleryItems : [{ src: imgSrc, filename, label: '1' }];
   let currentIndex = clamp(startIndex, 0, items.length - 1);
+  const iconStrokeAttrs = 'fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"';
+  const DRAW_ICONS = {
+    drawMode: `<svg viewBox="0 0 24 24" width="20" height="20" ${iconStrokeAttrs}><path d="M4 19.5V16.75L14.2 6.58a1.5 1.5 0 0 1 2.12 0l1.1 1.1a1.5 1.5 0 0 1 0 2.12L7.25 20H4Zm11.7-11.85 1.72 1.72"/><path d="M13.5 7.3 16.7 4.1a2 2 0 0 1 2.83 0l.37.37a2 2 0 0 1 0 2.83L16.7 10.5"/></svg>`,
+    pencil: `<svg viewBox="0 0 24 24" width="20" height="20" ${iconStrokeAttrs}><path d="M4 20h3.3l9.85-9.85-3.3-3.3L4 16.7V20Z"/><path d="m13.85 6.85 3.3 3.3"/><path d="m11 20 4-1"/></svg>`,
+    eraser: `<svg viewBox="0 0 24 24" width="20" height="20" ${iconStrokeAttrs}><path d="m7 15.5 7.85-7.85a2 2 0 0 1 2.83 0l1.82 1.82a2 2 0 0 1 0 2.83L14.3 17.5a2 2 0 0 1-1.41.59H8.41A2 2 0 0 1 7 17.5l-1.5-1.5a2 2 0 0 1 0-2.83L9.3 9.35"/><path d="M11 18h8"/></svg>`,
+    clear: `<svg viewBox="0 0 24 24" width="20" height="20" ${iconStrokeAttrs}><path d="M5 7h14"/><path d="M9 7V5.8c0-.99.81-1.8 1.8-1.8h2.4c.99 0 1.8.81 1.8 1.8V7"/><path d="m7 7 1 11a2 2 0 0 0 2 1.82h4a2 2 0 0 0 2-1.82L17 7"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>`,
+    undo: `<svg viewBox="0 0 24 24" width="20" height="20" ${iconStrokeAttrs}><path d="M9 7 4 12l5 5"/><path d="M20 18a7 7 0 0 0-7-7H4"/></svg>`,
+    redo: `<svg viewBox="0 0 24 24" width="20" height="20" ${iconStrokeAttrs}><path d="m15 7 5 5-5 5"/><path d="M4 18a7 7 0 0 1 7-7h9"/></svg>`,
+  } as const;
 
   const overlay = document.createElement('div');
   overlay.id = 'ytr-thumb-overlay';
@@ -1088,6 +2167,9 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
   const imgWrap = document.createElement('div');
   imgWrap.className = 'ytr-thumb-overlay-img-wrap';
 
+  const mediaLayer = document.createElement('div');
+  mediaLayer.className = 'ytr-thumb-overlay-media-layer';
+
   const stageStatus = document.createElement('div');
   stageStatus.className = 'ytr-thumb-overlay-status';
   stageStatus.textContent = isRu ? 'Загрузка превью…' : 'Loading preview…';
@@ -1098,11 +2180,21 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
   img.draggable = false;
   img.decoding = 'async';
 
+  const drawCanvas = document.createElement('canvas');
+  drawCanvas.className = 'ytr-thumb-overlay-drawing';
+  drawCanvas.hidden = !allowDrawing;
+
   const gallery = document.createElement('div');
   gallery.className = 'ytr-thumb-overlay-gallery';
 
   const galleryRow = document.createElement('div');
   galleryRow.className = 'ytr-thumb-overlay-gallery-row';
+
+  const galleryViewport = document.createElement('div');
+  galleryViewport.className = 'ytr-thumb-overlay-gallery-viewport';
+
+  const galleryTrack = document.createElement('div');
+  galleryTrack.className = 'ytr-thumb-overlay-gallery-track';
 
   const galleryPrev = document.createElement('button');
   galleryPrev.className = 'ytr-thumb-overlay-icon-btn ytr-thumb-overlay-gallery-arrow';
@@ -1122,11 +2214,173 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
   const panel = document.createElement('div');
   panel.className = 'ytr-thumb-overlay-panel';
 
+  const meta = document.createElement('div');
+  meta.className = 'ytr-thumb-overlay-meta';
+
+  const metaPill = document.createElement('div');
+  metaPill.className = 'ytr-thumb-overlay-pill';
+
+  const metaTitle = document.createElement('div');
+  metaTitle.className = 'ytr-thumb-overlay-title';
+
   const viewControls = document.createElement('div');
   viewControls.className = 'ytr-thumb-overlay-view-controls';
 
   const actions = document.createElement('div');
   actions.className = 'ytr-thumb-overlay-actions';
+
+  const drawControls = document.createElement('div');
+  drawControls.className = 'ytr-thumb-overlay-draw-controls';
+  drawControls.hidden = !allowDrawing;
+
+  const brushSizeShell = document.createElement('div');
+  brushSizeShell.className = 'ytr-thumb-overlay-brush-shell';
+
+  const brushSizeValue = document.createElement('span');
+  brushSizeValue.className = 'ytr-thumb-overlay-brush-value';
+
+  const colorWrap = document.createElement('div');
+  colorWrap.className = 'ytr-thumb-overlay-color-wrap';
+  colorWrap.title = isRu ? 'Цвет кисти' : 'Brush color';
+
+  const colorTrigger = document.createElement('button');
+  colorTrigger.className = 'ytr-thumb-overlay-color-trigger';
+  colorTrigger.type = 'button';
+  colorTrigger.setAttribute('aria-label', isRu ? 'Выбрать цвет кисти' : 'Choose brush color');
+  colorTrigger.setAttribute('aria-haspopup', 'dialog');
+  colorTrigger.setAttribute('aria-expanded', 'false');
+
+  const colorTriggerSwatch = document.createElement('span');
+  colorTriggerSwatch.className = 'ytr-thumb-overlay-color-swatch';
+
+  const colorTriggerIcon = document.createElement('span');
+  colorTriggerIcon.className = 'ytr-thumb-overlay-color-trigger-icon';
+  colorTriggerIcon.innerHTML = GOOGLE_ICON_SVGS.palette;
+
+  const colorPanel = document.createElement('div');
+  colorPanel.className = 'ytr-thumb-overlay-color-panel';
+  colorPanel.hidden = true;
+
+  const colorPanelHeader = document.createElement('div');
+  colorPanelHeader.className = 'ytr-thumb-overlay-color-panel-header';
+
+  const colorPanelTitle = document.createElement('div');
+  colorPanelTitle.className = 'ytr-thumb-overlay-color-panel-title';
+  colorPanelTitle.textContent = isRu ? 'Цвет кисти' : 'Brush color';
+
+  const colorPanelValue = document.createElement('div');
+  colorPanelValue.className = 'ytr-thumb-overlay-color-panel-value';
+
+  const colorArea = document.createElement('div');
+  colorArea.className = 'ytr-thumb-overlay-color-area';
+  colorArea.setAttribute('role', 'slider');
+  colorArea.setAttribute('aria-label', isRu ? 'Насыщенность и яркость' : 'Saturation and value');
+  colorArea.tabIndex = 0;
+
+  const colorAreaThumb = document.createElement('div');
+  colorAreaThumb.className = 'ytr-thumb-overlay-color-area-thumb';
+  colorArea.appendChild(colorAreaThumb);
+
+  const colorHueRow = document.createElement('div');
+  colorHueRow.className = 'ytr-thumb-overlay-color-hue-row';
+
+  const colorHueIcon = document.createElement('span');
+  colorHueIcon.className = 'ytr-thumb-overlay-color-hue-icon';
+  colorHueIcon.innerHTML = GOOGLE_ICON_SVGS.palette;
+
+  const colorHueInput = document.createElement('input');
+  colorHueInput.className = 'ytr-thumb-overlay-color-hue';
+  colorHueInput.type = 'range';
+  colorHueInput.min = '0';
+  colorHueInput.max = '360';
+  colorHueInput.step = '1';
+  colorHueInput.value = '0';
+  colorHueInput.setAttribute('aria-label', isRu ? 'Оттенок' : 'Hue');
+
+  const colorEyedropperBtn = document.createElement('button');
+  colorEyedropperBtn.className = 'ytr-thumb-overlay-color-eye';
+  colorEyedropperBtn.type = 'button';
+  colorEyedropperBtn.title = isRu ? 'Пипетка (I или Alt + клик)' : 'Eyedropper (I or Alt + click)';
+  colorEyedropperBtn.setAttribute('aria-label', colorEyedropperBtn.title);
+  colorEyedropperBtn.innerHTML = GOOGLE_ICON_SVGS.colorize;
+
+  colorHueRow.appendChild(colorHueIcon);
+  colorHueRow.appendChild(colorHueInput);
+  colorHueRow.appendChild(colorEyedropperBtn);
+
+  const colorFooter = document.createElement('div');
+  colorFooter.className = 'ytr-thumb-overlay-color-footer';
+
+  const colorHexField = document.createElement('input');
+  colorHexField.className = 'ytr-thumb-overlay-color-hex';
+  colorHexField.type = 'text';
+  colorHexField.inputMode = 'text';
+  colorHexField.maxLength = 7;
+  colorHexField.spellcheck = false;
+  colorHexField.autocapitalize = 'characters';
+  colorHexField.setAttribute('aria-label', isRu ? 'HEX-код цвета' : 'HEX color');
+
+  const colorPresetRow = document.createElement('div');
+  colorPresetRow.className = 'ytr-thumb-overlay-color-presets';
+
+  const pencilBtn = document.createElement('button');
+  pencilBtn.className = 'ytr-thumb-overlay-icon-btn';
+  pencilBtn.type = 'button';
+  pencilBtn.title = isRu ? 'Карандаш' : 'Pencil';
+  pencilBtn.setAttribute('aria-label', isRu ? 'Карандаш' : 'Pencil');
+  pencilBtn.innerHTML = DRAW_ICONS.pencil;
+
+  const eraserBtn = document.createElement('button');
+  eraserBtn.className = 'ytr-thumb-overlay-icon-btn';
+  eraserBtn.type = 'button';
+  eraserBtn.title = isRu ? 'Ластик' : 'Eraser';
+  eraserBtn.setAttribute('aria-label', isRu ? 'Ластик' : 'Eraser');
+  eraserBtn.innerHTML = DRAW_ICONS.eraser;
+
+  const undoBtn = document.createElement('button');
+  undoBtn.className = 'ytr-thumb-overlay-icon-btn';
+  undoBtn.type = 'button';
+  undoBtn.title = isRu ? 'Отменить' : 'Undo';
+  undoBtn.setAttribute('aria-label', isRu ? 'Отменить' : 'Undo');
+  undoBtn.innerHTML = DRAW_ICONS.undo;
+
+  const redoBtn = document.createElement('button');
+  redoBtn.className = 'ytr-thumb-overlay-icon-btn';
+  redoBtn.type = 'button';
+  redoBtn.title = isRu ? 'Вернуть' : 'Redo';
+  redoBtn.setAttribute('aria-label', isRu ? 'Вернуть' : 'Redo');
+  redoBtn.innerHTML = DRAW_ICONS.redo;
+
+  const clearDrawingBtn = document.createElement('button');
+  clearDrawingBtn.className = 'ytr-thumb-overlay-icon-btn';
+  clearDrawingBtn.type = 'button';
+  clearDrawingBtn.title = isRu ? 'Очистить рисунок' : 'Clear drawing';
+  clearDrawingBtn.setAttribute('aria-label', isRu ? 'Очистить рисунок' : 'Clear drawing');
+  clearDrawingBtn.innerHTML = DRAW_ICONS.clear;
+
+  const brushSizeInput = document.createElement('input');
+  brushSizeInput.className = 'ytr-thumb-overlay-brush-size';
+  brushSizeInput.type = 'range';
+  brushSizeInput.min = '1';
+  brushSizeInput.max = '96';
+  brushSizeInput.step = '1';
+  brushSizeInput.value = '8';
+  brushSizeInput.setAttribute('aria-label', isRu ? 'Размер кисти' : 'Brush size');
+
+  const colorInput = document.createElement('input');
+  colorInput.className = 'ytr-thumb-overlay-color';
+  colorInput.type = 'color';
+  colorInput.value = '#ffffff';
+  colorInput.setAttribute('aria-label', isRu ? 'Цвет кисти' : 'Brush color');
+  colorInput.tabIndex = -1;
+  colorInput.hidden = true;
+
+  const drawToggleBtn = document.createElement('button');
+  drawToggleBtn.className = 'ytr-thumb-overlay-icon-btn ytr-thumb-overlay-draw-toggle';
+  drawToggleBtn.type = 'button';
+  drawToggleBtn.title = isRu ? 'Режим рисования' : 'Drawing mode';
+  drawToggleBtn.setAttribute('aria-label', isRu ? 'Режим рисования' : 'Drawing mode');
+  drawToggleBtn.innerHTML = DRAW_ICONS.drawMode;
 
   const zoomOutBtn = document.createElement('button');
   zoomOutBtn.className = 'ytr-thumb-overlay-icon-btn';
@@ -1176,24 +2430,61 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
   closeBtn.setAttribute('aria-label', isRu ? 'Закрыть предпросмотр' : 'Close preview');
   closeBtn.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
 
+  const cursorPreview = document.createElement('div');
+  cursorPreview.className = 'ytr-thumb-overlay-cursor-preview';
+  cursorPreview.hidden = true;
+
   viewControls.appendChild(zoomOutBtn);
   viewControls.appendChild(scaleBadge);
   viewControls.appendChild(zoomInBtn);
   viewControls.appendChild(resetBtn);
 
+  if (allowDrawing) {
+    brushSizeShell.appendChild(brushSizeInput);
+    brushSizeShell.appendChild(brushSizeValue);
+    colorTrigger.appendChild(colorTriggerSwatch);
+    colorTrigger.appendChild(colorTriggerIcon);
+    colorPanelHeader.appendChild(colorPanelTitle);
+    colorPanelHeader.appendChild(colorPanelValue);
+    colorFooter.appendChild(colorHexField);
+    colorPanel.appendChild(colorPanelHeader);
+    colorPanel.appendChild(colorArea);
+    colorPanel.appendChild(colorHueRow);
+    colorPanel.appendChild(colorFooter);
+    colorPanel.appendChild(colorPresetRow);
+    colorWrap.appendChild(colorTrigger);
+    colorWrap.appendChild(colorInput);
+    colorWrap.appendChild(colorPanel);
+    drawControls.appendChild(pencilBtn);
+    drawControls.appendChild(eraserBtn);
+    drawControls.appendChild(undoBtn);
+    drawControls.appendChild(redoBtn);
+    drawControls.appendChild(brushSizeShell);
+    drawControls.appendChild(colorWrap);
+    drawControls.appendChild(clearDrawingBtn);
+  }
+  actions.appendChild(drawControls);
   actions.appendChild(viewControls);
+  if (allowDrawing) actions.appendChild(drawToggleBtn);
   actions.appendChild(copyBtn);
   actions.appendChild(dlBtn);
   actions.appendChild(closeBtn);
 
   controls.appendChild(actions);
-  imgWrap.appendChild(img);
+  mediaLayer.appendChild(img);
+  mediaLayer.appendChild(drawCanvas);
+  imgWrap.appendChild(mediaLayer);
+  imgWrap.appendChild(cursorPreview);
   stage.appendChild(stageStatus);
   stage.appendChild(imgWrap);
   content.appendChild(stage);
+  meta.appendChild(metaPill);
+  meta.appendChild(metaTitle);
   if (items.length > 1) {
+    gallery.appendChild(galleryTrack);
+    galleryViewport.appendChild(gallery);
     galleryRow.appendChild(galleryPrev);
-    galleryRow.appendChild(gallery);
+    galleryRow.appendChild(galleryViewport);
     galleryRow.appendChild(galleryNext);
     panel.appendChild(galleryRow);
   }
@@ -1205,6 +2496,40 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
   const thumbnailButtons: HTMLButtonElement[] = [];
 
   const getCurrentItem = (): OverlayGalleryItem => items[currentIndex];
+
+  function syncMeta() {
+    const currentItem = getCurrentItem();
+    if (!currentItem.kind) {
+      meta.hidden = true;
+      return;
+    }
+
+    meta.hidden = false;
+    if (currentItem.kind === 'history') {
+      metaPill.textContent = currentItem.status === 'current'
+        ? (isRu ? 'Сейчас' : 'Current')
+        : currentItem.status === 'published'
+          ? (isRu ? 'Старт' : 'Published')
+          : currentItem.status === 'first-seen'
+            ? (isRu ? 'Впервые замечено' : 'First seen')
+            : currentItem.status === 'archived'
+              ? (isRu ? 'Архив' : 'Archive')
+          : (isRu ? 'Изменение' : 'Observed');
+      metaTitle.textContent = currentItem.metaLabel || (isRu ? 'История превью' : 'Thumbnail history');
+      return;
+    }
+
+    metaPill.textContent = currentItem.kind === 'youtube-test'
+      ? 'YT Test'
+      : currentItem.kind === 'creator-test'
+        ? 'A/B Test'
+        : (isRu ? 'Original' : 'Original');
+    metaTitle.textContent = currentItem.kind === 'youtube-test'
+      ? `${isRu ? 'YouTube тест-кадр' : 'YouTube test frame'} ${currentItem.metaLabel || currentItem.label}`.trim()
+      : currentItem.kind === 'creator-test'
+        ? `${isRu ? 'Авторское A/B превью' : 'Creator A/B thumbnail'} ${currentItem.metaLabel || currentItem.label}`.trim()
+        : (currentItem.metaLabel || (isRu ? 'Оригинальное превью' : 'Original thumbnail'));
+  }
 
   function setCopyButtonState(state: 'idle' | 'busy' | 'success') {
     copyBtn.dataset.state = state;
@@ -1229,22 +2554,361 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
   let dragStartY = 0;
   let startPanX = 0;
   let startPanY = 0;
-  let clickTimer: ReturnType<typeof setTimeout> | null = null;
   let lastTouchDist = 0;
   let lastTouchX = 0;
   let lastTouchY = 0;
+  let drawMode = false;
+  let drawTool: OverlayDrawTool = 'none';
+  let drawing = false;
+  let activeStroke: OverlayStroke | null = null;
+  let drawingStrokes: OverlayStroke[] = [];
+  let drawingRedoStrokes: OverlayStroke[] = [];
+  const drawingCtx = drawCanvas.getContext('2d');
+  const drawingStates = new Map<number, { strokes: OverlayStroke[]; redo: OverlayStroke[] }>();
+  let pointerPreviewActive = false;
+  let pointerPreviewPinned = false;
+  let pointerPreviewX = 0;
+  let pointerPreviewY = 0;
+  let pointerPreviewTimeout: number | null = null;
+  let lastStrokeAnchorPoint: { x: number; y: number } | null = null;
+  let colorPanelOpen = false;
+  let colorHsv = rgbToHsv(hexToRgb(colorInput.value) || { r: 255, g: 255, b: 255 });
+  let eyedropperMode = false;
+  let spacePanActive = false;
+  const colorPresets = ['#000000', '#ffffff', '#ff0000', '#ff7a00', '#ffd400', '#00c950', '#0096ff', '#2046f5', '#7a2cff', '#ff2ea6'];
+
+  function cloneStroke(stroke: OverlayStroke): OverlayStroke {
+    return {
+      ...stroke,
+      points: stroke.points.map((point) => ({ ...point })),
+    };
+  }
+
+  function loadDrawingState(index: number) {
+    const state = drawingStates.get(index);
+    drawingStrokes = state ? state.strokes.map(cloneStroke) : [];
+    drawingRedoStrokes = state ? state.redo.map(cloneStroke) : [];
+    updateLastStrokeAnchorPoint();
+  }
+
+  function persistDrawingState() {
+    if (!allowDrawing) return;
+    drawingStates.set(currentIndex, {
+      strokes: drawingStrokes.map(cloneStroke),
+      redo: drawingRedoStrokes.map(cloneStroke),
+    });
+  }
+
+  function getBrushBaseSize(): number {
+    const width = drawCanvas.clientWidth || img.clientWidth || 1;
+    const height = drawCanvas.clientHeight || img.clientHeight || 1;
+    return Math.max(1, Math.min(width, height));
+  }
+
+  function updateLastStrokeAnchorPoint() {
+    const lastStroke = drawingStrokes[drawingStrokes.length - 1];
+    const lastPoint = lastStroke?.points[lastStroke.points.length - 1];
+    lastStrokeAnchorPoint = lastPoint ? { ...lastPoint } : null;
+  }
+
+  function syncColorPickerUi() {
+    const normalizedColor = normalizeHexColor(colorInput.value, '#ffffff');
+    const hueColor = rgbToHex(hsvToRgb({ h: colorHsv.h, s: 1, v: 1 }));
+    colorTriggerSwatch.style.background = normalizedColor;
+    colorPanelValue.textContent = normalizedColor.toUpperCase();
+    colorHexField.value = normalizedColor.toUpperCase();
+    colorArea.style.setProperty('--ytr-picker-hue', hueColor);
+    colorAreaThumb.style.left = `${colorHsv.s * 100}%`;
+    colorAreaThumb.style.top = `${(1 - colorHsv.v) * 100}%`;
+    colorHueInput.value = String(Math.round(colorHsv.h));
+    colorTrigger.setAttribute('aria-expanded', String(colorPanelOpen));
+    colorWrap.dataset.open = String(colorPanelOpen);
+    colorEyedropperBtn.classList.toggle('active', eyedropperMode);
+    colorEyedropperBtn.setAttribute('aria-pressed', String(eyedropperMode));
+  }
+
+  function setColorPanelOpen(next: boolean) {
+    colorPanelOpen = next;
+    colorPanel.hidden = !next;
+    syncColorPickerUi();
+  }
+
+  function setBrushColorFromHsv(nextColor: HsvColor) {
+    colorHsv = {
+      h: ((nextColor.h % 360) + 360) % 360,
+      s: clamp(nextColor.s, 0, 1),
+      v: clamp(nextColor.v, 0, 1),
+    };
+    colorInput.value = rgbToHex(hsvToRgb(colorHsv));
+    syncColorPickerUi();
+    updateCursorPreview();
+  }
+
+  function setBrushColor(nextColor: string) {
+    const normalized = normalizeHexColor(nextColor, colorInput.value);
+    const rgb = hexToRgb(normalized);
+    if (!rgb) return;
+    colorInput.value = normalized;
+    colorHsv = rgbToHsv(rgb);
+    syncColorPickerUi();
+    updateCursorPreview();
+  }
+
+  function updateColorAreaFromPointer(clientX: number, clientY: number) {
+    const rect = colorArea.getBoundingClientRect();
+    const saturation = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1);
+    const value = 1 - clamp((clientY - rect.top) / Math.max(1, rect.height), 0, 1);
+    setBrushColorFromHsv({ h: colorHsv.h, s: saturation, v: value });
+  }
+
+  function setEyedropperMode(next: boolean) {
+    if (!allowDrawing) return;
+    eyedropperMode = next;
+    if (next && !drawMode) {
+      setDrawMode(true);
+    }
+    if (next) {
+      setColorPanelOpen(false);
+    } else {
+      syncColorPickerUi();
+    }
+    syncToolState();
+  }
+
+  function bumpBrushSize(delta: number) {
+    const min = Number(brushSizeInput.min);
+    const max = Number(brushSizeInput.max);
+    const nextValue = clamp(Number(brushSizeInput.value) + delta, min, max);
+    if (nextValue === Number(brushSizeInput.value)) return;
+    brushSizeInput.value = String(nextValue);
+    updateBrushSizeValue();
+    showCenteredBrushPreview();
+    updateCursorPreview();
+  }
+
+  function syncToolState() {
+    if (allowDrawing) {
+      pencilBtn.classList.toggle('active', drawMode && drawTool === 'pencil');
+      eraserBtn.classList.toggle('active', drawMode && drawTool === 'eraser');
+      undoBtn.disabled = drawingStrokes.length === 0;
+      redoBtn.disabled = drawingRedoStrokes.length === 0;
+      clearDrawingBtn.disabled = drawingStrokes.length === 0;
+      drawToggleBtn.classList.toggle('active', drawMode);
+      drawToggleBtn.title = drawMode ? (isRu ? 'Закрыть режим рисования' : 'Exit drawing mode') : (isRu ? 'Режим рисования' : 'Drawing mode');
+      drawToggleBtn.setAttribute('aria-label', drawToggleBtn.title);
+      drawControls.hidden = !drawMode;
+      viewControls.hidden = drawMode;
+      copyBtn.hidden = drawMode;
+      dlBtn.hidden = drawMode;
+      colorWrap.hidden = !drawMode || drawTool === 'eraser' || drawTool === 'none';
+      brushSizeShell.hidden = !drawMode || drawTool === 'none';
+    }
+
+    if (eyedropperMode) {
+      cursorPreview.hidden = true;
+      imgWrap.style.cursor = 'crosshair';
+      return;
+    }
+
+    if (spacePanActive) {
+      cursorPreview.hidden = true;
+      imgWrap.style.cursor = isDragging ? 'grabbing' : 'grab';
+      return;
+    }
+
+    if (drawMode && drawTool === 'pencil') {
+      imgWrap.style.cursor = 'none';
+      updateCursorPreview();
+      return;
+    }
+    if (drawMode && drawTool === 'eraser') {
+      imgWrap.style.cursor = 'none';
+      updateCursorPreview();
+      return;
+    }
+    cursorPreview.hidden = true;
+    if (!allowDrawing) return;
+    imgWrap.style.cursor = isDragging ? 'grabbing' : 'grab';
+  }
+
+  function updateBrushSizeValue() {
+    brushSizeValue.textContent = `${brushSizeInput.value}px`;
+  }
+
+  function updateCursorPreview() {
+    if (!allowDrawing || !drawMode || drawTool === 'none' || (!pointerPreviewActive && !pointerPreviewPinned)) {
+      cursorPreview.hidden = true;
+      return;
+    }
+
+    const diameter = Math.max(6, Math.round(Number(brushSizeInput.value) * Math.max(scale, 0.5)));
+    cursorPreview.hidden = false;
+    cursorPreview.dataset.tool = drawTool;
+    cursorPreview.style.width = `${diameter}px`;
+    cursorPreview.style.height = `${diameter}px`;
+    cursorPreview.style.left = `${Math.round(pointerPreviewX)}px`;
+    cursorPreview.style.top = `${Math.round(pointerPreviewY)}px`;
+    if (drawTool === 'eraser') {
+      cursorPreview.style.background = 'rgba(255, 255, 255, 0.08)';
+      cursorPreview.style.borderColor = 'rgba(255, 255, 255, 0.6)';
+    } else {
+      cursorPreview.style.background = `${colorInput.value}2b`;
+      cursorPreview.style.borderColor = colorInput.value;
+    }
+  }
+
+  function showCenteredBrushPreview() {
+    if (!allowDrawing || !drawMode || drawTool === 'none') return;
+    const wrapRect = imgWrap.getBoundingClientRect();
+    const previewRect = drawCanvas.clientWidth > 0 && drawCanvas.clientHeight > 0
+      ? drawCanvas.getBoundingClientRect()
+      : imgWrap.getBoundingClientRect();
+    pointerPreviewX = (previewRect.left - wrapRect.left) + previewRect.width / 2;
+    pointerPreviewY = (previewRect.top - wrapRect.top) + previewRect.height / 2;
+    pointerPreviewPinned = true;
+    updateCursorPreview();
+    if (pointerPreviewTimeout) {
+      window.clearTimeout(pointerPreviewTimeout);
+    }
+    pointerPreviewTimeout = window.setTimeout(() => {
+      pointerPreviewPinned = false;
+      pointerPreviewTimeout = null;
+      updateCursorPreview();
+    }, 850);
+  }
+
+  function redrawDrawing() {
+    if (!allowDrawing || !drawingCtx) return;
+    const width = Math.max(1, drawCanvas.clientWidth);
+    const height = Math.max(1, drawCanvas.clientHeight);
+    drawingCtx.clearRect(0, 0, width, height);
+    renderOverlayStrokes(drawingCtx, drawingStrokes, width, height);
+    clearDrawingBtn.disabled = drawingStrokes.length === 0;
+  }
+
+  function syncDrawingSurface() {
+    if (!allowDrawing || !drawingCtx) return;
+    const width = Math.max(1, Math.round(img.clientWidth));
+    const height = Math.max(1, Math.round(img.clientHeight));
+    const dpr = window.devicePixelRatio || 1;
+    drawCanvas.style.width = `${width}px`;
+    drawCanvas.style.height = `${height}px`;
+    drawCanvas.width = Math.max(1, Math.round(width * dpr));
+    drawCanvas.height = Math.max(1, Math.round(height * dpr));
+    drawingCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    redrawDrawing();
+    updateCursorPreview();
+  }
+
+  function clearDrawing() {
+    drawingStrokes = [];
+    drawingRedoStrokes = [];
+    activeStroke = null;
+    updateLastStrokeAnchorPoint();
+    persistDrawingState();
+    redrawDrawing();
+  }
+
+  function getPointFromEvent(clientX: number, clientY: number) {
+    const rect = drawCanvas.getBoundingClientRect();
+    return {
+      x: clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1),
+      y: clamp((clientY - rect.top) / Math.max(1, rect.height), 0, 1),
+    };
+  }
+
+  async function sampleColorFromPreview(clientX: number, clientY: number): Promise<string | null> {
+    const point = getPointFromEvent(clientX, clientY);
+    const source = await getExportSource();
+    const sourceImage = await loadImage(source);
+    const width = Math.max(1, sourceImage.naturalWidth || sourceImage.width);
+    const height = Math.max(1, sourceImage.naturalHeight || sourceImage.height);
+    if (!width || !height) return null;
+
+    const sampleCanvas = document.createElement('canvas');
+    sampleCanvas.width = width;
+    sampleCanvas.height = height;
+    const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+    if (!sampleCtx) return null;
+
+    try {
+      sampleCtx.drawImage(sourceImage, 0, 0, width, height);
+      const px = clamp(Math.round(point.x * (width - 1)), 0, width - 1);
+      const py = clamp(Math.round(point.y * (height - 1)), 0, height - 1);
+      const [r, g, b, alpha] = sampleCtx.getImageData(px, py, 1, 1).data;
+      if (!alpha) return null;
+      return rgbToHex({ r, g, b });
+    } catch (error) {
+      console.warn('[YouTube Rewind] Preview eyedropper failed', error);
+      return null;
+    }
+  }
+
+  async function pickBrushColorFromPreview(clientX: number, clientY: number) {
+    try {
+      const sampledColor = await sampleColorFromPreview(clientX, clientY);
+      if (!sampledColor) {
+        showYtrToast(isRu ? 'Не удалось считать цвет с превью' : 'Could not sample color from preview');
+        setEyedropperMode(false);
+        return;
+      }
+
+      setBrushColor(sampledColor);
+      if (drawTool === 'none') {
+        drawTool = 'pencil';
+      }
+      showCenteredBrushPreview();
+      setEyedropperMode(false);
+      syncToolState();
+    } catch (error) {
+      console.warn('[YouTube Rewind] Eyedropper load failed', error);
+      showYtrToast(isRu ? 'Не удалось считать цвет с превью' : 'Could not sample color from preview');
+      setEyedropperMode(false);
+    }
+  }
+
+  function beginDrawing(clientX: number, clientY: number, constrainLine = false) {
+    if (!allowDrawing || !drawingCtx || !drawMode || drawTool === 'none') return;
+    const point = getPointFromEvent(clientX, clientY);
+    const anchorPoint = constrainLine && lastStrokeAnchorPoint ? { ...lastStrokeAnchorPoint } : null;
+    activeStroke = {
+      tool: drawTool,
+      color: colorInput.value,
+      sizeRatio: Number(brushSizeInput.value) / getBrushBaseSize(),
+      points: anchorPoint ? [anchorPoint, point] : [point],
+    };
+    drawingRedoStrokes = [];
+    drawingStrokes = [...drawingStrokes, activeStroke];
+    redrawDrawing();
+  }
+
+  function pushDrawingPoint(clientX: number, clientY: number, constrainLine = false) {
+    if (!activeStroke) return;
+    const point = getPointFromEvent(clientX, clientY);
+    if (constrainLine && activeStroke.points.length) {
+      activeStroke.points = [activeStroke.points[0], point];
+    } else {
+      const lastPoint = activeStroke.points[activeStroke.points.length - 1];
+      if (lastPoint && Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) < 0.001) return;
+      activeStroke.points.push(point);
+    }
+    redrawDrawing();
+  }
 
   function applyTransform(animate = false) {
-    const maxPanX = Math.max(img.clientWidth * scale, imgWrap.clientWidth) * 1.25;
-    const maxPanY = Math.max(img.clientHeight * scale, imgWrap.clientHeight) * 1.25;
+    const baseWidth = mediaLayer.clientWidth || img.clientWidth || imgWrap.clientWidth;
+    const baseHeight = mediaLayer.clientHeight || img.clientHeight || imgWrap.clientHeight;
+    const maxPanX = Math.max(baseWidth * scale, imgWrap.clientWidth) * 1.25;
+    const maxPanY = Math.max(baseHeight * scale, imgWrap.clientHeight) * 1.25;
     panX = clamp(panX, -maxPanX, maxPanX);
     panY = clamp(panY, -maxPanY, maxPanY);
 
-    img.style.transition = animate ? 'transform 0.24s cubic-bezier(0.2, 0, 0, 1)' : 'none';
-    img.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
-    imgWrap.style.cursor = scale !== 1 ? (isDragging ? 'grabbing' : 'grab') : 'pointer';
+    mediaLayer.style.transition = animate ? 'transform 0.24s cubic-bezier(0.2, 0, 0, 1)' : 'none';
+    mediaLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
     scaleBadge.textContent = `${Math.round(scale * 100)}%`;
-    content.dataset.zoomed = String(scale !== 1);
+    content.dataset.zoomed = String(scale !== 1 || panX !== 0 || panY !== 0);
+    updateCursorPreview();
+    syncToolState();
   }
 
   function resetTransform() {
@@ -1259,18 +2923,39 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
     applyTransform(animate);
   }
 
+  function getGalleryMaxScrollLeft(): number {
+    return Math.max(0, galleryViewport.scrollWidth - galleryViewport.clientWidth);
+  }
+
+  function scrollGalleryTo(left: number, behavior: ScrollBehavior = 'smooth') {
+    galleryViewport.scrollTo({
+      left: clamp(left, 0, getGalleryMaxScrollLeft()),
+      behavior,
+    });
+  }
+
   function syncGalleryState() {
     thumbnailButtons.forEach((button, index) => {
       button.classList.toggle('active', index === currentIndex);
     });
     galleryPrev.disabled = currentIndex === 0;
     galleryNext.disabled = currentIndex === items.length - 1;
+    const activeThumb = thumbnailButtons[currentIndex];
+    if (items.length > 1 && activeThumb && galleryViewport.isConnected) {
+      const viewportRect = galleryViewport.getBoundingClientRect();
+      if (!viewportRect.width) return;
+      const thumbRect = activeThumb.getBoundingClientRect();
+      const targetLeft = galleryViewport.scrollLeft + (thumbRect.left - viewportRect.left) - (viewportRect.width - thumbRect.width) / 2;
+      scrollGalleryTo(targetLeft);
+    }
   }
 
   function setCurrentIndex(index: number, reset = true) {
+    persistDrawingState();
     currentIndex = clamp(index, 0, items.length - 1);
     const nextSrc = getCurrentItem().src;
     const reusedLoadedImage = img.currentSrc === nextSrc && img.complete;
+    loadDrawingState(currentIndex);
     if (reusedLoadedImage) {
       stageStatus.hidden = true;
     } else {
@@ -1284,8 +2969,11 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
       panY = 0;
     }
     setCopyButtonState('idle');
+    updateBrushSizeValue();
+    syncMeta();
     syncGalleryState();
     if (reusedLoadedImage) {
+      syncDrawingSurface();
       applyTransform(false);
     }
   }
@@ -1301,18 +2989,53 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
     thumbImage.alt = '';
     thumbImage.draggable = false;
 
+    const thumbBadge = document.createElement('span');
+    thumbBadge.className = 'ytr-thumb-overlay-thumb-badge';
+    thumbBadge.textContent = item.label;
+
     thumbButton.appendChild(thumbImage);
+    thumbButton.appendChild(thumbBadge);
     thumbButton.addEventListener('click', (event) => {
       event.stopPropagation();
       setCurrentIndex(index);
     });
     thumbButton.title = item.label;
     thumbnailButtons.push(thumbButton);
-    gallery.appendChild(thumbButton);
+    galleryTrack.appendChild(thumbButton);
   });
+
+  galleryViewport.addEventListener('wheel', (event) => {
+    const dominantDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    if (!dominantDelta) return;
+
+    const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+      ? 18
+      : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+        ? Math.max(1, galleryViewport.clientWidth)
+        : 1;
+    const nextLeft = clamp(
+      galleryViewport.scrollLeft + (dominantDelta * unit),
+      0,
+      getGalleryMaxScrollLeft(),
+    );
+
+    if (Math.abs(nextLeft - galleryViewport.scrollLeft) < 0.5) return;
+
+    event.preventDefault();
+    scrollGalleryTo(nextLeft, 'auto');
+  }, { passive: false });
+
+  galleryViewport.addEventListener('scroll', () => {
+    const maxScrollLeft = getGalleryMaxScrollLeft();
+    const clampedLeft = clamp(galleryViewport.scrollLeft, 0, maxScrollLeft);
+    if (Math.abs(clampedLeft - galleryViewport.scrollLeft) > 0.5) {
+      galleryViewport.scrollLeft = clampedLeft;
+    }
+  }, { passive: true });
 
   img.addEventListener('load', () => {
     stageStatus.hidden = true;
+    syncDrawingSurface();
     applyTransform(false);
   });
   img.addEventListener('error', () => {
@@ -1320,10 +3043,27 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
     stageStatus.textContent = isRu ? 'Не удалось загрузить превью' : 'Could not load preview';
   });
 
+  imgWrap.addEventListener('mouseenter', () => {
+    pointerPreviewActive = true;
+    updateCursorPreview();
+  });
+
+  imgWrap.addEventListener('mouseleave', () => {
+    pointerPreviewActive = false;
+    updateCursorPreview();
+  });
+
+  imgWrap.addEventListener('mousemove', (event) => {
+    const rect = imgWrap.getBoundingClientRect();
+    pointerPreviewX = event.clientX - rect.left;
+    pointerPreviewY = event.clientY - rect.top;
+    updateCursorPreview();
+  });
+
   imgWrap.addEventListener('wheel', (event) => {
     event.preventDefault();
-    const delta = event.deltaY > 0 ? -0.15 : 0.15;
-    const nextScale = clamp(scale + delta * scale, 0.5, 8);
+    const delta = event.deltaY > 0 ? -0.14 : 0.14;
+    const nextScale = clamp(scale * (1 + delta), 0.5, 8);
     const rect = imgWrap.getBoundingClientRect();
     const cx = event.clientX - rect.left - rect.width / 2;
     const cy = event.clientY - rect.top - rect.height / 2;
@@ -1334,59 +3074,73 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
     applyTransform(false);
   }, { passive: false });
 
-  imgWrap.addEventListener('click', (event) => {
-    if (isDragging) return;
-    if (clickTimer) {
-      clearTimeout(clickTimer);
-      clickTimer = null;
-      resetTransform();
-      return;
-    }
-
-    clickTimer = setTimeout(() => {
-      clickTimer = null;
-      if (scale === 1) {
-        const rect = imgWrap.getBoundingClientRect();
-        const cx = event.clientX - rect.left - rect.width / 2;
-        const cy = event.clientY - rect.top - rect.height / 2;
-        const nextScale = 2;
-        const ratio = nextScale / scale;
-        panX = cx - ratio * (cx - panX);
-        panY = cy - ratio * (cy - panY);
-        scale = nextScale;
-        applyTransform(true);
-      }
-    }, 180);
+  imgWrap.addEventListener('dblclick', (event) => {
+    event.preventDefault();
+    resetTransform();
   });
 
   imgWrap.addEventListener('mousedown', (event) => {
-    if (scale === 1) return;
+    if (event.button !== 0) return;
+    if (allowDrawing && drawMode && (eyedropperMode || event.altKey)) {
+      event.preventDefault();
+      event.stopPropagation();
+      void pickBrushColorFromPreview(event.clientX, event.clientY);
+      return;
+    }
+
+    if (allowDrawing && drawMode && drawTool !== 'none' && !spacePanActive) {
+      drawing = true;
+      beginDrawing(event.clientX, event.clientY, event.shiftKey);
+
+      const onDrawMove = (moveEvent: MouseEvent) => {
+        if (!drawing) return;
+        const rect = imgWrap.getBoundingClientRect();
+        pointerPreviewX = moveEvent.clientX - rect.left;
+        pointerPreviewY = moveEvent.clientY - rect.top;
+        pushDrawingPoint(moveEvent.clientX, moveEvent.clientY, moveEvent.shiftKey);
+        updateCursorPreview();
+      };
+
+      const onDrawUp = () => {
+        drawing = false;
+        if (activeStroke?.points.length) {
+          lastStrokeAnchorPoint = { ...activeStroke.points[activeStroke.points.length - 1] };
+        }
+        activeStroke = null;
+        persistDrawingState();
+        syncToolState();
+        document.removeEventListener('mousemove', onDrawMove);
+        document.removeEventListener('mouseup', onDrawUp);
+      };
+
+      document.addEventListener('mousemove', onDrawMove);
+      document.addEventListener('mouseup', onDrawUp);
+      return;
+    }
+
     event.preventDefault();
-    isDragging = false;
+    isDragging = true;
     dragStartX = event.clientX;
     dragStartY = event.clientY;
     startPanX = panX;
     startPanY = panY;
+    syncToolState();
 
     const onMove = (moveEvent: MouseEvent) => {
-      const dx = moveEvent.clientX - dragStartX;
-      const dy = moveEvent.clientY - dragStartY;
-      if (!isDragging && Math.abs(dx) + Math.abs(dy) > 4) isDragging = true;
-      panX = startPanX + dx;
-      panY = startPanY + dy;
+      panX = startPanX + (moveEvent.clientX - dragStartX);
+      panY = startPanY + (moveEvent.clientY - dragStartY);
       applyTransform(false);
     };
 
     const onUp = () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      imgWrap.style.cursor = scale !== 1 ? 'grab' : 'pointer';
-      setTimeout(() => { isDragging = false; }, 10);
+      isDragging = false;
+      syncToolState();
     };
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
-    imgWrap.style.cursor = 'grabbing';
   });
 
   imgWrap.addEventListener('touchstart', (event) => {
@@ -1397,7 +3151,7 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
       return;
     }
 
-    if (event.touches.length === 1 && scale !== 1) {
+    if (event.touches.length === 1) {
       lastTouchX = event.touches[0].clientX;
       lastTouchY = event.touches[0].clientY;
       startPanX = panX;
@@ -1420,68 +3174,224 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
       return;
     }
 
-    if (event.touches.length === 1 && scale !== 1) {
+    if (event.touches.length === 1) {
       panX = startPanX + (event.touches[0].clientX - lastTouchX);
       panY = startPanY + (event.touches[0].clientY - lastTouchY);
       applyTransform(false);
     }
   }, { passive: false });
 
+  async function getExportSource(): Promise<string> {
+    if (!allowDrawing || !drawingStrokes.length) {
+      return getCurrentItem().src;
+    }
+    return await buildOverlayExportDataUrl(getCurrentItem(), drawingStrokes);
+  }
+
+  function hasOverlayChanges(): boolean {
+    if (scale !== 1 || panX !== 0 || panY !== 0) return true;
+    if (!allowDrawing) return false;
+    if (drawingStrokes.length > 0 || drawingRedoStrokes.length > 0) return true;
+    for (const state of drawingStates.values()) {
+      if (state.strokes.length > 0 || state.redo.length > 0) return true;
+    }
+    return false;
+  }
+
   const tryCopyImage = async () => {
     copyBtn.disabled = true;
     setCopyButtonState('busy');
-    const result = await copyImageToClipboard(getCurrentItem().src);
-    copyBtn.disabled = false;
+    try {
+      const source = await getExportSource();
+      const result = await copyImageToClipboard(source);
+      copyBtn.disabled = false;
 
-    if (result === 'image') {
-      setCopyButtonState('success');
-      showYtrToast(isRu ? 'Изображение скопировано' : 'Image copied to clipboard');
-      setTimeout(() => setCopyButtonState('idle'), 1400);
-      return;
+      if (result === 'image') {
+        setCopyButtonState('success');
+        showYtrToast(isRu ? 'Изображение скопировано' : 'Image copied to clipboard');
+        setTimeout(() => setCopyButtonState('idle'), 1400);
+        return;
+      }
+
+      setCopyButtonState('idle');
+      if (result === 'link') {
+        showYtrToast(isRu ? 'Ссылка на изображение скопирована' : 'Image link copied');
+        return;
+      }
+
+      showYtrToast(isRu ? 'Не удалось скопировать изображение' : 'Could not copy image');
+    } catch (error) {
+      console.error('[YouTube Rewind] Copy overlay image failed', error);
+      copyBtn.disabled = false;
+      setCopyButtonState('idle');
+      showYtrToast(isRu ? 'Не удалось скопировать изображение' : 'Could not copy image');
     }
-
-    setCopyButtonState('idle');
-    if (result === 'link') {
-      showYtrToast(isRu ? 'Ссылка на изображение скопирована' : 'Image link copied');
-      return;
-    }
-
-    showYtrToast(isRu ? 'Не удалось скопировать изображение' : 'Could not copy image');
   };
 
   const remove = () => {
+    persistDrawingState();
+    if (pointerPreviewTimeout) {
+      window.clearTimeout(pointerPreviewTimeout);
+      pointerPreviewTimeout = null;
+    }
     overlay.remove();
     document.documentElement.classList.remove('ytr-overlay-lock-scroll');
     document.removeEventListener('keydown', handler);
+    document.removeEventListener('keyup', handleOverlayKeyUp);
+    document.removeEventListener('pointerdown', handleOverlayPointerDown, true);
+    window.removeEventListener('resize', syncDrawingSurface);
+    activeOverlayCleanup = null;
   };
 
+  activeOverlayCleanup = remove;
+
+  const requestRemove = async () => {
+    if (hasOverlayChanges()) {
+      const confirmed = await showYtrConfirmDialog({
+        title: isRu ? 'Закрыть без сохранения?' : 'Discard changes?',
+        message: isRu
+          ? 'Масштаб, позиция и рисунок будут потеряны.'
+          : 'Your zoom, position, and drawing changes will be lost.',
+        confirmText: isRu ? 'Закрыть' : 'Discard',
+        cancelText: isRu ? 'Продолжить' : 'Keep editing',
+      });
+      if (!confirmed) return;
+    }
+    remove();
+  };
+
+  function undoDrawing() {
+    if (!drawingStrokes.length) return;
+    const lastStroke = drawingStrokes[drawingStrokes.length - 1];
+    drawingRedoStrokes = [...drawingRedoStrokes, cloneStroke(lastStroke)];
+    drawingStrokes = drawingStrokes.slice(0, -1);
+    updateLastStrokeAnchorPoint();
+    persistDrawingState();
+    redrawDrawing();
+    syncToolState();
+  }
+
+  function redoDrawing() {
+    if (!drawingRedoStrokes.length) return;
+    const restored = drawingRedoStrokes[drawingRedoStrokes.length - 1];
+    drawingRedoStrokes = drawingRedoStrokes.slice(0, -1);
+    drawingStrokes = [...drawingStrokes, cloneStroke(restored)];
+    updateLastStrokeAnchorPoint();
+    persistDrawingState();
+    redrawDrawing();
+    syncToolState();
+  }
+
+  function setDrawMode(nextDrawMode: boolean) {
+    if (!allowDrawing) return;
+    drawMode = nextDrawMode;
+    if (drawMode && drawTool === 'none') {
+      drawTool = 'pencil';
+    }
+    if (!drawMode) {
+      drawTool = 'none';
+      eyedropperMode = false;
+      spacePanActive = false;
+      setColorPanelOpen(false);
+    }
+    syncToolState();
+  }
+
   function handler(event: KeyboardEvent) {
-    if (event.key === 'Escape') remove();
-    if (event.key === '0' || event.key.toLowerCase() === 'r') resetTransform();
-    if (event.key === '+' || event.key === '=') zoomBy(1.3);
-    if (event.key === '-') zoomBy(1 / 1.3);
-    if (event.key.toLowerCase() === 'c') void tryCopyImage();
+    const metaOrCtrl = event.ctrlKey || event.metaKey;
+    const target = event.target;
+    const isTextInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+    if (event.key === 'Escape' && (colorPanelOpen || eyedropperMode)) {
+      event.preventDefault();
+      setEyedropperMode(false);
+      setColorPanelOpen(false);
+      return;
+    }
+    if (allowDrawing && drawMode && event.code === 'Space' && !isTextInput) {
+      event.preventDefault();
+      spacePanActive = true;
+      syncToolState();
+      return;
+    }
+    if (isTextInput && !metaOrCtrl) return;
+    if (allowDrawing && drawMode && metaOrCtrl && event.code === 'KeyZ') {
+      event.preventDefault();
+      if (event.shiftKey) redoDrawing();
+      else undoDrawing();
+      return;
+    }
+    if (allowDrawing && drawMode && metaOrCtrl && event.code === 'KeyY') {
+      event.preventDefault();
+      redoDrawing();
+      return;
+    }
+    if (allowDrawing && (event.code === 'BracketLeft' || event.code === 'BracketRight')) {
+      event.preventDefault();
+      bumpBrushSize(event.code === 'BracketRight' ? 4 : -4);
+      return;
+    }
+    if (allowDrawing && event.code === 'KeyB') {
+      event.preventDefault();
+      setEyedropperMode(false);
+      setDrawMode(true);
+      drawTool = 'pencil';
+      syncToolState();
+      return;
+    }
+    if (allowDrawing && event.code === 'KeyE') {
+      event.preventDefault();
+      setEyedropperMode(false);
+      setDrawMode(true);
+      drawTool = 'eraser';
+      syncToolState();
+      return;
+    }
+    if (allowDrawing && event.code === 'KeyI') {
+      event.preventDefault();
+      setEyedropperMode(!eyedropperMode);
+      return;
+    }
+    if (allowDrawing && drawMode && (event.code === 'Delete' || event.code === 'Backspace')) {
+      event.preventDefault();
+      clearDrawing();
+      syncToolState();
+      return;
+    }
+    if (event.key === 'Escape') void requestRemove();
+    if (event.code === 'Digit0' || event.code === 'Numpad0' || event.code === 'KeyR') resetTransform();
+    if (event.code === 'Equal' || event.code === 'NumpadAdd') zoomBy(1.3);
+    if (event.code === 'Minus' || event.code === 'NumpadSubtract') zoomBy(1 / 1.3);
+    if (event.code === 'KeyC') void tryCopyImage();
     if (event.key === 'ArrowLeft' && items.length > 1) setCurrentIndex(currentIndex - 1);
     if (event.key === 'ArrowRight' && items.length > 1) setCurrentIndex(currentIndex + 1);
   }
 
-  backdrop.addEventListener('click', remove);
-  closeBtn.addEventListener('click', remove);
+  function handleOverlayKeyUp(event: KeyboardEvent) {
+    if (event.code !== 'Space' || !spacePanActive) return;
+    spacePanActive = false;
+    syncToolState();
+  }
+
+  function handleOverlayPointerDown(event: PointerEvent) {
+    if (!allowDrawing || !colorPanelOpen) return;
+    const target = event.target;
+    if (target instanceof Node && colorWrap.contains(target)) return;
+    setColorPanelOpen(false);
+  }
+
+  backdrop.addEventListener('click', () => { void requestRemove(); });
+  closeBtn.addEventListener('click', () => { void requestRemove(); });
   zoomOutBtn.addEventListener('click', (event) => { event.stopPropagation(); zoomBy(1 / 1.25); });
   zoomInBtn.addEventListener('click', (event) => { event.stopPropagation(); zoomBy(1.25); });
   resetBtn.addEventListener('click', (event) => { event.stopPropagation(); resetTransform(); });
   copyBtn.addEventListener('click', (event) => { event.stopPropagation(); void tryCopyImage(); });
-  dlBtn.addEventListener('click', (event) => {
+  dlBtn.addEventListener('click', async (event) => {
     event.stopPropagation();
-    const currentItem = getCurrentItem();
-    const a = document.createElement('a');
-    a.href = currentItem.src;
-    a.download = currentItem.filename;
-    if (currentItem.src.startsWith('data:') || currentItem.src.startsWith('blob:')) {
-      a.click();
-    } else {
-      a.target = '_blank';
-      a.click();
+    try {
+      await triggerDownload(await getExportSource(), getCurrentItem().filename);
+    } catch (error) {
+      console.error('[YouTube Rewind] Download overlay image failed', error);
+      showYtrToast(isRu ? 'Не удалось скачать изображение' : 'Could not download image');
     }
   });
   galleryPrev.addEventListener('click', (event) => {
@@ -1492,19 +3402,143 @@ function showImageOverlay(imgSrc: string, filename: string, galleryItems: Overla
     event.stopPropagation();
     setCurrentIndex(currentIndex + 1);
   });
+  if (allowDrawing) {
+    const toggleDrawTool = (tool: OverlayDrawTool) => {
+      setEyedropperMode(false);
+      if (!drawMode) drawMode = true;
+      drawTool = drawTool === tool ? 'none' : tool;
+      if (drawTool === 'none') drawTool = tool;
+      if (drawTool !== 'pencil') {
+        setColorPanelOpen(false);
+      }
+      syncToolState();
+    };
+
+    colorPresets.forEach((preset) => {
+      const presetButton = document.createElement('button');
+      presetButton.className = 'ytr-thumb-overlay-color-preset';
+      presetButton.type = 'button';
+      presetButton.style.background = preset;
+      presetButton.title = preset.toUpperCase();
+      presetButton.setAttribute('aria-label', `${isRu ? 'Цвет' : 'Color'} ${preset.toUpperCase()}`);
+      presetButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setBrushColor(preset);
+      });
+      colorPresetRow.appendChild(presetButton);
+    });
+
+    drawToggleBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setDrawMode(!drawMode);
+    });
+    pencilBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      toggleDrawTool('pencil');
+    });
+    eraserBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      toggleDrawTool('eraser');
+    });
+    clearDrawingBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      clearDrawing();
+      syncToolState();
+    });
+    undoBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      undoDrawing();
+    });
+    redoBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      redoDrawing();
+    });
+    colorTrigger.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (!drawMode) {
+        setDrawMode(true);
+        drawTool = 'pencil';
+      }
+      setEyedropperMode(false);
+      setColorPanelOpen(!colorPanelOpen);
+    });
+    colorArea.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setEyedropperMode(false);
+      setColorPanelOpen(true);
+      updateColorAreaFromPointer(event.clientX, event.clientY);
+
+      const onMove = (moveEvent: PointerEvent) => {
+        updateColorAreaFromPointer(moveEvent.clientX, moveEvent.clientY);
+      };
+      const onUp = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+      };
+
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+    colorHueInput.addEventListener('input', () => {
+      setBrushColorFromHsv({ h: Number(colorHueInput.value), s: colorHsv.s, v: colorHsv.v });
+    });
+    colorHexField.addEventListener('input', () => {
+      const normalized = normalizeHexColor(colorHexField.value, '');
+      if (normalized) {
+        setBrushColor(normalized);
+      } else {
+        colorPanelValue.textContent = colorHexField.value.toUpperCase();
+      }
+    });
+    colorHexField.addEventListener('blur', () => {
+      colorHexField.value = colorInput.value.toUpperCase();
+      colorPanelValue.textContent = colorInput.value.toUpperCase();
+    });
+    colorHexField.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      setBrushColor(normalizeHexColor(colorHexField.value, colorInput.value));
+      setColorPanelOpen(false);
+    });
+    colorEyedropperBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setEyedropperMode(!eyedropperMode);
+    });
+    colorInput.addEventListener('input', () => {
+      if (drawTool === 'none') {
+        drawTool = 'pencil';
+      }
+      setBrushColor(colorInput.value);
+      syncToolState();
+    });
+    brushSizeInput.addEventListener('input', () => {
+      updateBrushSizeValue();
+      showCenteredBrushPreview();
+      updateCursorPreview();
+    });
+  }
   document.body.appendChild(overlay);
   document.addEventListener('keydown', handler);
+  document.addEventListener('keyup', handleOverlayKeyUp);
+  document.addEventListener('pointerdown', handleOverlayPointerDown, true);
   document.documentElement.classList.add('ytr-overlay-lock-scroll');
+  window.addEventListener('resize', syncDrawingSurface);
   requestAnimationFrame(() => {
+    loadDrawingState(currentIndex);
+    updateBrushSizeValue();
+    syncColorPickerUi();
     setCurrentIndex(currentIndex, true);
     overlay.focus();
     applyTransform(false);
+    syncToolState();
   });
 }
 
 function createScreenshotAction(videoId: string, isRu: boolean, nativeActionAnchor: Element | null): HTMLDivElement {
   const wrapper = document.createElement('div');
   wrapper.className = 'ytr-utility-btn-wrap ytr-screenshot-btn-wrap';
+  wrapper.dataset.videoId = videoId;
   applyNativeActionWrapperClasses(wrapper, nativeActionAnchor, ['ytr-utility-btn-wrap', 'ytr-screenshot-btn-wrap']);
 
   const button = document.createElement('button');
@@ -1512,7 +3546,7 @@ function createScreenshotAction(videoId: string, isRu: boolean, nativeActionAnch
   button.title = isRu ? 'Сделать скриншот кадра' : 'Capture frame screenshot';
   button.setAttribute('aria-label', isRu ? 'Сделать скриншот кадра' : 'Capture frame screenshot');
   applyNativeActionButtonClasses(button, nativeActionAnchor, ['ytr-action-btn', 'ytr-action-btn-screenshot']);
-  button.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M9 4.5 7.78 6H5.25C4.56 6 4 6.56 4 7.25v9.5c0 .69.56 1.25 1.25 1.25h13.5c.69 0 1.25-.56 1.25-1.25v-9.5C20 6.56 19.44 6 18.75 6h-2.53L15 4.5H9Zm3 10.75a3.25 3.25 0 1 1 0-6.5 3.25 3.25 0 0 1 0 6.5Zm0-1.5a1.75 1.75 0 1 0 0-3.5 1.75 1.75 0 0 0 0 3.5Z"/></svg>`;
+  button.innerHTML = GOOGLE_ICON_SVGS.photoCamera;
 
   button.addEventListener('click', async (event) => {
     event.stopPropagation();
@@ -1523,11 +3557,11 @@ function createScreenshotAction(videoId: string, isRu: boolean, nativeActionAnch
 
     try {
       const shot = await captureCurrentVideoFrame(videoId);
-      if (currentSettings?.betaEnabled && currentSettings.betaScreenshotOpenPreview) {
-        showImageOverlay(shot.dataUrl, shot.filename);
-      } else {
-        triggerDownload(shot.dataUrl, shot.filename);
+      if (currentSettings?.betaVideoFrameScreenshot && currentSettings.betaScreenshotInstantDownload) {
+        await triggerDownload(shot.dataUrl, shot.filename);
         showYtrToast(isRu ? 'Скриншот сохранён' : 'Screenshot downloaded');
+      } else {
+        showImageOverlay(shot.dataUrl, shot.filename, [{ src: shot.dataUrl, filename: shot.filename, label: '1' }], 0, { drawing: true });
       }
     } catch (error) {
       console.error('[YouTube Rewind] Frame screenshot failed', error);
@@ -1542,12 +3576,27 @@ function createScreenshotAction(videoId: string, isRu: boolean, nativeActionAnch
   return wrapper;
 }
 
-// --- v0.4.0: Download Button (Thumbnail + Video) ---
+// --- v0.5.0: Download Button (Thumbnail + Video) ---
 
 let downloadBtnInjected = false;
 let downloadNavListenerAdded = false;
 let downloadMenuCloseHandler: (() => void) | null = null;
 let downloadMenuViewportListenerAdded = false;
+let downloadInjectTimers: number[] = [];
+type PortaledYtrMenu = HTMLElement & {
+  __ytrOwner?: HTMLElement | null;
+  __ytrRepositionFrame?: number | null;
+  __ytrResizeObserver?: ResizeObserver | null;
+};
+
+function scheduleDownloadButtonInjection(callback: () => void, delays: number[]): void {
+  downloadInjectTimers.forEach((timer) => clearTimeout(timer));
+  downloadInjectTimers = delays.map((delay) => window.setTimeout(callback, delay));
+}
+
+function setDownloadMenuScrollLock(locked: boolean): void {
+  document.documentElement.classList.toggle('ytr-download-menu-lock-scroll', locked);
+}
 
 function closeAllYtrMenus(): void {
   const openMenus = document.querySelectorAll('.ytr-download-menu-open') as NodeListOf<HTMLElement>;
@@ -1556,43 +3605,97 @@ function closeAllYtrMenus(): void {
     menu.style.removeProperty('left');
     menu.style.removeProperty('top');
     menu.style.removeProperty('bottom');
+    delete menu.dataset.position;
 
     const owner = (menu as HTMLElement & { __ytrOwner?: HTMLElement | null }).__ytrOwner;
     if (owner && menu.parentElement !== owner) {
       owner.appendChild(menu);
     }
   });
+  setDownloadMenuScrollLock(false);
+}
+
+function closeNativeYouTubeMenus(): void {
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  (document.activeElement as HTMLElement | null)?.blur?.();
+
+  const outsideTarget = document.body || document.documentElement;
+  ['pointerdown', 'mousedown', 'mouseup', 'click'].forEach((type) => {
+    outsideTarget.dispatchEvent(new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+    }));
+  });
+
+  document.querySelectorAll<HTMLElement>('[aria-expanded="true"]').forEach((trigger) => {
+    if (trigger.closest('.ytr-download-btn, .ytr-screenshot-btn-wrap')) return;
+    trigger.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function positionYtrMenu(menu: HTMLElement, wrapper: HTMLElement): void {
+  const viewportPadding = 12;
+  const menuGap = 12;
+  menu.style.bottom = 'auto';
+  menu.style.maxHeight = `calc(100vh - ${viewportPadding * 2}px)`;
+  const menuRect = menu.getBoundingClientRect();
+  const wrapperRect = wrapper.getBoundingClientRect();
+
+  let left = wrapperRect.right - menuRect.width;
+  left = clamp(left, viewportPadding, window.innerWidth - menuRect.width - viewportPadding);
+
+  let top = wrapperRect.bottom + menuGap;
+  let verticalPosition: 'below' | 'above' = 'below';
+  if (top + menuRect.height > window.innerHeight - viewportPadding) {
+    verticalPosition = 'above';
+    top = Math.max(viewportPadding, wrapperRect.top - menuRect.height - (menuGap + 2));
+  }
+
+  menu.style.left = `${Math.round(left)}px`;
+  menu.style.top = `${Math.round(top)}px`;
+  menu.dataset.position = verticalPosition;
+}
+
+function scheduleYtrMenuPosition(menu: HTMLElement, wrapper: HTMLElement): void {
+  const portalMenu = menu as PortaledYtrMenu;
+  if (portalMenu.__ytrRepositionFrame) {
+    cancelAnimationFrame(portalMenu.__ytrRepositionFrame);
+  }
+
+  portalMenu.__ytrRepositionFrame = requestAnimationFrame(() => {
+    portalMenu.__ytrRepositionFrame = null;
+    if (!menu.classList.contains('ytr-download-menu-open')) return;
+    positionYtrMenu(menu, wrapper);
+  });
 }
 
 function openYtrMenu(menu: HTMLElement, wrapper: HTMLElement): void {
   closeAllYtrMenus();
-  // Close YouTube's own popup menus
-  document.querySelectorAll('tp-yt-iron-dropdown[style*="display"]').forEach((d) => {
-    (d as HTMLElement).style.display = 'none';
-  });
+  closeNativeYouTubeMenus();
 
-  const portalMenu = menu as HTMLElement & { __ytrOwner?: HTMLElement | null };
+  const portalMenu = menu as PortaledYtrMenu;
   portalMenu.__ytrOwner = wrapper;
   if (menu.parentElement !== document.body) {
     document.body.appendChild(menu);
   }
 
   menu.classList.add('ytr-download-menu-open');
-  menu.style.bottom = 'auto';
-  const menuRect = menu.getBoundingClientRect();
-  const wrapperRect = wrapper.getBoundingClientRect();
-  const viewportPadding = 12;
+  setDownloadMenuScrollLock(true);
+  positionYtrMenu(menu, wrapper);
+  scheduleYtrMenuPosition(menu, wrapper);
+}
 
-  let left = wrapperRect.right - menuRect.width;
-  left = clamp(left, viewportPadding, window.innerWidth - menuRect.width - viewportPadding);
-
-  let top = wrapperRect.bottom + 8;
-  if (top + menuRect.height > window.innerHeight - viewportPadding) {
-    top = Math.max(viewportPadding, wrapperRect.top - menuRect.height - 8);
-  }
-
-  menu.style.left = `${Math.round(left)}px`;
-  menu.style.top = `${Math.round(top)}px`;
+function repositionOpenYtrMenus(): void {
+  document.querySelectorAll('.ytr-download-menu-open').forEach((menuNode) => {
+    const menu = menuNode as PortaledYtrMenu;
+    const owner = menu.__ytrOwner;
+    if (!owner?.isConnected) {
+      closeAllYtrMenus();
+      return;
+    }
+    scheduleYtrMenuPosition(menu, owner);
+  });
 }
 
 function collectClassNames(value: string | null | undefined): string[] {
@@ -1628,19 +3731,83 @@ function applyNativeActionButtonClasses(button: HTMLButtonElement, anchor: Eleme
   button.dataset.ytrNative = template.buttonClassName ? 'true' : 'false';
 }
 
-function setupDownloadThumbnailButton(s: Settings): void {
-  const screenshotEnabled = !!(s.betaEnabled && s.betaVideoFrameScreenshot);
-  const downloadEnabled = !!(s.betaEnabled && s.downloadThumbnailButton);
+type DownloadThumbnailVariant = {
+  candidates: string[];
+  label: string;
+  filenameSuffix: string;
+  kind: 'original' | 'creator-test' | 'youtube-test';
+  metaLabel: string;
+  order: number;
+};
 
-  if (!downloadEnabled && !screenshotEnabled) {
+type LoadedDownloadThumbnail = DownloadThumbnailVariant & {
+  url: string;
+  el: HTMLImageElement;
+  hash?: string | null;
+};
+
+const DOWNLOAD_THUMBNAIL_BASE_NAMES = ['maxresdefault', 'sddefault', 'hqdefault', 'mqdefault', 'default'] as const;
+
+function buildThumbnailCandidateUrls(videoId: string, names: string[]): string[] {
+  const baseUrl = `https://i.ytimg.com/vi/${videoId}/`;
+  const seen = new Set<string>();
+  return names
+    .map((name) => `${baseUrl}${name}.jpg`)
+    .filter((url) => {
+      if (seen.has(url)) return false;
+      seen.add(url);
+      return true;
+    });
+}
+
+function normalizeThumbnailUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = '';
+    const entries = [...parsed.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b));
+    parsed.search = '';
+    for (const [key, value] of entries) {
+      parsed.searchParams.append(key, value);
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+function getDownloadThumbnailVariants(videoId: string): DownloadThumbnailVariant[] {
+  return [
+    {
+      candidates: buildThumbnailCandidateUrls(videoId, [
+        'maxresdefault',
+        'sddefault',
+        'hqdefault',
+        'mqdefault',
+        'default',
+      ]),
+      label: 'Original',
+      filenameSuffix: 'original',
+      kind: 'original',
+      metaLabel: '',
+      order: 0,
+    },
+  ];
+}
+
+function setupDownloadThumbnailButton(s: Settings): void {
+  const screenshotEnabled = !!s.betaVideoFrameScreenshot;
+  const downloadEnabled = !!s.downloadThumbnailButton;
+  const isWatchPage = window.location.pathname === '/watch';
+
+  if (!isWatchPage || (!downloadEnabled && !screenshotEnabled)) {
     document.querySelectorAll('.ytr-download-btn, .ytr-screenshot-btn-wrap').forEach((el) => el.remove());
     downloadBtnInjected = false;
     return;
   }
 
   const injectButton = () => {
-    const downloadEnabled = !!(currentSettings?.betaEnabled && currentSettings.downloadThumbnailButton);
-    const screenshotEnabledNow = !!(currentSettings?.betaEnabled && currentSettings.betaVideoFrameScreenshot);
+    const downloadEnabled = !!currentSettings?.downloadThumbnailButton;
+    const screenshotEnabledNow = !!currentSettings?.betaVideoFrameScreenshot;
     if (!downloadEnabled && !screenshotEnabledNow) return;
 
     const videoId = new URLSearchParams(window.location.search).get('v');
@@ -1656,9 +3823,18 @@ function setupDownloadThumbnailButton(s: Settings): void {
       ? moreBtn
       : insertTarget.querySelector('button, #button-shape, yt-button-shape');
 
-    const isRu = currentSettings?.language === 'ru';
+    const isRu = getContentLocale() === 'ru';
     let screenshotWrapper = document.querySelector('.ytr-screenshot-btn-wrap') as HTMLDivElement | null;
     let downloadWrapper = document.querySelector('.ytr-download-btn') as HTMLDivElement | null;
+
+    if (screenshotWrapper?.dataset.videoId !== videoId) {
+      screenshotWrapper?.remove();
+      screenshotWrapper = null;
+    }
+    if (downloadWrapper?.dataset.videoId !== videoId) {
+      downloadWrapper?.remove();
+      downloadWrapper = null;
+    }
 
     if (!screenshotEnabledNow && screenshotWrapper) {
       screenshotWrapper.remove();
@@ -1713,129 +3889,113 @@ function setupDownloadThumbnailButton(s: Settings): void {
     if (downloadEnabled && !downloadWrapper) {
       downloadWrapper = document.createElement('div');
       downloadWrapper.className = 'ytr-download-btn ytr-utility-btn-wrap';
+      downloadWrapper.dataset.videoId = videoId;
 
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.title = isRu ? 'Скачать и посмотреть превью' : 'Download and preview thumbnails';
       btn.setAttribute('aria-label', isRu ? 'Скачать и посмотреть превью' : 'Download and preview thumbnails');
-      btn.innerHTML = `<svg viewBox="0 -960 960 960" width="24" height="24" fill="currentColor"><path d="M469-327q-5-2-10-7L308-485q-9-9.27-8.5-21.64.5-12.36 9.11-21.36 9.39-9 21.89-9t21.5 9l98 99v-341q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v341l99-99q8.8-9 20.9-8.5 12.1.5 21.49 9.5 8.61 9 8.61 21.5t-9 21.5L501-334q-5 5-10.13 7-5.14 2-11 2-5.87 0-10.87-2ZM220-160q-24 0-42-18t-18-42v-113q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v113h520v-113q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v113q0 24-18 42t-42 18H220Z"/></svg>`;
+      btn.innerHTML = `<svg viewBox="0 -960 960 960" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M480-320 280-520l42-44 128 128v-324h60v324l128-128 42 44-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h60v120h520v-120h60v120q0 33-23.5 56.5T720-160H240Z"/></svg>`;
 
       const menu = document.createElement('div');
       menu.className = 'ytr-download-menu';
 
-      const carouselOuter = document.createElement('div');
-      carouselOuter.className = 'ytr-carousel';
+      const previewVariant = getDownloadThumbnailVariants(videoId)[0];
+      let loadedThumb: LoadedDownloadThumbnail | null = null;
+      let thumbnailPrepared = false;
 
-      const carouselViewport = document.createElement('div');
-      carouselViewport.className = 'ytr-carousel-viewport';
+      const previewButton = document.createElement('button');
+      previewButton.className = 'ytr-download-preview';
+      previewButton.type = 'button';
+      previewButton.title = isRu ? 'Открыть превью' : 'Open thumbnail preview';
+      previewButton.disabled = true;
 
-      const track = document.createElement('div');
-      track.className = 'ytr-carousel-track';
+      const previewImage = document.createElement('img');
+      previewImage.alt = previewVariant.label;
+      previewImage.className = 'ytr-download-preview-img';
+      previewImage.loading = 'eager';
+      previewImage.decoding = 'async';
+      previewImage.crossOrigin = 'anonymous';
 
-      const thumbVariants = [
-        { url: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`, label: 'Main' },
-        { url: `https://img.youtube.com/vi/${videoId}/maxres1.jpg`, label: 'B' },
-        { url: `https://img.youtube.com/vi/${videoId}/maxres2.jpg`, label: 'C' },
-        { url: `https://img.youtube.com/vi/${videoId}/maxres3.jpg`, label: 'D' },
-      ];
-      const loadedThumbs: { url: string; label: string; el: HTMLImageElement; order: number }[] = [];
-      let carouselIdx = 0;
+      const previewLabel = document.createElement('div');
+      previewLabel.className = 'ytr-download-preview-label';
+      previewLabel.textContent = isRu ? 'Открыть превью' : 'Click to preview';
 
-      for (const [variantIndex, variant] of thumbVariants.entries()) {
-        const img = document.createElement('img');
-        img.src = variant.url;
-        img.alt = variant.label;
-        img.className = 'ytr-carousel-img';
-        img.style.display = 'none';
-        img.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          const galleryItems = loadedThumbs.map((thumb) => ({
-            src: thumb.url,
-            filename: `thumbnail-${videoId}-${thumb.label.toLowerCase()}.jpg`,
-            label: thumb.label,
-          }));
-          const activeIndex = Math.max(0, galleryItems.findIndex((thumb) => thumb.src === variant.url));
-          showImageOverlay(
-            variant.url,
-            `thumbnail-${videoId}-${variant.label.toLowerCase()}.jpg`,
-            galleryItems,
-            activeIndex,
-          );
-        });
-        const removeInvalid = () => {
-          img.remove();
-          const idx = loadedThumbs.findIndex((t) => t.el === img);
-          if (idx >= 0) loadedThumbs.splice(idx, 1);
-          refreshCarousel();
-        };
-        img.addEventListener('error', removeInvalid);
-        img.addEventListener('load', () => {
-          if (img.naturalWidth <= 120) {
-            removeInvalid();
+      previewButton.appendChild(previewImage);
+      previewButton.appendChild(previewLabel);
+      menu.appendChild(previewButton);
+
+      previewButton.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        if (!loadedThumb) return;
+        showImageOverlay(
+          loadedThumb.url,
+          `thumbnail-${videoId}-${loadedThumb.filenameSuffix}.jpg`,
+          [{
+            src: loadedThumb.url,
+            filename: `thumbnail-${videoId}-${loadedThumb.filenameSuffix}.jpg`,
+            label: loadedThumb.label,
+            kind: loadedThumb.kind,
+            metaLabel: loadedThumb.metaLabel,
+          }],
+          0,
+          { drawing: true },
+        );
+      });
+
+      function prepareThumbnail() {
+        if (thumbnailPrepared) return;
+        thumbnailPrepared = true;
+
+        const loadCandidate = (candidateIndex: number) => {
+          if (!downloadWrapper?.isConnected) return;
+          const nextUrl = previewVariant.candidates[candidateIndex];
+          if (!nextUrl) {
+            previewButton.disabled = true;
             return;
           }
-          img.style.display = '';
-          if (!loadedThumbs.some((thumb) => thumb.el === img)) {
-            loadedThumbs.push({ url: variant.url, label: variant.label, el: img, order: variantIndex });
-            loadedThumbs.sort((a, b) => a.order - b.order);
-          }
-          refreshCarousel();
+          previewImage.dataset.candidateIndex = String(candidateIndex);
+          previewImage.src = nextUrl;
+        };
+
+        previewImage.addEventListener('error', () => {
+          const candidateIndex = Number.parseInt(previewImage.dataset.candidateIndex || '0', 10);
+          loadCandidate(candidateIndex + 1);
         });
-        track.appendChild(img);
-      }
 
-      const prevArrow = document.createElement('button');
-      prevArrow.className = 'ytr-carousel-arrow ytr-carousel-prev';
-      prevArrow.type = 'button';
-      prevArrow.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>`;
-      prevArrow.addEventListener('click', (e) => { e.stopPropagation(); goSlide(-1); });
+        previewImage.addEventListener('load', () => {
+          if (!downloadWrapper?.isConnected) return;
 
-      const nextArrow = document.createElement('button');
-      nextArrow.className = 'ytr-carousel-arrow ytr-carousel-next';
-      nextArrow.type = 'button';
-      nextArrow.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>`;
-      nextArrow.addEventListener('click', (e) => { e.stopPropagation(); goSlide(1); });
+          const candidateIndex = Number.parseInt(previewImage.dataset.candidateIndex || '0', 10);
+          const isLastCandidate = candidateIndex >= previewVariant.candidates.length - 1;
+          const hasMeaningfulSize = previewImage.naturalWidth > MIN_FALLBACK_THUMBNAIL_WIDTH
+            && previewImage.naturalHeight > MIN_FALLBACK_THUMBNAIL_HEIGHT;
 
-      const dotsRow = document.createElement('div');
-      dotsRow.className = 'ytr-carousel-dots';
-
-      const previewHint = document.createElement('div');
-      previewHint.className = 'ytr-download-menu-hint';
-      previewHint.textContent = isRu ? 'Нажми на превью, чтобы открыть его в большом просмотре' : 'Click a thumbnail to open the large preview';
-
-      function refreshCarousel() {
-        if (carouselIdx >= loadedThumbs.length) carouselIdx = Math.max(0, loadedThumbs.length - 1);
-        track.style.transform = `translateX(-${carouselIdx * 100}%)`;
-        prevArrow.style.visibility = carouselIdx > 0 ? 'visible' : 'hidden';
-        nextArrow.style.visibility = carouselIdx < loadedThumbs.length - 1 ? 'visible' : 'hidden';
-        dotsRow.innerHTML = '';
-        if (loadedThumbs.length > 1) {
-          for (let i = 0; i < loadedThumbs.length; i++) {
-            const d = document.createElement('span');
-            d.className = 'ytr-carousel-dot' + (i === carouselIdx ? ' active' : '');
-            d.addEventListener('click', (e) => { e.stopPropagation(); carouselIdx = i; refreshCarousel(); });
-            dotsRow.appendChild(d);
+          if (!hasMeaningfulSize && !isLastCandidate) {
+            loadCandidate(candidateIndex + 1);
+            return;
           }
-        }
-        carouselOuter.dataset.multi = String(loadedThumbs.length > 1);
-        previewHint.style.display = loadedThumbs.length > 0 ? 'block' : 'none';
+
+          if (previewImage.naturalWidth <= 0 || previewImage.naturalHeight <= 0) {
+            previewButton.disabled = true;
+            return;
+          }
+
+          loadedThumb = {
+            ...previewVariant,
+            url: normalizeThumbnailUrl(previewImage.currentSrc || previewImage.src),
+            el: previewImage,
+            hash: getImageFingerprint(previewImage),
+          };
+          previewButton.disabled = false;
+
+          if (downloadWrapper && menu.classList.contains('ytr-download-menu-open')) {
+            scheduleYtrMenuPosition(menu, downloadWrapper);
+          }
+        });
+
+        loadCandidate(0);
       }
-
-      function goSlide(dir: number) {
-        carouselIdx = Math.max(0, Math.min(loadedThumbs.length - 1, carouselIdx + dir));
-        refreshCarousel();
-      }
-
-      carouselViewport.appendChild(track);
-      carouselOuter.appendChild(prevArrow);
-      carouselOuter.appendChild(carouselViewport);
-      carouselOuter.appendChild(nextArrow);
-      menu.appendChild(carouselOuter);
-      menu.appendChild(dotsRow);
-      menu.appendChild(previewHint);
-
-      setTimeout(refreshCarousel, 50);
-      setTimeout(refreshCarousel, 1500);
 
       const thumbItem = document.createElement('button');
       thumbItem.className = 'ytr-download-menu-item';
@@ -1844,10 +4004,8 @@ function setupDownloadThumbnailButton(s: Settings): void {
       thumbItem.addEventListener('click', (e) => {
         e.stopPropagation();
         closeAllYtrMenus();
-        const cur = loadedThumbs[carouselIdx];
-        if (cur) {
-          triggerDownload(cur.url, `thumbnail-${videoId}${cur.label === 'Main' ? '' : '-' + cur.label.toLowerCase()}.jpg`);
-        }
+        const downloadUrl = loadedThumb?.url || previewVariant.candidates[0];
+        void triggerDownload(downloadUrl, `thumbnail-${videoId}-${previewVariant.filenameSuffix}.jpg`);
       });
 
       const videoItem = document.createElement('button');
@@ -1863,13 +4021,23 @@ function setupDownloadThumbnailButton(s: Settings): void {
       menu.appendChild(thumbItem);
       menu.appendChild(videoItem);
 
-      btn.addEventListener('click', (e) => {
+      const portaledMenu = menu as PortaledYtrMenu;
+      if (!portaledMenu.__ytrResizeObserver) {
+        portaledMenu.__ytrResizeObserver = new ResizeObserver(() => {
+          if (downloadWrapper && menu.classList.contains('ytr-download-menu-open')) {
+            scheduleYtrMenuPosition(menu, downloadWrapper);
+          }
+        });
+        portaledMenu.__ytrResizeObserver.observe(menu);
+      }
+
+      btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         if (menu.classList.contains('ytr-download-menu-open')) {
           closeAllYtrMenus();
         } else {
+          prepareThumbnail();
           openYtrMenu(menu, downloadWrapper!);
-          refreshCarousel();
         }
       });
 
@@ -1880,8 +4048,7 @@ function setupDownloadThumbnailButton(s: Settings): void {
 
       if (!downloadMenuViewportListenerAdded) {
         downloadMenuViewportListenerAdded = true;
-        window.addEventListener('resize', closeAllYtrMenus);
-        document.addEventListener('scroll', closeAllYtrMenus, true);
+        window.addEventListener('resize', repositionOpenYtrMenus);
       }
 
       downloadWrapper.appendChild(btn);
@@ -1908,18 +4075,20 @@ function setupDownloadThumbnailButton(s: Settings): void {
   if (!downloadNavListenerAdded) {
     downloadNavListenerAdded = true;
     document.addEventListener('yt-navigate-finish', () => {
-      setTimeout(injectButton, 1000);
-      setTimeout(injectButton, 3000);
+      scheduleDownloadButtonInjection(injectButton, [900, 2200]);
     });
   }
 
-  setTimeout(injectButton, 1500);
-  setTimeout(injectButton, 3000);
+  scheduleDownloadButtonInjection(injectButton, [900, 2200]);
 }
 
 // --- Fullscreen Detection (hide timer overlay) ---
 
+let fullscreenDetectionSetup = false;
+
 function setupFullscreenDetection(): void {
+  if (fullscreenDetectionSetup) return;
+  fullscreenDetectionSetup = true;
   const updateFullscreen = () => {
     const isFs = !!document.fullscreenElement ||
       !!document.querySelector('ytd-watch-flexy[fullscreen]');
@@ -1932,10 +4101,13 @@ function setupFullscreenDetection(): void {
   // Also observe the player's fullscreen attribute
   const checkPlayerFs = () => {
     const player = document.querySelector('ytd-watch-flexy');
-    if (player) {
-      const obs = new MutationObserver(updateFullscreen);
-      obs.observe(player, { attributes: true, attributeFilter: ['fullscreen'] });
-    }
+    if (!player) return;
+    if (observedFullscreenPlayer === player && playerFullscreenObserver) return;
+
+    playerFullscreenObserver?.disconnect();
+    observedFullscreenPlayer = player;
+    playerFullscreenObserver = new MutationObserver(updateFullscreen);
+    playerFullscreenObserver.observe(player, { attributes: true, attributeFilter: ['fullscreen'] });
   };
   setTimeout(checkPlayerFs, 2000);
   document.addEventListener('yt-navigate-finish', () => setTimeout(checkPlayerFs, 1500));
@@ -1943,18 +4115,23 @@ function setupFullscreenDetection(): void {
 
 // --- MutationObserver ---
 
-const TAGS_NEEDING_EXPLORE = new Set(['YTD-RICH-SECTION-RENDERER']);
-const TAGS_NEEDING_SIDEBAR = new Set(['YTD-GUIDE-SECTION-RENDERER', 'YTD-GUIDE-RENDERER']);
-const TAGS_NEEDING_ACTION = new Set(['YT-BUTTON-VIEW-MODEL', 'YTD-BUTTON-RENDERER', 'YTD-DOWNLOAD-BUTTON-RENDERER']);
-const TAGS_NEEDING_FEED = new Set(['YTD-RICH-ITEM-RENDERER', 'YTD-VIDEO-RENDERER', 'YTD-COMPACT-VIDEO-RENDERER', 'YTD-GRID-VIDEO-RENDERER']);
-
 let pendingFlags = 0; // bitmask: 1=explore, 2=sidebar, 4=action, 8=feed
 let rafId = 0;
+
+function getActiveScanFlags(): number {
+  let flags = 0;
+  if (needsExploreTags()) flags |= 1;
+  if (needsSidebarTags()) flags |= 2;
+  if (needsActionTags()) flags |= 4;
+  if (needsFeedTags()) flags |= 8;
+  return flags;
+}
 
 function flushPending(): void {
   rafId = 0;
   const flags = pendingFlags;
   pendingFlags = 0;
+  syncPageContextFlags();
   if (flags & 1) tagExploreSections();
   if (flags & 2) tagSidebarSections();
   if (flags & 4) tagActionButtons();
@@ -1962,47 +4139,102 @@ function flushPending(): void {
 }
 
 function scheduleScan(flag: number): void {
+  if (!flag) return;
   pendingFlags |= flag;
   if (!rafId) rafId = requestAnimationFrame(flushPending);
 }
 
+function getObservedScanTargets(): Array<{ root: Element; flags: number }> {
+  const targets: Array<{ root: Element; flags: number }> = [];
+  const exploreFlags = needsExploreTags() ? 1 : 0;
+  const feedFlags = needsFeedTags() ? 8 : 0;
+
+  const homeRoot = document.querySelector('ytd-browse[page-subtype="home"]');
+  if (homeRoot && (exploreFlags || feedFlags)) {
+    targets.push({ root: homeRoot, flags: exploreFlags | feedFlags });
+  }
+
+  const searchRoot = document.querySelector('ytd-search');
+  if (searchRoot && feedFlags) {
+    targets.push({ root: searchRoot, flags: feedFlags });
+  }
+
+  const guideRoot = document.querySelector('ytd-guide-renderer, tp-yt-app-drawer #guide-content');
+  if (guideRoot && needsSidebarTags()) {
+    targets.push({ root: guideRoot, flags: 2 });
+  }
+
+  const watchActionsRoot = document.querySelector('ytd-watch-metadata');
+  if (watchActionsRoot && needsActionTags()) {
+    targets.push({ root: watchActionsRoot, flags: 4 });
+  }
+
+  return targets;
+}
+
+function refreshObservedScanRoots(): void {
+  if (!documentScanObserver) return;
+  documentScanObserver.disconnect();
+
+  if (!getActiveScanFlags()) return;
+
+  for (const { root } of getObservedScanTargets()) {
+    documentScanObserver.observe(root, {
+      childList: true,
+      subtree: true,
+    });
+  }
+}
+
 function startObserver(): void {
-  const observer = new MutationObserver((mutations) => {
+  if (documentScanObserver) return;
+
+  documentScanObserver = new MutationObserver((mutations) => {
+    const activeFlags = getActiveScanFlags();
+    if (!activeFlags) return;
+
     let flags = 0;
 
     for (const mutation of mutations) {
       if (mutation.type !== 'childList') continue;
-      for (const node of mutation.addedNodes) {
-        if (!(node instanceof HTMLElement)) continue;
-        const tag = node.tagName;
+      if (isObserverIgnoredNode(mutation.target)) continue;
 
-        if (!(flags & 1) && TAGS_NEEDING_EXPLORE.has(tag)) flags |= 1;
-        if (!(flags & 2) && TAGS_NEEDING_SIDEBAR.has(tag)) flags |= 2;
-        if (!(flags & 4) && (TAGS_NEEDING_ACTION.has(tag) || node.id === 'top-level-buttons-computed')) flags |= 4;
-        if (!(flags & 8) && TAGS_NEEDING_FEED.has(tag)) flags |= 8;
-        // YTD-BROWSE triggers all scans (full page navigation)
-        if (tag === 'YTD-BROWSE') { flags = 15; break; }
-
-        if (flags === 15) break;
+      const target = mutation.target as Element;
+      if (!(flags & 2) && needsSidebarTags() && target.closest('ytd-guide-renderer, tp-yt-app-drawer, #guide-content')) {
+        flags |= 2;
       }
+      if (!(flags & 4) && needsActionTags() && target.closest('ytd-watch-metadata')) {
+        flags |= 4;
+      }
+      if (target.closest('ytd-browse[page-subtype="home"]')) {
+        if (!(flags & 1) && needsExploreTags()) flags |= 1;
+        if (!(flags & 8) && needsFeedTags()) flags |= 8;
+      }
+      if (!(flags & 8) && needsFeedTags() && target.closest('ytd-search')) {
+        flags |= 8;
+      }
+
       if (flags === 15) break;
     }
 
     if (flags) scheduleScan(flags);
   });
 
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-  });
+  refreshObservedScanRoots();
 
   // Initial scan after YouTube renders content
-  setTimeout(() => scheduleScan(15), 800);
-  setTimeout(() => scheduleScan(15), 2500);
+  const initialFlags = getActiveScanFlags();
+  if (initialFlags) {
+    fullScanTimers.forEach((timer) => clearTimeout(timer));
+    fullScanTimers = [800, 2500].map((delay) => window.setTimeout(() => scheduleScan(initialFlags), delay));
+  }
 
   // Re-scan on YouTube SPA navigation (page changes without full reload)
   document.addEventListener('yt-navigate-finish', () => {
-    setTimeout(() => scheduleScan(15), 500);
-    setTimeout(() => scheduleScan(15), 2000);
+    refreshObservedScanRoots();
+    const navigationFlags = getActiveScanFlags();
+    if (!navigationFlags) return;
+    fullScanTimers.forEach((timer) => clearTimeout(timer));
+    fullScanTimers = [500, 2000].map((delay) => window.setTimeout(() => scheduleScan(navigationFlags), delay));
   });
 }

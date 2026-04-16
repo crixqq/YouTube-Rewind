@@ -1,16 +1,30 @@
 <script lang="ts">
-  import { DEFAULT_SETTINGS, loadSettings, saveSettings, PROFILES, type Settings, type CustomProfile } from '@/lib/settings';
+  import { DEFAULT_SETTINGS, loadSettings, saveSettings, PROFILES, clearWatchTimeState, type Settings, type CustomProfile } from '@/lib/settings';
+  import { createProfileExportPayload, createSettingsExportPayload, parseSettingsTransfer, stringifySettingsTransfer } from '@/lib/settings-transfer';
   import { t, setLocale, allTranslations } from '@/lib/i18n';
   import SettingsSection from '@/components/SettingsSection.svelte';
   import Toggle from '@/components/Toggle.svelte';
   import Slider from '@/components/Slider.svelte';
   import ShapePicker from '@/components/ShapePicker.svelte';
   import ChipGroup from '@/components/ChipGroup.svelte';
+  import ColorPicker from '@/components/ColorPicker.svelte';
 
   const urlParams = new URLSearchParams(window.location.search);
   const isStandaloneView = urlParams.get('view') === 'page';
-  const MAX_LOGO_FILE_SIZE = 2 * 1024 * 1024;
+  const MAX_LOGO_IMAGE_FILE_SIZE = 2 * 1024 * 1024;
+  const MAX_LOGO_VIDEO_FILE_SIZE = 16 * 1024 * 1024;
   const LOGO_ACCEPT = 'image/png,image/jpeg,image/gif,image/svg+xml,image/webp,video/mp4,video/webm,video/ogg';
+  const BUILTIN_REWIND_LOGO_URL = browser.runtime.getURL('logo-header.png');
+  const LOGO_VARIANTS: Settings['logoVariant'][] = ['youtube', 'rewind', 'custom'];
+  const THEME_PRESETS = [
+    { id: 'default', label: 'themePresetDefault', dark: '#c8bfff', light: '#443795' },
+    { id: 'twilight', label: 'themePresetTwilight', dark: '#9fb4ff', light: '#3554a5' },
+    { id: 'mint', label: 'themePresetMint', dark: '#8bdcc7', light: '#2d6b5a' },
+    { id: 'rose', label: 'themePresetRose', dark: '#f0bdd8', light: '#8d4569' },
+    { id: 'ocean', label: 'themePresetOcean', dark: '#7ed8ff', light: '#155993' },
+    { id: 'amber', label: 'themePresetAmber', dark: '#f3c98c', light: '#8d5b17' },
+  ] as const;
+  type ResolvedThemeMode = Exclude<Settings['interfaceThemeMode'], 'auto'>;
 
   let settings = $state<Settings>({ ...DEFAULT_SETTINGS });
   let loaded = $state(false);
@@ -22,7 +36,7 @@
   let searchFocused = $state(false);
 
   // Export/Import
-  type DataFeedback = '' | 'copied' | 'imported' | 'error' | 'profile';
+  type DataFeedback = '' | 'copied' | 'imported' | 'error' | 'profile' | 'reset';
   let dataFeedback = $state<DataFeedback>('');
   let feedbackTimeout: ReturnType<typeof setTimeout>;
   type SheetFeedback = { text: string; type: 'ok' | 'error' } | null;
@@ -32,6 +46,7 @@
   let sheetFeedback = $state<SheetFeedback>(null);
   let sheetFeedbackTimeout: ReturnType<typeof setTimeout>;
   let betaConfirmOpen = $state(false);
+  let logoAnimationConfirmOpen = $state(false);
 
   let importDragging = $state(false);
   let importPasting = $state(false);
@@ -42,7 +57,11 @@
   let logoDragging = $state(false);
   let logoPasting = $state(false);
   let logoDraftUrl = $state('');
-  let logoDraftRatio = $state(0);
+  let systemPrefersDark = $state(true);
+  type LogoScaleKey = 'youtubeLogoScale' | 'rewindLogoScale' | 'customLogoScale';
+  let developerConfirmOpen = $state(false);
+  let developerFeedback = $state<SheetFeedback>(null);
+  let developerFeedbackTimeout: ReturnType<typeof setTimeout>;
 
   function formatPercent(value: number): string {
     return `${Math.round(value)}%`;
@@ -51,6 +70,394 @@
   function parsePercent(text: string): number {
     const numeric = parseInt(text.replace('%', '').trim(), 10);
     return Number.isNaN(numeric) ? 100 : numeric;
+  }
+
+  function clampHue(value: number): number {
+    return Math.min(360, Math.max(0, Math.round(value)));
+  }
+
+  function clamp01(value: number): number {
+    return Math.min(1, Math.max(0, value));
+  }
+
+  function normalizeThemeMode(mode: unknown): Settings['interfaceThemeMode'] {
+    if (mode === 'light' || mode === 'dark') return mode;
+    return 'auto';
+  }
+
+  function resolveThemeMode(mode: Settings['interfaceThemeMode'], prefersDark = systemPrefersDark): ResolvedThemeMode {
+    if (mode === 'auto') return prefersDark ? 'dark' : 'light';
+    return mode;
+  }
+
+  function getOppositeThemeMode(mode: ResolvedThemeMode): ResolvedThemeMode {
+    return mode === 'dark' ? 'light' : 'dark';
+  }
+
+  function hslColor(hue: number, saturation: number, lightness: number): string {
+    return `hsl(${Math.round(hue)} ${Math.round(saturation)}% ${Math.round(lightness)}%)`;
+  }
+
+  function clampPercent(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function hexFromHsl(hue: number, saturation: number, lightness: number): string {
+    const h = ((hue % 360) + 360) % 360 / 360;
+    const s = Math.min(1, Math.max(0, saturation / 100));
+    const l = Math.min(1, Math.max(0, lightness / 100));
+
+    if (s === 0) {
+      const gray = Math.round(l * 255);
+      return `#${gray.toString(16).padStart(2, '0').repeat(3)}`;
+    }
+
+    const hueToRgb = (p: number, q: number, t: number): number => {
+      let next = t;
+      if (next < 0) next += 1;
+      if (next > 1) next -= 1;
+      if (next < 1 / 6) return p + (q - p) * 6 * next;
+      if (next < 1 / 2) return q;
+      if (next < 2 / 3) return p + (q - p) * (2 / 3 - next) * 6;
+      return p;
+    };
+
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    const r = Math.round(hueToRgb(p, q, h + 1 / 3) * 255);
+    const g = Math.round(hueToRgb(p, q, h) * 255);
+    const b = Math.round(hueToRgb(p, q, h - 1 / 3) * 255);
+    return `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+  }
+
+  function hexFromRgb(r: number, g: number, b: number): string {
+    return `#${[r, g, b].map((channel) => Math.min(255, Math.max(0, Math.round(channel))).toString(16).padStart(2, '0')).join('')}`;
+  }
+
+  function rgbToHue(r: number, g: number, b: number, fallbackHue = DEFAULT_SETTINGS.interfaceThemeHue): number {
+    const red = clamp01(r / 255);
+    const green = clamp01(g / 255);
+    const blue = clamp01(b / 255);
+    const max = Math.max(red, green, blue);
+    const min = Math.min(red, green, blue);
+    const delta = max - min;
+
+    if (delta < 0.01) return clampHue(fallbackHue);
+
+    let hue = 0;
+    if (max === red) {
+      hue = ((green - blue) / delta) % 6;
+    } else if (max === green) {
+      hue = (blue - red) / delta + 2;
+    } else {
+      hue = (red - green) / delta + 4;
+    }
+
+    return clampHue(hue * 60);
+  }
+
+  function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
+    const red = clamp01(r / 255);
+    const green = clamp01(g / 255);
+    const blue = clamp01(b / 255);
+    const max = Math.max(red, green, blue);
+    const min = Math.min(red, green, blue);
+    const delta = max - min;
+    let hue = 0;
+    const lightness = (max + min) / 2;
+    const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
+
+    if (delta !== 0) {
+      if (max === red) hue = ((green - blue) / delta) % 6;
+      else if (max === green) hue = (blue - red) / delta + 2;
+      else hue = (red - green) / delta + 4;
+    }
+
+    return {
+      h: ((hue * 60) + 360) % 360,
+      s: saturation,
+      l: lightness,
+    };
+  }
+
+  function parseHexColor(value: string): [number, number, number] | null {
+    const normalized = value.trim().toLowerCase();
+    const match = normalized.match(/^#([0-9a-f]{6})$/i);
+    if (!match) return null;
+    return [
+      Number.parseInt(normalized.slice(1, 3), 16),
+      Number.parseInt(normalized.slice(3, 5), 16),
+      Number.parseInt(normalized.slice(5, 7), 16),
+    ];
+  }
+
+  function parseRgbChannels(value: string): [number, number, number] | null {
+    const match = value.match(/rgba?\(([^)]+)\)/i);
+    if (!match) return null;
+    const parts = match[1].split(',').slice(0, 3).map((part) => Number.parseFloat(part.trim()));
+    if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) return null;
+    return [
+      Math.min(255, Math.max(0, Math.round(parts[0]))),
+      Math.min(255, Math.max(0, Math.round(parts[1]))),
+      Math.min(255, Math.max(0, Math.round(parts[2]))),
+    ];
+  }
+
+  function mixHexColors(first: string, second: string, ratio = 0.5): string {
+    const a = parseHexColor(first);
+    const b = parseHexColor(second);
+    if (!a || !b) return first;
+    const weight = clamp01(ratio);
+    return hexFromRgb(
+      a[0] * weight + b[0] * (1 - weight),
+      a[1] * weight + b[1] * (1 - weight),
+      a[2] * weight + b[2] * (1 - weight),
+    );
+  }
+
+  function getSeedThemeColor(value: string | undefined = settings.interfaceThemeColor): string {
+    return parseHexColor(value || '') ? value!.toLowerCase() : DEFAULT_SETTINGS.interfaceThemeColor;
+  }
+
+  function buildThemeColorPatch(color: string, fallbackHue = settings.interfaceThemeHue): Pick<Settings, 'interfaceThemeColor' | 'interfaceThemeHue'> {
+    const nextColor = getSeedThemeColor(color);
+    const rgb = parseHexColor(nextColor) || parseHexColor(DEFAULT_SETTINGS.interfaceThemeColor)!;
+    return {
+      interfaceThemeColor: nextColor,
+      interfaceThemeHue: rgbToHue(rgb[0], rgb[1], rgb[2], fallbackHue),
+    };
+  }
+
+  function normalizeThemeSeedColor(color: string): string {
+    const rgb = parseHexColor(color);
+    if (!rgb) return DEFAULT_SETTINGS.interfaceThemeColor;
+    const original = hexFromRgb(rgb[0], rgb[1], rgb[2]).toLowerCase();
+    const hsl = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+    if (hsl.s >= 0.06 && hsl.l >= 0.22 && hsl.l <= 0.92) {
+      return original;
+    }
+    const saturation = hsl.s < 0.06 ? 0.08 : hsl.s;
+    const lightness = clamp01(Math.min(0.92, Math.max(0.22, hsl.l)));
+    return hexFromHsl(hsl.h, saturation * 100, lightness * 100);
+  }
+
+  function sanitizeThemeSeedColor(mode: ResolvedThemeMode, color: string): string {
+    const rgb = parseHexColor(normalizeThemeSeedColor(color));
+    if (!rgb) return DEFAULT_SETTINGS.interfaceThemeColor;
+    const hsl = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+    const saturation = hsl.s < 0.08 ? 0.18 : hsl.s;
+    const lightness = mode === 'dark'
+      ? clamp01(Math.min(0.92, Math.max(0.58, hsl.l)))
+      : clamp01(Math.min(0.9, Math.max(0.16, hsl.l)));
+
+    return hexFromHsl(hsl.h, saturation * 100, lightness * 100);
+  }
+
+  function resolveThemeColorInput(value: string): { color: string; hue: number } | null {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const probe = document.createElement('span');
+    probe.style.color = '';
+    probe.style.color = trimmed;
+    if (!probe.style.color) return null;
+    document.body.appendChild(probe);
+    const computed = getComputedStyle(probe).color;
+    probe.remove();
+    const channels = parseRgbChannels(computed);
+    if (!channels) return null;
+    return {
+      color: hexFromRgb(channels[0], channels[1], channels[2]),
+      hue: rgbToHue(channels[0], channels[1], channels[2], settings.interfaceThemeHue),
+    };
+  }
+
+  function getThemePrimaryColor(mode: ResolvedThemeMode, seedColor = getSeedThemeColor()): string {
+    const [red, green, blue] = parseHexColor(seedColor) || parseHexColor(DEFAULT_SETTINGS.interfaceThemeColor)!;
+    const { h, s } = rgbToHsl(red, green, blue);
+    if (mode === 'light') {
+      return hexFromHsl(h, clampPercent(s * 100 * 0.46, 34, 56), 40);
+    }
+    return sanitizeThemeSeedColor('dark', seedColor);
+  }
+
+  function getThemePresetColor(
+    preset: typeof THEME_PRESETS[number],
+    mode: ResolvedThemeMode = resolveThemeMode(settings.interfaceThemeMode),
+  ): string {
+    return (mode === 'light' ? preset.light : preset.dark).toLowerCase();
+  }
+
+  function findMatchingThemePreset(color: string, mode: ResolvedThemeMode): typeof THEME_PRESETS[number] | null {
+    const normalizedColor = getSeedThemeColor(color);
+    return THEME_PRESETS.find((preset) => getThemePresetColor(preset, mode) === normalizedColor) || null;
+  }
+
+  function getLinkedThemeColor(currentColor: string, sourceMode: ResolvedThemeMode, targetMode: ResolvedThemeMode): string {
+    const preset = findMatchingThemePreset(currentColor, sourceMode);
+    if (preset) return getThemePresetColor(preset, targetMode);
+    return sanitizeThemeSeedColor(targetMode, currentColor);
+  }
+
+  function coerceThemeColorForMode(
+    modeSetting: Settings['interfaceThemeMode'],
+    targetMode: ResolvedThemeMode,
+    currentColor: string,
+  ): string {
+    const normalizedColor = getSeedThemeColor(currentColor);
+    if (findMatchingThemePreset(normalizedColor, targetMode)) {
+      return normalizedColor;
+    }
+
+    const presetFromOppositeMode = findMatchingThemePreset(normalizedColor, getOppositeThemeMode(targetMode));
+    if (presetFromOppositeMode) {
+      return getThemePresetColor(presetFromOppositeMode, targetMode);
+    }
+
+    if (modeSetting === 'auto') {
+      return sanitizeThemeSeedColor(targetMode, normalizedColor);
+    }
+
+    return normalizedColor;
+  }
+
+  function isThemePresetActive(preset: typeof THEME_PRESETS[number]): boolean {
+    return getSeedThemeColor(settings.interfaceThemeColor) === getThemePresetColor(preset, resolveThemeMode(settings.interfaceThemeMode));
+  }
+
+  let themeColorPresets = $derived.by(() => {
+    const presetColors = THEME_PRESETS.map((preset) => getThemePresetColor(preset, resolveThemeMode(settings.interfaceThemeMode)));
+    return [...new Set([DEFAULT_SETTINGS.interfaceThemeColor, ...presetColors])];
+  });
+
+  function applyThemePreset(preset: typeof THEME_PRESETS[number]): void {
+    const nextColor = getThemePresetColor(preset, resolveThemeMode(settings.interfaceThemeMode));
+    void applySettingsPatch(buildThemeColorPatch(nextColor, settings.interfaceThemeHue));
+  }
+
+  function switchInterfaceThemeMode(nextMode: Settings['interfaceThemeMode']): void {
+    const previousResolvedMode = resolveThemeMode(settings.interfaceThemeMode);
+    const nextResolvedMode = resolveThemeMode(nextMode);
+    const nextSettingsPatch: Partial<Settings> = { interfaceThemeMode: nextMode };
+
+    if (previousResolvedMode !== nextResolvedMode) {
+      const nextColor = getLinkedThemeColor(getSeedThemeColor(settings.interfaceThemeColor), previousResolvedMode, nextResolvedMode);
+      Object.assign(nextSettingsPatch, buildThemeColorPatch(nextColor, settings.interfaceThemeHue));
+    }
+
+    void applySettingsPatch(nextSettingsPatch);
+  }
+
+  function buildInterfaceTheme(mode: ResolvedThemeMode, seedColor: string): Record<string, string> {
+    const accentSeed = sanitizeThemeSeedColor(mode, seedColor);
+    const [red, green, blue] = parseHexColor(accentSeed) || parseHexColor(DEFAULT_SETTINGS.interfaceThemeColor)!;
+    const { h: accentHue, s: accentSaturation } = rgbToHsl(red, green, blue);
+    const neutralHue = (accentHue + 8) % 360;
+    const primary = getThemePrimaryColor(mode, accentSeed);
+    const secondary = mode === 'light'
+      ? hexFromHsl(accentHue, clampPercent(accentSaturation * 100 * 0.2, 12, 22), 46)
+      : hexFromHsl(accentHue, clampPercent(accentSaturation * 100 * 0.2, 12, 24), 78);
+    const primaryContainer = mode === 'light'
+      ? hexFromHsl(accentHue, clampPercent(accentSaturation * 100 * 0.84, 62, 90), 89)
+      : hexFromHsl(accentHue, clampPercent(accentSaturation * 100 * 0.5, 30, 58), 34);
+    const secondaryContainer = mode === 'light'
+      ? hexFromHsl(accentHue, clampPercent(accentSaturation * 100 * 0.26, 14, 30), 90)
+      : hexFromHsl(accentHue, clampPercent(accentSaturation * 100 * 0.14, 10, 18), 31);
+    const logoColor = mode === 'light'
+      ? mixHexColors(primary, '#6a6675', 0.44)
+      : mixHexColors(accentSeed, '#d7d3e5', 0.42);
+
+    if (mode === 'light') {
+      return {
+        '--md-primary': primary,
+        '--md-on-primary': '#ffffff',
+        '--md-primary-container': primaryContainer,
+        '--md-on-primary-container': hexFromHsl(accentHue, clampPercent(accentSaturation * 100 * 0.54, 42, 62), 18),
+        '--md-secondary': secondary,
+        '--md-on-secondary': '#ffffff',
+        '--md-secondary-container': secondaryContainer,
+        '--md-on-secondary-container': hexFromHsl(accentHue, clampPercent(accentSaturation * 100 * 0.34, 20, 38), 20),
+        '--md-surface': hslColor(neutralHue, 18, 97),
+        '--md-surface-dim': hslColor(neutralHue, 8, 86),
+        '--md-surface-container-lowest': '#ffffff',
+        '--md-surface-container-low': hslColor(neutralHue, 16, 95),
+        '--md-surface-container': hslColor(neutralHue, 14, 92),
+        '--md-surface-container-high': hslColor(neutralHue, 12, 89),
+        '--md-surface-container-highest': hslColor(neutralHue, 10, 85),
+        '--md-on-surface': hslColor(neutralHue, 10, 13),
+        '--md-on-surface-variant': hslColor(neutralHue, 8, 32),
+        '--md-outline': hslColor(neutralHue, 8, 50),
+        '--md-outline-variant': hslColor(neutralHue, 12, 80),
+        '--md-error': '#ba1a1a',
+        '--ytr-logo-color': logoColor,
+      };
+    }
+
+    return {
+      '--md-primary': primary,
+      '--md-on-primary': hexFromHsl(accentHue, clampPercent(accentSaturation * 100 * 0.42, 24, 48), 21),
+      '--md-primary-container': primaryContainer,
+      '--md-on-primary-container': '#ede7ff',
+      '--md-secondary': secondary,
+      '--md-on-secondary': '#2a2734',
+      '--md-secondary-container': secondaryContainer,
+      '--md-on-secondary-container': '#eee9f7',
+      '--md-surface': hslColor(neutralHue, 12, 10),
+      '--md-surface-dim': hslColor(neutralHue, 10, 9),
+      '--md-surface-container-lowest': hslColor(neutralHue, 10, 7),
+      '--md-surface-container-low': hslColor(neutralHue, 9, 12),
+      '--md-surface-container': hslColor(neutralHue, 8, 14),
+      '--md-surface-container-high': hslColor(neutralHue, 8, 18),
+      '--md-surface-container-highest': hslColor(neutralHue, 7, 22),
+      '--md-on-surface': hslColor(neutralHue, 10, 91),
+      '--md-on-surface-variant': hslColor(neutralHue, 8, 76),
+      '--md-outline': hslColor(neutralHue, 8, 58),
+      '--md-outline-variant': hslColor(neutralHue, 7, 24),
+      '--md-error': '#ffb4ab',
+      '--ytr-logo-color': logoColor,
+    };
+  }
+
+  function applyInterfaceTheme(mode: ResolvedThemeMode, seedColor: string): void {
+    if (typeof document === 'undefined' || !document.body) return;
+    const tokens = buildInterfaceTheme(mode, getSeedThemeColor(seedColor));
+    const root = document.documentElement;
+    for (const [token, value] of Object.entries(tokens)) {
+      root.style.setProperty(token, value);
+    }
+    document.body.dataset.ytrThemeMode = mode;
+  }
+
+  function getInterfaceThemePrimaryHex(mode: ResolvedThemeMode, seedColor: string): string {
+    return getThemePrimaryColor(mode, getSeedThemeColor(seedColor));
+  }
+
+  function formatThemeHue(value: number): string {
+    const currentSeed = getSeedThemeColor(settings.interfaceThemeColor);
+    const [red, green, blue] = parseHexColor(currentSeed) || parseHexColor(DEFAULT_SETTINGS.interfaceThemeColor)!;
+    const { s, l } = rgbToHsl(red, green, blue);
+    return hexFromHsl(value, s * 100, l * 100);
+  }
+
+  function commitInterfaceThemeColor(value: string): void {
+    const next = resolveThemeColorInput(value);
+    if (next === null) return;
+    const normalizedColor = sanitizeThemeSeedColor(resolveThemeMode(settings.interfaceThemeMode), next.color);
+    void applySettingsPatch(buildThemeColorPatch(normalizedColor, next.hue));
+  }
+
+  function resetInterfaceThemePalette(): void {
+    const nextColor = getThemePresetColor(THEME_PRESETS[0], resolveThemeMode(settings.interfaceThemeMode));
+    void applySettingsPatch(buildThemeColorPatch(nextColor, DEFAULT_SETTINGS.interfaceThemeHue));
+  }
+
+  function updateInterfaceThemeHue(value: number): void {
+    const nextHue = clampHue(value);
+    const currentSeed = getSeedThemeColor(settings.interfaceThemeColor);
+    const [red, green, blue] = parseHexColor(currentSeed) || parseHexColor(DEFAULT_SETTINGS.interfaceThemeColor)!;
+    const { s, l } = rgbToHsl(red, green, blue);
+    const nextSeed = sanitizeThemeSeedColor(resolveThemeMode(settings.interfaceThemeMode), hexFromHsl(nextHue, s * 100, l * 100));
+    void applySettingsPatch(buildThemeColorPatch(nextSeed, nextHue));
   }
 
   // Update checker
@@ -78,6 +485,53 @@
 
   function isVideoLogo(src: string): boolean {
     return /^data:video\//i.test(src) || /\.(mp4|webm|ogg|mov)(?:$|[?#])/i.test(src);
+  }
+
+  function normalizeLogoVariant(value: unknown): Settings['logoVariant'] {
+    return value === 'youtube' || value === 'rewind' || value === 'custom'
+      ? value
+      : DEFAULT_SETTINGS.logoVariant;
+  }
+
+  function clampLogoScale(value: number, fallback: number): number {
+    const nextValue = Number.isFinite(value) ? value : fallback;
+    return Math.min(220, Math.max(40, Math.round(nextValue)));
+  }
+
+  function getLogoScaleKey(variant: Settings['logoVariant']): LogoScaleKey {
+    if (variant === 'rewind') return 'rewindLogoScale';
+    if (variant === 'custom') return 'customLogoScale';
+    return 'youtubeLogoScale';
+  }
+
+  function getLogoScaleValue(source: Pick<Settings, LogoScaleKey>, variant: Settings['logoVariant']): number {
+    return source[getLogoScaleKey(variant)];
+  }
+
+  function updateLogoScale(variant: Settings['logoVariant'], value: number): void {
+    update(getLogoScaleKey(variant), value as Settings[LogoScaleKey]);
+  }
+
+  function getLogoScaleResetValue(variant: Settings['logoVariant']): number {
+    if (variant === 'rewind') return DEFAULT_SETTINGS.rewindLogoScale;
+    if (variant === 'custom') return DEFAULT_SETTINGS.customLogoScale;
+    return DEFAULT_SETTINGS.youtubeLogoScale;
+  }
+
+  function resetLogoScale(variant: Settings['logoVariant']): void {
+    updateLogoScale(variant, getLogoScaleResetValue(variant));
+  }
+
+  function getEffectiveLogoSource(variant: Settings['logoVariant'], customLogo: string): string {
+    if (variant === 'rewind') return BUILTIN_REWIND_LOGO_URL;
+    if (variant === 'custom' && customLogo) return customLogo;
+    return '';
+  }
+
+  function getLogoPresetLabel(variant: Settings['logoVariant']): string {
+    if (variant === 'youtube') return t('logoPresetYoutube');
+    if (variant === 'custom') return t('logoPresetUploaded');
+    return t('logoPresetRewind');
   }
 
   const AMO_URL = 'https://addons.mozilla.org/firefox/addon/youtube-rewind/';
@@ -160,6 +614,9 @@
     { id: 'fr', label: 'Français' },
     { id: 'de', label: 'Deutsch' },
     { id: 'tr', label: 'Türkçe' },
+    { id: 'it', label: 'Italiano' },
+    { id: 'pl', label: 'Polski' },
+    { id: 'nl', label: 'Nederlands' },
     { id: 'ja', label: '日本語' },
     { id: 'ko', label: '한국어' },
     { id: 'zh', label: '中文' },
@@ -176,18 +633,27 @@
     sectionSidebarFilter: ['sidebar', 'guide', 'left menu', 'боковая панель', 'левое меню'],
     sectionThumbnailEffect: ['thumbnail', 'preview image', 'cover', 'миниатюра', 'превью', 'обложка'],
     sectionAvatarShape: ['avatar', 'channel icon', 'profile picture', 'аватар', 'иконка канала', 'форма'],
-    sectionData: ['backup', 'import', 'export', 'copy', 'paste', 'reset', 'бэкап', 'импорт', 'экспорт', 'копировать', 'вставить', 'сброс'],
+    sectionDeveloper: ['developer', 'debug', 'diagnostics', 'import', 'export', 'copy', 'paste', 'reset', 'reload', 'cache', 'developer tools', 'разработчик', 'отладка', 'диагностика', 'импорт', 'экспорт', 'копировать', 'вставить', 'сброс', 'перезагрузка', 'кэш'],
+    sectionInterface: ['interface', 'theme', 'appearance', 'ui color', 'accent color', 'интерфейс', 'тема', 'цвет темы', 'цвет интерфейса'],
     sectionBeta: ['beta', 'experimental', 'labs', 'preview features', 'бета', 'экспериментальные функции'],
+    settingDeveloperEnabled: ['developer tools', 'developer mode', 'debug tools', 'режим разработчика', 'инструменты разработчика'],
     settingCustomLogo: ['logo', 'branding', 'channel mark', 'логотип'],
+    settingLogoVariant: ['logo preset', 'logo variant', 'default logo', 'rewind logo', 'вариант логотипа', 'пресет логотипа', 'дефолтный логотип'],
     settingCustomLogoSize: ['logo size', 'logo scale', 'размер логотипа', 'масштаб логотипа'],
-    settingHideLogoAnimation: ['logo motion', 'logo animation', 'анимация логотипа'],
+    settingInterfaceThemeMode: ['theme mode', 'auto theme', 'system theme', 'dark theme', 'light theme', 'режим темы', 'авто тема', 'системная тема', 'темная тема', 'светлая тема'],
+    settingInterfaceThemePresets: ['theme presets', 'preset colors', 'theme palette', 'цветовые пресеты', 'пресеты темы', 'палитра темы'],
+    settingInterfaceThemeColor: ['theme color', 'accent color', 'hue', 'цвет темы', 'акцент', 'тон'],
+    settingInterfaceThemeCustomColor: ['custom color', 'hex color', 'свой цвет', 'hex'],
+    settingInterfaceThemeReset: ['reset palette', 'default palette', 'сброс палитры'],
+    settingDefaultQuality: ['default quality', 'preferred quality', 'video quality', 'качество по умолчанию', 'предпочитаемое качество', 'качество видео'],
+    settingHideLogoAnimation: ['logo motion', 'logo animation', 'event logo', 'event logo variants', 'анимация логотипа', 'ивентовые версии'],
+    settingDisableThumbnailPreview: ['hover preview', 'preview on hover', 'moving thumbnail', 'thumbnail preview', 'предпросмотр при наведении', 'двигающееся превью'],
     settingVideosPerRow: ['grid', 'columns', 'videos per line', 'сетка', 'колонки', 'видео в ряд'],
     settingWatchTimeLimit: ['limit', 'daily limit', 'screen time', 'лимит', 'ограничение'],
     settingWatchTimerEnabled: ['watch timer', 'time counter', 'таймер', 'счетчик времени'],
-    settingBetaStandalonePage: ['tab mode', 'standalone page', 'separate tab', 'вкладка', 'отдельная вкладка'],
     settingBetaHomepageRevealAnimation: ['feed animation', 'home animation', 'card reveal', 'анимация ленты', 'анимация карточек'],
     settingBetaVideoFrameScreenshot: ['screenshot', 'frame capture', 'video frame', 'скриншот', 'кадр видео'],
-    settingBetaScreenshotOpenPreview: ['screenshot preview', 'open screenshot', 'предпросмотр скриншота', 'просмотр скриншота'],
+    settingBetaScreenshotInstantDownload: ['instant screenshot download', 'download screenshot immediately', 'скачивать скриншот сразу', 'моментальное скачивание скриншота'],
     hideJoinButton: ['join', 'membership', 'sponsor', 'спонсировать'],
     hideSubscribeButton: ['subscribe', 'подписаться', 'подписка'],
     hideLikeDislike: ['like', 'dislike', 'лайк', 'дизлайк'],
@@ -271,27 +737,29 @@
 
   const PROFILE_BETA_KEYS: (keyof Settings)[] = [
     'betaEnabled',
-    'downloadThumbnailButton',
     'disableAvatarLiveRedirect',
-    'betaStandalonePage',
     'betaHomepageRevealAnimation',
-    'betaVideoFrameScreenshot',
-    'betaScreenshotOpenPreview',
+    'defaultQuality',
   ];
 
   function normalizeLocalSettings(next: Settings): Settings {
     const normalized = cloneSettings(next);
-    normalized.customLogoScale = Math.min(220, Math.max(40, Math.round(normalized.customLogoScale || 100)));
+    normalized.youtubeLogoScale = clampLogoScale(normalized.youtubeLogoScale, DEFAULT_SETTINGS.youtubeLogoScale);
+    normalized.rewindLogoScale = clampLogoScale(normalized.rewindLogoScale, DEFAULT_SETTINGS.rewindLogoScale);
+    normalized.customLogoScale = clampLogoScale(normalized.customLogoScale, DEFAULT_SETTINGS.customLogoScale);
+    normalized.betaStandalonePage = true;
+    normalized.logoVariant = normalizeLogoVariant(normalized.logoVariant);
+    normalized.interfaceThemeMode = normalizeThemeMode(normalized.interfaceThemeMode);
+    normalized.interfaceThemeHue = clampHue(normalized.interfaceThemeHue ?? DEFAULT_SETTINGS.interfaceThemeHue);
+    normalized.interfaceThemeColor = getSeedThemeColor(normalized.interfaceThemeColor);
+    normalized.developerEnabled = Boolean(normalized.developerEnabled);
     if (!normalized.betaEnabled) {
-      normalized.downloadThumbnailButton = false;
       normalized.disableAvatarLiveRedirect = false;
-      normalized.betaStandalonePage = false;
       normalized.betaHomepageRevealAnimation = false;
-      normalized.betaVideoFrameScreenshot = false;
-      normalized.betaScreenshotOpenPreview = false;
+      normalized.defaultQuality = 'auto';
     }
     if (!normalized.betaVideoFrameScreenshot) {
-      normalized.betaScreenshotOpenPreview = false;
+      normalized.betaScreenshotInstantDownload = false;
     }
     return normalized;
   }
@@ -301,6 +769,8 @@
     delete (profileSettings as any).language;
     delete (profileSettings as any).customProfiles;
     delete (profileSettings as any).activeProfile;
+    delete (profileSettings as any).developerEnabled;
+    delete (profileSettings as any).betaStandalonePage;
     return profileSettings;
   }
 
@@ -316,17 +786,171 @@
     return {
       ...profileSettings,
       betaEnabled: settings.betaEnabled,
-      downloadThumbnailButton: settings.downloadThumbnailButton,
       disableAvatarLiveRedirect: settings.disableAvatarLiveRedirect,
-      betaStandalonePage: settings.betaStandalonePage,
       betaHomepageRevealAnimation: settings.betaHomepageRevealAnimation,
-      betaVideoFrameScreenshot: settings.betaVideoFrameScreenshot,
-      betaScreenshotOpenPreview: settings.betaScreenshotOpenPreview,
     };
+  }
+
+  const PROFILE_LOGO_KEYS: Array<
+    'logoVariant' |
+    'customLogo' |
+    'customLogoRatio' |
+    'youtubeLogoScale' |
+    'rewindLogoScale' |
+    'customLogoScale' |
+    'hideLogoAnimation'
+  > = [
+    'logoVariant',
+    'customLogo',
+    'customLogoRatio',
+    'youtubeLogoScale',
+    'rewindLogoScale',
+    'customLogoScale',
+    'hideLogoAnimation',
+  ];
+
+  function stripLogoDefaults(resetData: Partial<Settings>, profileSettings?: Partial<Settings>): void {
+    for (const key of PROFILE_LOGO_KEYS) {
+      if (!profileSettings || !(key in profileSettings)) {
+        delete (resetData as any)[key];
+      }
+    }
+  }
+
+  function pickSettingsKeys(source: Partial<Settings>, keys: readonly (keyof Settings)[]): Record<string, unknown> {
+    const picked: Record<string, unknown> = {};
+    for (const key of keys) {
+      picked[key as string] = source[key];
+    }
+    return picked;
+  }
+
+  function computeProfileModifiedState(nextSettings: Settings): boolean {
+    const activeId = nextSettings.activeProfile;
+    if (!activeId || activeId === 'none') return false;
+
+    if (activeId.startsWith('custom:')) {
+      const profileName = activeId.slice(7);
+      const profile = (nextSettings.customProfiles || []).find((entry) => entry.name === profileName);
+      if (!profile) return false;
+
+      const baseline = normalizeLocalSettings({
+        ...DEFAULT_SETTINGS,
+        ...resolveAppliedProfileSettings(profile.settings),
+        activeProfile: activeId,
+        language: nextSettings.language,
+        customProfiles: cloneCustomProfiles(nextSettings.customProfiles || []),
+      });
+
+      return JSON.stringify(extractProfileSettings(nextSettings)) !== JSON.stringify(extractProfileSettings(baseline));
+    }
+
+    const profile = PROFILES[activeId];
+    if (!profile) return false;
+
+    const profileKeys = Object.keys(profile) as (keyof Settings)[];
+    const baseline = { ...DEFAULT_SETTINGS, ...profile };
+    return JSON.stringify(pickSettingsKeys(nextSettings, profileKeys)) !== JSON.stringify(pickSettingsKeys(baseline, profileKeys));
+  }
+
+  function syncProfileModifiedState(nextSettings: Settings = settings): void {
+    profileModified = computeProfileModifiedState(nextSettings);
   }
 
   function settingsEqual(a: Settings, b: Settings): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  function getBuiltinProfileLabel(profileId: string): string {
+    const option = PROFILE_OPTIONS.find((profile) => profile.id === profileId);
+    return option ? t(option.label) : profileId;
+  }
+
+  function createUniqueCustomProfileName(baseName: string): string {
+    const trimmed = baseName.trim() || 'Custom';
+    const existing = new Set((settings.customProfiles || []).map((profile) => profile.name));
+    if (!existing.has(trimmed)) return trimmed;
+    let suffix = 2;
+    while (existing.has(`${trimmed} ${suffix}`)) {
+      suffix++;
+    }
+    return `${trimmed} ${suffix}`;
+  }
+
+  function shouldDetachBuiltinProfile(partial: Partial<Settings>): boolean {
+    const activeId = settings.activeProfile;
+    if (!activeId || activeId === 'none' || activeId.startsWith('custom:')) return false;
+    if ('activeProfile' in partial || 'customProfiles' in partial) return false;
+    return Object.keys(partial).length > 0;
+  }
+
+  function createDetachedBuiltinProfilePatch(partial: Partial<Settings>): Partial<Settings> {
+    const activeId = settings.activeProfile;
+    if (!activeId || activeId === 'none' || activeId.startsWith('custom:')) {
+      return partial;
+    }
+
+    const name = createUniqueCustomProfileName(getBuiltinProfileLabel(activeId));
+    const nextSettings = normalizeLocalSettings({
+      ...settings,
+      ...partial,
+      activeProfile: `custom:${name}`,
+      customProfiles: cloneCustomProfiles([
+        ...(settings.customProfiles || []),
+        {
+          name,
+          settings: extractProfileSettings({ ...settings, ...partial, activeProfile: `custom:${name}` }),
+        },
+      ]),
+    });
+
+    return {
+      ...partial,
+      activeProfile: nextSettings.activeProfile,
+      customProfiles: nextSettings.customProfiles,
+    };
+  }
+
+  function sanitizeFileNameSegment(value: string): string {
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/[\\/:*?"<>|]+/g, ' ')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      || 'settings';
+  }
+
+  function getCurrentConfigName(source: Settings = settings): string {
+    const activeId = source.activeProfile;
+    if (!activeId || activeId === 'none') {
+      return t('profileNone');
+    }
+    return activeId.startsWith('custom:')
+      ? activeId.slice(7)
+      : getBuiltinProfileLabel(activeId);
+  }
+
+  function buildExportFileName(ext: string): string {
+    const configName = getCurrentConfigName();
+    const normalizedName = sanitizeFileNameSegment(configName);
+    if (!configName || normalizedName === sanitizeFileNameSegment(t('profileNone'))) {
+      return `youtube-rewind-settings.${ext}`;
+    }
+    return `youtube-rewind-${normalizedName}-settings.${ext}`;
+  }
+
+  function buildProfileExportFileName(profileName: string, ext: string): string {
+    const normalizedName = sanitizeFileNameSegment(profileName);
+    return `youtube-rewind-profile-${normalizedName}.${ext}`;
+  }
+
+  function getActiveCustomProfile(): CustomProfile | null {
+    const activeId = settings.activeProfile;
+    if (!activeId || !activeId.startsWith('custom:')) return null;
+    const profileName = activeId.slice(7);
+    return (settings.customProfiles || []).find((profile) => profile.name === profileName) || null;
   }
 
   function patchLocalSettings(partial: Partial<Settings>): void {
@@ -342,14 +966,15 @@
       setLocale(settings.language);
       langVersion++;
     }
+    syncProfileModifiedState(settings);
   }
 
-  async function applySettingsPatch(partial: Partial<Settings>, markProfileModified = false): Promise<void> {
-    patchLocalSettings(partial);
-    if (markProfileModified && settings.activeProfile !== 'none') {
-      profileModified = true;
-    }
-    await saveSettings(partial);
+  async function applySettingsPatch(partial: Partial<Settings>): Promise<void> {
+    const nextPatch = shouldDetachBuiltinProfile(partial)
+      ? createDetachedBuiltinProfilePatch(partial)
+      : partial;
+    patchLocalSettings(nextPatch);
+    await saveSettings(nextPatch);
   }
 
   function showSheetFeedback(text: string, type: 'ok' | 'error' = 'ok') {
@@ -368,17 +993,64 @@
     logoDragging = false;
     logoPasting = false;
     logoDraftUrl = settings.customLogo;
-    logoDraftRatio = settings.customLogoRatio;
     sheetFeedback = null;
   }
+
+  $effect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      const previousResolvedMode = resolveThemeMode(settings.interfaceThemeMode, systemPrefersDark);
+      const nextPrefersDark = event.matches;
+      const nextResolvedMode = resolveThemeMode(settings.interfaceThemeMode, nextPrefersDark);
+      systemPrefersDark = nextPrefersDark;
+
+      if (!loaded || settings.interfaceThemeMode !== 'auto' || previousResolvedMode === nextResolvedMode) {
+        return;
+      }
+
+      const nextColor = getLinkedThemeColor(getSeedThemeColor(settings.interfaceThemeColor), previousResolvedMode, nextResolvedMode);
+      const themePatch = buildThemeColorPatch(nextColor, settings.interfaceThemeHue);
+      patchLocalSettings(themePatch);
+      void saveSettings(themePatch);
+    };
+
+    systemPrefersDark = media.matches;
+    media.addEventListener('change', handleChange);
+    return () => {
+      media.removeEventListener('change', handleChange);
+    };
+  });
 
   // Init once on mount — no reactive deps, so $effect runs only once
   $effect(() => {
     loadSettings().then((s) => {
-      settings = cloneSettings(s);
-      setLocale(s.language);
+      const normalizedThemeMode = normalizeThemeMode(s.interfaceThemeMode);
+      const resolvedMode = resolveThemeMode(normalizedThemeMode, systemPrefersDark);
+      const coercedThemeColor = coerceThemeColorForMode(normalizedThemeMode, resolvedMode, s.interfaceThemeColor);
+      const nextThemePatch: Partial<Settings> = {};
+
+      if (normalizedThemeMode !== s.interfaceThemeMode) {
+        nextThemePatch.interfaceThemeMode = normalizedThemeMode;
+      }
+      if (coercedThemeColor !== getSeedThemeColor(s.interfaceThemeColor)) {
+        Object.assign(nextThemePatch, buildThemeColorPatch(coercedThemeColor, s.interfaceThemeHue));
+      }
+
+      settings = cloneSettings(normalizeLocalSettings({
+        ...s,
+        ...nextThemePatch,
+      }));
+      setLocale(settings.language);
+      logoDraftUrl = settings.customLogo;
+      syncProfileModifiedState(settings);
       loaded = true;
       checkForUpdates();
+
+      if (Object.keys(nextThemePatch).length > 0) {
+        void saveSettings(nextThemePatch);
+      }
     });
   });
 
@@ -386,6 +1058,15 @@
     document.body.dataset.ytrLayout = isStandaloneView ? 'page' : 'popup';
     return () => {
       delete document.body.dataset.ytrLayout;
+    };
+  });
+
+  $effect(() => {
+    applyInterfaceTheme(resolveThemeMode(settings.interfaceThemeMode), settings.interfaceThemeColor);
+    return () => {
+      if (typeof document !== 'undefined' && document.body) {
+        delete document.body.dataset.ytrThemeMode;
+      }
     };
   });
 
@@ -402,9 +1083,15 @@
         setLocale(next.language);
         langVersion++;
       }
+      syncProfileModifiedState(next);
       if (!next.betaEnabled) {
         betaConfirmOpen = false;
         if (activeSheet) clearSheetState();
+      }
+      if (!next.developerEnabled) {
+        developerConfirmOpen = false;
+        developerFeedback = null;
+        showResetConfirm = false;
       }
     };
 
@@ -415,7 +1102,7 @@
   });
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
-    void applySettingsPatch({ [key]: value } as Pick<Settings, K>, key !== 'activeProfile');
+    void applySettingsPatch({ [key]: value } as Pick<Settings, K>);
   }
 
   function saveChangesToProfile() {
@@ -434,8 +1121,7 @@
         void saveSettings({ customProfiles: nextProfiles });
       }
     } else {
-      // Built-in profile modified — save as new custom profile with the built-in name + "(modified)"
-      const name = activeId + ' *';
+      const name = createUniqueCustomProfileName(getBuiltinProfileLabel(activeId));
       const profileSettings = extractProfileSettings(settings);
       const newProfile: CustomProfile = { name, settings: profileSettings };
       const profiles = cloneCustomProfiles([...(settings.customProfiles || []), newProfile]);
@@ -448,7 +1134,6 @@
         activeProfile: 'custom:' + name,
       });
     }
-    profileModified = false;
     showFeedback('profile');
   }
 
@@ -570,14 +1255,14 @@
     );
   }
 
-  function selectLanguage(lang: string) {
+  async function selectLanguage(lang: string) {
     patchLocalSettings({ language: lang });
-    void saveSettings({ language: lang });
     langMenuOpen = false;
+    await saveSettings({ language: lang });
+    window.location.reload();
   }
 
   function openStandalonePage() {
-    if (!(settings.betaEnabled && settings.betaStandalonePage)) return;
     browser.tabs.create({ url: browser.runtime.getURL('popup.html?view=page') });
   }
 
@@ -603,33 +1288,21 @@
     if (activeSheet) clearSheetState();
     void applySettingsPatch({
       betaEnabled: false,
-      downloadThumbnailButton: false,
       disableAvatarLiveRedirect: false,
-      betaStandalonePage: false,
       betaHomepageRevealAnimation: false,
-      betaVideoFrameScreenshot: false,
-      betaScreenshotOpenPreview: false,
     });
   }
 
-  function toggleBetaStandalonePage(value: boolean) {
-    if (!settings.betaEnabled) return;
-    void applySettingsPatch({ betaStandalonePage: value });
-    if (!value && activeSheet) clearSheetState();
-  }
-
   function toggleBetaVideoFrameScreenshot(value: boolean) {
-    if (!settings.betaEnabled) return;
     void applySettingsPatch({
       betaVideoFrameScreenshot: value,
-      betaScreenshotOpenPreview: value ? settings.betaScreenshotOpenPreview : false,
+      betaScreenshotInstantDownload: value ? settings.betaScreenshotInstantDownload : false,
     });
   }
 
   function openLogoPage() {
-    if (isStandaloneView && settings.betaEnabled && settings.betaStandalonePage) {
+    if (isStandaloneView) {
       logoDraftUrl = settings.customLogo;
-      logoDraftRatio = settings.customLogoRatio;
       activeSheet = 'logo';
       return;
     }
@@ -637,14 +1310,48 @@
   }
 
   function removeLogo() {
-    patchLocalSettings({
+    logoAnimationConfirmOpen = false;
+    const nextPatch: Partial<Settings> = {
       customLogo: '',
       customLogoRatio: 0,
-    });
-    void saveSettings({
-      customLogo: '',
-      customLogoRatio: 0,
-    });
+    };
+    if (settings.logoVariant === 'custom') {
+      nextPatch.logoVariant = 'rewind';
+      nextPatch.hideLogoAnimation = true;
+    }
+    patchLocalSettings(nextPatch);
+    void saveSettings(nextPatch);
+  }
+
+  function selectLogoVariant(variant: Settings['logoVariant']) {
+    if (variant === 'custom' && !settings.customLogo) {
+      openLogoPage();
+      return;
+    }
+
+    const patch: Partial<Settings> = { logoVariant: variant };
+    if (variant !== 'youtube') {
+      patch.hideLogoAnimation = true;
+    }
+    void applySettingsPatch(patch);
+  }
+
+  function toggleHideLogoAnimation(value: boolean) {
+    if (!value && settings.logoVariant !== 'youtube') {
+      logoAnimationConfirmOpen = true;
+      return;
+    }
+    logoAnimationConfirmOpen = false;
+    void applySettingsPatch({ hideLogoAnimation: value });
+  }
+
+  function cancelLogoAnimationConfirm() {
+    logoAnimationConfirmOpen = false;
+  }
+
+  function confirmLogoAnimationEnable() {
+    logoAnimationConfirmOpen = false;
+    void applySettingsPatch({ hideLogoAnimation: false });
   }
 
   function toggleLangMenu() {
@@ -672,65 +1379,34 @@
     feedbackTimeout = setTimeout(() => { dataFeedback = ''; }, 2000);
   }
 
+  function showDeveloperFeedback(text: string, type: 'ok' | 'error' = 'ok') {
+    developerFeedback = { text, type };
+    clearTimeout(developerFeedbackTimeout);
+    developerFeedbackTimeout = setTimeout(() => { developerFeedback = null; }, 2500);
+  }
+
   function exportFile(format: 'json' | 'txt') {
-    const { language: _, ...exportData } = settings;
-    let content: string;
-    let mime: string;
-    let ext: string;
-    if (format === 'json') {
-      content = JSON.stringify(exportData, null, 2);
-      mime = 'application/json';
-      ext = 'json';
-    } else {
-      content = Object.entries(exportData).map(([k, v]) => `${k} = ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('\n');
-      mime = 'text/plain';
-      ext = 'txt';
-    }
+    const payload = createSettingsExportPayload(settings, getCurrentConfigName());
+    const ext = format === 'json' ? 'json' : 'txt';
+    const mime = format === 'json' ? 'application/json' : 'text/plain';
+    const content = stringifySettingsTransfer(payload, format);
     const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `youtube-rewind-settings.${ext}`;
+    a.download = buildExportFileName(ext);
     a.click();
     URL.revokeObjectURL(url);
   }
 
   async function copyToClipboard() {
     try {
-      const { language: _, ...exportData } = settings;
-      await navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
+      const payload = createSettingsExportPayload(settings, getCurrentConfigName());
+      await navigator.clipboard.writeText(stringifySettingsTransfer(payload, 'json'));
       showFeedback('copied');
     } catch {
       showFeedback('error');
     }
-  }
-
-  function parseSettings(text: string): Partial<Settings> | null {
-    // Try JSON
-    try {
-      const obj = JSON.parse(text);
-      if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) return obj;
-    } catch {}
-    // Try key=value TXT format
-    try {
-      const lines = text.split('\n').filter((l) => l.includes('='));
-      if (lines.length === 0) return null;
-      const result: Record<string, unknown> = {};
-      for (const line of lines) {
-        const [key, ...rest] = line.split('=');
-        const k = key.trim();
-        const v = rest.join('=').trim();
-        if (v === 'true') result[k] = true;
-        else if (v === 'false') result[k] = false;
-        else if (!isNaN(Number(v)) && v !== '') result[k] = Number(v);
-        else {
-          // Try parsing JSON values (for arrays/objects)
-          try { result[k] = JSON.parse(v); } catch { result[k] = v; }
-        }
-      }
-      return result as Partial<Settings>;
-    } catch {}
-    return null;
   }
 
   async function applyImport(data: Partial<Settings>) {
@@ -753,7 +1429,7 @@
   }
 
   function openImportPage() {
-    if (isStandaloneView && settings.betaEnabled && settings.betaStandalonePage) {
+    if (isStandaloneView) {
       activeSheet = 'import';
       return;
     }
@@ -763,9 +1439,9 @@
   async function pasteFromClipboard() {
     try {
       const text = await navigator.clipboard.readText();
-      const parsed = parseSettings(text);
+      const parsed = parseSettingsTransfer(text);
       if (parsed) {
-        await applyImport(parsed);
+        await applyImport(parsed.settings);
         handleImportSuccess('popup');
       }
       else showFeedback('error');
@@ -786,12 +1462,12 @@
         showSheetFeedback(t('pasteClipboardEmpty'), 'error');
         return;
       }
-      const parsed = parseSettings(text);
+      const parsed = parseSettingsTransfer(text);
       if (!parsed) {
         showSheetFeedback(t('importError'), 'error');
         return;
       }
-      await applyImport(parsed);
+      await applyImport(parsed.settings);
       handleImportSuccess('sheet');
     } catch {
       showSheetFeedback(t('pasteClipboardError'), 'error');
@@ -803,7 +1479,7 @@
   async function loadImportFile(file: File, mode: 'import' | 'profile-import') {
     if (!file) return;
     const text = await file.text();
-    const parsed = parseSettings(text);
+    const parsed = parseSettingsTransfer(text);
     if (!parsed) {
       showSheetFeedback(t('importError'), 'error');
       return;
@@ -812,11 +1488,11 @@
     if (mode === 'profile-import') {
       pendingProfileText = text;
       pendingProfileFileName = file.name;
-      sheetProfileNameInput = file.name.replace(/\.(json|txt)$/i, '');
+      sheetProfileNameInput = parsed.configName || file.name.replace(/\.(json|txt)$/i, '');
       return;
     }
 
-    await applyImport(parsed);
+    await applyImport(parsed.settings);
     handleImportSuccess('sheet');
   }
 
@@ -832,14 +1508,14 @@
         showSheetFeedback(t('pasteClipboardEmpty'), 'error');
         return;
       }
-      const parsed = parseSettings(text);
+      const parsed = parseSettingsTransfer(text);
       if (!parsed) {
         showSheetFeedback(t('importError'), 'error');
         return;
       }
       pendingProfileText = text;
       pendingProfileFileName = 'clipboard.json';
-      sheetProfileNameInput = 'clipboard-profile';
+      sheetProfileNameInput = parsed.configName || 'clipboard-profile';
     } catch {
       showSheetFeedback(t('pasteClipboardError'), 'error');
     } finally {
@@ -850,17 +1526,19 @@
   async function confirmSheetProfileImport() {
     const name = sheetProfileNameInput.trim();
     if (!name) return;
-    const parsed = parseSettings(pendingProfileText);
+    const parsed = parseSettingsTransfer(pendingProfileText);
     if (!parsed) {
       showSheetFeedback(t('importError'), 'error');
       return;
     }
 
-    delete (parsed as any).customProfiles;
-    delete (parsed as any).language;
-    delete (parsed as any).activeProfile;
+    delete (parsed.settings as any).customProfiles;
+    delete (parsed.settings as any).language;
+    delete (parsed.settings as any).activeProfile;
+    delete (parsed.settings as any).developerEnabled;
+    delete (parsed.settings as any).betaStandalonePage;
 
-    const newProfile: CustomProfile = { name, settings: parsed };
+    const newProfile: CustomProfile = { name, settings: parsed.settings };
     const profiles = cloneCustomProfiles([...(settings.customProfiles || []), newProfile]);
     patchLocalSettings({ customProfiles: profiles });
     await saveSettings({ customProfiles: profiles });
@@ -874,6 +1552,91 @@
     pendingProfileText = '';
     pendingProfileFileName = '';
     sheetProfileNameInput = '';
+  }
+
+  function exportActiveCustomProfile(): void {
+    const activeProfile = getActiveCustomProfile();
+    if (!activeProfile) return;
+    const payload = createProfileExportPayload(activeProfile);
+    const content = stringifySettingsTransfer(payload, 'json');
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = buildProfileExportFileName(activeProfile.name, 'json');
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function requestDeveloperEnable(): void {
+    developerConfirmOpen = true;
+  }
+
+  function cancelDeveloperEnable(): void {
+    developerConfirmOpen = false;
+  }
+
+  function confirmDeveloperEnable(): void {
+    developerConfirmOpen = false;
+    void applySettingsPatch({ developerEnabled: true });
+  }
+
+  function toggleDeveloperTools(value: boolean): void {
+    if (value) {
+      requestDeveloperEnable();
+      return;
+    }
+    developerConfirmOpen = false;
+    developerFeedback = null;
+    showResetConfirm = false;
+    void applySettingsPatch({ developerEnabled: false });
+  }
+
+  async function copyDeveloperSnapshot(): Promise<void> {
+    try {
+      const payload = createSettingsExportPayload(settings, getCurrentConfigName());
+      const snapshot = {
+        app: 'YouTube Rewind',
+        version: browser.runtime.getManifest().version,
+        exportedAt: new Date().toISOString(),
+        browserUiLanguage: browser.i18n.getUILanguage(),
+        settingsLanguage: settings.language,
+        activeProfile: settings.activeProfile,
+        currentConfigName: getCurrentConfigName(),
+        themeMode: resolveThemeMode(settings.interfaceThemeMode),
+        userAgent: navigator.userAgent,
+        settings: payload,
+      };
+      await navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2));
+      showDeveloperFeedback(t('developerDebugCopied'));
+    } catch {
+      showDeveloperFeedback(t('developerActionFailed'), 'error');
+    }
+  }
+
+  async function clearDeveloperUpdateCache(): Promise<void> {
+    try {
+      await browser.storage.local.remove(CACHE_KEY);
+      latestVersion = '';
+      releaseUrl = '';
+      updateState = 'idle';
+      showDeveloperFeedback(t('developerUpdateCacheCleared'));
+    } catch {
+      showDeveloperFeedback(t('developerActionFailed'), 'error');
+    }
+  }
+
+  async function resetDeveloperWatchTime(): Promise<void> {
+    try {
+      await clearWatchTimeState();
+      showDeveloperFeedback(t('developerWatchTimeReset'));
+    } catch {
+      showDeveloperFeedback(t('developerActionFailed'), 'error');
+    }
+  }
+
+  function reloadExtension(): void {
+    browser.runtime.reload();
   }
 
   function validateLogoRatio(width: number, height: number): number {
@@ -927,13 +1690,15 @@
     });
   }
 
+  function getLogoSizeError(isVideo: boolean): string {
+    if (!isVideo) return t('customLogoErrorSize');
+    return settings.language === 'ru'
+      ? 'Видео слишком большое (макс. 16 МБ)'
+      : 'Video is too large (max 16 MB)';
+  }
+
   async function processLogoFile(file: File) {
     if (!file) return;
-    if (file.size > MAX_LOGO_FILE_SIZE) {
-      showSheetFeedback(t('customLogoErrorSize'), 'error');
-      return;
-    }
-
     const fileType = file.type.toLowerCase();
     const isImage = fileType.startsWith('image/');
     const isVideo = fileType.startsWith('video/');
@@ -943,13 +1708,18 @@
       return;
     }
 
+    const sizeLimit = isVideo ? MAX_LOGO_VIDEO_FILE_SIZE : MAX_LOGO_IMAGE_FILE_SIZE;
+    if (file.size > sizeLimit) {
+      showSheetFeedback(getLogoSizeError(isVideo), 'error');
+      return;
+    }
+
     try {
       const dataUrl = await readFileAsDataUrl(file);
       const ratio = isVideo ? await loadVideoRatio(dataUrl) : await loadImageRatio(dataUrl);
       logoDraftUrl = dataUrl;
-      logoDraftRatio = ratio;
-      patchLocalSettings({ customLogo: dataUrl, customLogoRatio: ratio });
-      await saveSettings({ customLogo: dataUrl, customLogoRatio: ratio });
+      patchLocalSettings({ logoVariant: 'custom', customLogo: dataUrl, customLogoRatio: ratio, hideLogoAnimation: true });
+      await saveSettings({ logoVariant: 'custom', customLogo: dataUrl, customLogoRatio: ratio, hideLogoAnimation: true });
       showSheetFeedback(t('customLogoSaved'));
     } catch (error) {
       if (error instanceof Error && error.message === 'ratio_invalid') {
@@ -987,9 +1757,16 @@
 
   async function removeLogoFromSheet() {
     logoDraftUrl = '';
-    logoDraftRatio = 0;
-    patchLocalSettings({ customLogo: '', customLogoRatio: 0 });
-    await saveSettings({ customLogo: '', customLogoRatio: 0 });
+    const nextPatch: Partial<Settings> = {
+      customLogo: '',
+      customLogoRatio: 0,
+    };
+    if (settings.logoVariant === 'custom') {
+      nextPatch.logoVariant = 'rewind';
+      nextPatch.hideLogoAnimation = true;
+    }
+    patchLocalSettings(nextPatch);
+    await saveSettings(nextPatch);
     showSheetFeedback(t('customLogoRemoved'));
   }
 
@@ -1012,7 +1789,6 @@
   function applyProfile(profileId: string) {
     if (profileId === 'none') {
       update('activeProfile', 'none');
-      profileModified = false;
       return;
     }
     const profile = PROFILES[profileId];
@@ -1020,19 +1796,21 @@
 
     const resetData = { ...DEFAULT_SETTINGS };
     delete (resetData as any).language;
-    delete (resetData as any).customLogo;
-    delete (resetData as any).customLogoRatio;
-    delete (resetData as any).customLogoScale;
+    stripLogoDefaults(resetData);
+    delete (resetData as any).interfaceThemeMode;
+    delete (resetData as any).interfaceThemeHue;
+    delete (resetData as any).interfaceThemeColor;
+    delete (resetData as any).defaultQuality;
     delete (resetData as any).customProfiles;
     delete (resetData as any).betaEnabled;
     delete (resetData as any).betaStandalonePage;
     delete (resetData as any).betaHomepageRevealAnimation;
     delete (resetData as any).betaVideoFrameScreenshot;
-    delete (resetData as any).betaScreenshotOpenPreview;
+    delete (resetData as any).betaScreenshotInstantDownload;
+    delete (resetData as any).developerEnabled;
     const merged = { ...resetData, ...profile, activeProfile: profileId };
     patchLocalSettings(merged);
     void saveSettings(merged);
-    profileModified = false;
     showFeedback('profile');
   }
 
@@ -1050,6 +1828,7 @@
     person: 'M372-523q-42-42-42-108t42-108q42-42 108-42t108 42q42 42 42 108t-42 108q-42 42-108 42t-108-42ZM160-220v-34q0-38 19-65t49-41q67-30 128.5-45T480-420q62 0 123 15.5T731-360q31 14 50 41t19 65v34q0 25-17.5 42.5T740-160H220q-25 0-42.5-17.5T160-220Z',
     database: 'M740.5-569Q840-618 840-680q0-63-99.5-111.5T480-840q-161 0-260.5 48.5T120-680q0 62 99.5 111T480-520q161 0 260.5-49ZM592-428.5q62-8.5 117.5-26.5t93-46.5Q840-530 840-570v100q0 40-37.5 68.5t-93 46.5Q654-337 592-328.5T480.5-320q-49.5 0-112-8.5t-118-27q-55.5-18.5-93-47T120-470v-100q0 39 37.5 67.5t93 47q55.5 18.5 118 27t112 8.5q49.5 0 111.5-8.5Zm0 200q62-8.5 117.5-26.5t93-46.5Q840-330 840-370v100q0 40-37.5 68.5t-93 46.5Q654-137 592-128.5T480.5-120q-49.5 0-112-8.5t-118-27q-55.5-18.5-93-47T120-270v-100q0 39 37.5 67.5t93 47q55.5 18.5 118 27t112 8.5q49.5 0 111.5-8.5Z',
     info: 'M504.5-288.63q8.5-8.62 8.5-21.37v-180q0-12.75-8.68-21.38-8.67-8.62-21.5-8.62-12.82 0-21.32 8.62-8.5 8.63-8.5 21.38v180q0 12.75 8.68 21.37 8.67 8.63 21.5 8.63 12.82 0 21.32-8.63Zm-1-314.57q9.5-9.2 9.5-22.8 0-14.45-9.48-24.22-9.48-9.78-23.5-9.78t-23.52 9.78Q447-640.45 447-626q0 13.6 9.48 22.8 9.48 9.2 23.5 9.2t23.52-9.2ZM480.27-80q-82.74 0-155.5-31.5Q252-143 197.5-197.5t-86-127.34Q80-397.68 80-480.5t31.5-155.66Q143-709 197.5-763t127.34-85.5Q397.68-880 480.5-880t155.66 31.5Q709-817 763-763t85.5 127Q880-563 880-480.27q0 82.74-31.5 155.5Q817-252 763-197.68q-54 54.31-127 86Q563-80 480.27-80Z',
+    palette: 'M480-120q-74.23 0-139.19-28.5Q275.84-177 227.42-225.42 179-273.84 150.5-338.81 122-403.77 122-478q0-155 100.08-257.5Q322.15-838 477-838q149 0 255 96.5T838-494q0 75-50.57 124.5Q736.85-320 660-320h-63q-11 0-18.5 7.5T571-294q0 7 7.5 14.5T597-272q19 0 33 14.5t14 34.5q0 48-43.81 75.5Q556.38-120 480-120Zm-3-60q49 0 82.5-14.5T593-223q0-2-6.5-5.5T569-232q-34 0-58-24t-24-58q0-34 24-58t58-24h91q46 0 82-31.5t36-79.5q0-121-85-196t-216-75q-128 0-211.5 81T182-478q0 122 85.5 210T477-180Zm-197-223q25 0 42.5-17.5T340-463q0-25-17.5-42.5T280-523q-25 0-42.5 17.5T220-463q0 25 17.5 42.5T280-403Zm100-130q25 0 42.5-17.5T440-593q0-25-17.5-42.5T380-653q-25 0-42.5 17.5T320-593q0 25 17.5 42.5T380-533Zm200 0q25 0 42.5-17.5T640-593q0-25-17.5-42.5T580-653q-25 0-42.5 17.5T520-593q0 25 17.5 42.5T580-533Zm100 130q25 0 42.5-17.5T740-463q0-25-17.5-42.5T680-523q-25 0-42.5 17.5T620-463q0 25 17.5 42.5T680-403Z',
   } as const;
 
   // --- Custom Profiles ---
@@ -1074,7 +1853,7 @@
   }
 
   function importProfileFromFile() {
-    if (isStandaloneView && settings.betaEnabled && settings.betaStandalonePage) {
+    if (isStandaloneView) {
       activeSheet = 'profile-import';
       return;
     }
@@ -1093,7 +1872,6 @@
       customProfiles: profiles,
       activeProfile: wasActive ? 'none' : settings.activeProfile,
     });
-    if (wasActive) profileModified = false;
   }
 
   function startRenameProfile(index: number) {
@@ -1125,12 +1903,14 @@
     delete (resetData as any).language;
     delete (resetData as any).customProfiles;
     delete (resetData as any).activeProfile;
+    delete (resetData as any).betaStandalonePage;
+    delete (resetData as any).developerEnabled;
     const profileSettings = resolveAppliedProfileSettings(profile.settings);
+    stripLogoDefaults(resetData, profileSettings);
 
     const merged = { ...resetData, ...profileSettings, activeProfile: 'custom:' + profile.name };
     patchLocalSettings(merged);
     void saveSettings(merged);
-    profileModified = false;
     showFeedback('profile');
   }
 
@@ -1143,9 +1923,11 @@
       langVersion++;
     }
     await saveSettings(resetData);
-    profileModified = false;
+    syncProfileModifiedState(settings);
     showResetConfirm = false;
-    showFeedback('imported');
+    developerConfirmOpen = false;
+    developerFeedback = null;
+    showFeedback('reset');
   }
 
   let currentLangDisplay = $derived(getLanguageDisplayName(settings.language, false));
@@ -1193,15 +1975,32 @@
     { id: 'hidden', label: 'thumbnailHidden' },
   ];
 
-  const THUMBNAIL_SHAPES = [
-    { id: 'none', label: 'thumbShapeDefault' },
-    { id: 'sharp', label: 'thumbShapeSharp' },
-    { id: 'rounded', label: 'thumbShapeRounded' },
-    { id: 'scallop', label: 'thumbShapeScallop' },
-    { id: 'notched', label: 'thumbShapeNotched' },
-    { id: 'slanted', label: 'thumbShapeSlanted' },
-    { id: 'arch', label: 'thumbShapeArch' },
-    { id: 'fan', label: 'thumbShapeFan' },
+  const AVATAR_SHAPE_ITEMS = [
+    { id: 'none', labelKey: 'shapeDefault', svgContent: '<circle cx="16" cy="16" r="13" fill="currentColor"/>' },
+    { id: 'superellipse', labelKey: 'shapeSuperellipse', svgContent: '<rect x="3" y="3" width="26" height="26" rx="6" fill="currentColor"/>' },
+    { id: 'rounded-square', labelKey: 'shapeRoundedSquare', svgContent: '<rect x="3" y="3" width="26" height="26" rx="3" fill="currentColor"/>' },
+    { id: 'notched', labelKey: 'thumbShapeNotched', svgContent: '<path d="M10,2 H22 L30,10 V22 L22,30 H10 L2,22 V10 Z" fill="currentColor"/>' },
+    { id: 'slanted', labelKey: 'thumbShapeSlanted', svgContent: '<path d="M8,3 H30 L24,29 H2 Z" fill="currentColor"/>' },
+    { id: 'arch', labelKey: 'thumbShapeArch', svgContent: '<path d="M7,29 H25 Q29,29 29,25 V14 Q29,3 16,3 Q3,3 3,14 V25 Q3,29 7,29Z" fill="currentColor"/>' },
+    { id: 'diamond', labelKey: 'shapeDiamond', svgContent: '<rect x="5" y="5" width="22" height="22" rx="5" fill="currentColor" transform="rotate(45 16 16)"/>' },
+    { id: 'hexagon', labelKey: 'shapeHexagon', svgContent: '<path d="M18,1.5 L28,7.2 Q30,8.5,30,11 L30,21 Q30,23.5,28,24.8 L18,30.5 Q16,31.7,14,30.5 L4,24.8 Q2,23.5,2,21 L2,11 Q2,8.5,4,7.2 L14,1.5 Q16,0.3,18,1.5Z" fill="currentColor"/>' },
+    { id: 'octagon', labelKey: 'shapeOctagon', svgContent: '<path d="M11,2 L21,2 Q23,2,25,4 L28,7 Q30,9,30,11 L30,21 Q30,23,28,25 L25,28 Q23,30,21,30 L11,30 Q9,30,7,28 L4,25 Q2,23,2,21 L2,11 Q2,9,4,7 L7,4 Q9,2,11,2Z" fill="currentColor"/>' },
+    { id: 'clover', labelKey: 'shapeClover', svgContent: '<path d="M16,1 C20.5,1,21.8,5.8,26.2,7.8 C30.4,9.7,31,13.5,31,16 C31,20.5,26.2,21.8,24.2,26.2 C22.3,30.4,18.5,31,16,31 C11.5,31,10.2,26.2,5.8,24.2 C1.6,22.3,1,18.5,1,16 C1,11.5,5.8,10.2,7.8,5.8 C9.7,1.6,13.5,1,16,1Z" fill="currentColor"/>' },
+    { id: 'flower', labelKey: 'shapeFlower', svgContent: '<path d="M26.8,5.2 C30,8.4,28.1,11.7,29.9,16 C31.3,20.1,30,23.6,26.8,26.8 C23.6,30,20.3,28.1,16,29.9 C11.9,31.3,8.4,30,5.2,26.8 C2,23.6,3.9,20.3,2.1,16 C0.7,11.9,2,8.4,5.2,5.2 C8.4,2,11.7,3.9,16,2.1 C20.1,0.7,23.6,2,26.8,5.2Z" fill="currentColor"/>' },
+    { id: 'square', labelKey: 'shapeSquare', svgContent: '<rect x="3" y="3" width="26" height="26" fill="currentColor"/>' },
+  ];
+
+  const THUMBNAIL_SHAPE_ITEMS = [
+    { id: 'none', labelKey: 'thumbShapeDefault', viewBox: '0 0 44 28', svgContent: '<rect x="2" y="4" width="40" height="20" rx="4" fill="currentColor"/>' },
+    { id: 'sharp', labelKey: 'thumbShapeSharp', viewBox: '0 0 44 28', svgContent: '<rect x="2" y="4" width="40" height="20" fill="currentColor"/>' },
+    { id: 'rounded', labelKey: 'thumbShapeRounded', viewBox: '0 0 44 28', svgContent: '<rect x="2" y="4" width="40" height="20" rx="6" fill="currentColor"/>' },
+    { id: 'superellipse', labelKey: 'shapeSuperellipse', viewBox: '0 0 44 28', svgContent: '<rect x="2" y="4" width="40" height="20" rx="8" fill="currentColor"/>' },
+    { id: 'notched', labelKey: 'thumbShapeNotched', viewBox: '0 0 44 28', svgContent: '<path d="M8,4 H36 L42,10 V18 L36,24 H8 L2,18 V10 Z" fill="currentColor"/>' },
+    { id: 'slanted', labelKey: 'thumbShapeSlanted', viewBox: '0 0 44 28', svgContent: '<path d="M6,4 H42 L38,24 H2 Z" fill="currentColor"/>' },
+    { id: 'arch', labelKey: 'thumbShapeArch', viewBox: '0 0 44 28', svgContent: '<path d="M8,24 H36 Q40,24 40,20 V14 Q40,4 22,4 Q4,4 4,14 V20 Q4,24 8,24 Z" fill="currentColor"/>' },
+    { id: 'diamond', labelKey: 'shapeDiamond', viewBox: '0 0 44 28', svgContent: '<path d="M14,4 H30 L40,14 L30,24 H14 L4,14 Z" fill="currentColor"/>' },
+    { id: 'hexagon', labelKey: 'shapeHexagon', viewBox: '0 0 44 28', svgContent: '<path d="M10,4 H34 L42,14 L34,24 H10 L2,14 Z" fill="currentColor"/>' },
+    { id: 'octagon', labelKey: 'shapeOctagon', viewBox: '0 0 44 28', svgContent: '<path d="M8,4 H36 L42,10 V18 L36,24 H8 L2,18 V10 Z" fill="currentColor"/>' },
   ];
 
   const BANNER_STYLES = [
@@ -1277,10 +2076,10 @@
       <header class="app-header">
         <div class="header-content">
           <div class="header-brand">
-            <img src="/logo-header.png" alt="YouTube Rewind" class="app-logo" />
+            <span class="app-logo" role="img" aria-label="YouTube Rewind"></span>
           </div>
           <div class="header-actions">
-            {#if settings.betaEnabled && settings.betaStandalonePage && !isStandaloneView}
+            {#if !isStandaloneView}
               <button class="info-button" onclick={openStandalonePage} title={t('betaOpenStandalone')} aria-label={t('betaOpenStandalone')}>
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="3" y="4" width="18" height="14" rx="2"/>
@@ -1362,7 +2161,7 @@
                         <polyline points="7 10 12 15 17 10"/>
                         <line x1="12" y1="15" x2="12" y2="3"/>
                       </svg>
-                      {t('updateDownload')}
+                      <span>{t('updateDownload')}</span>
                     </a>
                   {:else if updateState === 'up-to-date'}
                     <div class="update-status update-status-ok">
@@ -1388,15 +2187,6 @@
         </div>
       </header>
 
-      {#if isStandaloneView && !(settings.betaEnabled && settings.betaStandalonePage)}
-        <div class="standalone-locked">
-          <div class="standalone-locked-card">
-            <div class="standalone-locked-badge">{t('sectionBeta')}</div>
-            <h2>{t('betaStandaloneLockedTitle')}</h2>
-            <p>{t('betaStandaloneLockedMessage')}</p>
-          </div>
-        </div>
-      {:else}
         <!-- Search bar -->
         <div class="search-bar" class:focused={searchFocused}>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1423,13 +2213,13 @@
         <SettingsSection title={t('sectionProfiles')} icon={ICON.tune} hidden={!sectionVisible(['sectionProfiles', 'profileNone', 'profileFocus', 'profileMinimal', 'profileClean', 'profileSaveCurrent', 'profileFromFile'], ['custom', 'preset'])}>
           <div class="effect-picker">
             {#each PROFILE_OPTIONS as profile (profile.id)}
-              <button
-                class="effect-option"
-                class:active={settings.activeProfile === profile.id}
-                onclick={() => applyProfile(profile.id)}
-              >
-                {t(profile.label)}
-              </button>
+                <button
+                  class="effect-option"
+                  class:active={settings.activeProfile === profile.id}
+                  onclick={() => applyProfile(profile.id)}
+                >
+                  <span class="effect-option-label">{t(profile.label)}</span>
+                </button>
             {/each}
             {#each settings.customProfiles || [] as cp, i}
               <div class="custom-profile-chip">
@@ -1451,24 +2241,17 @@
                     ondblclick={(e) => { e.preventDefault(); startRenameProfile(i); }}
                     title={t('profileRenameHint')}
                   >
-                    {cp.name}
+                    <span class="effect-option-label">{cp.name}</span>
                   </button>
                 {/if}
-                <button class="custom-profile-delete" onclick={() => deleteCustomProfile(i)} title={t('profileDelete')}>
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <button class="custom-profile-delete" onclick={() => deleteCustomProfile(i)} title={t('profileDelete')} aria-label={t('profileDelete')}>
+                  <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                   </svg>
                 </button>
               </div>
             {/each}
           </div>
-          {#if profileModified && settings.activeProfile !== 'none'}
-            <div class="profile-save-row">
-              <button class="action-btn action-btn-save" onclick={saveChangesToProfile}>
-                {t('profileSaveChanges')}
-              </button>
-            </div>
-          {/if}
           {#if showProfileAdd}
             <div class="profile-add-card">
               <input
@@ -1489,13 +2272,26 @@
               </div>
             </div>
           {:else}
-            <div class="profile-add-trigger">
+            <div class="profile-actions-row">
               <button class="action-btn" onclick={() => { showProfileAdd = true; }} aria-label="Add profile">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
               </button>
+              {#if getActiveCustomProfile()}
+                <button class="action-btn" onclick={exportActiveCustomProfile}>
+                  {t('profileExport')}
+                </button>
+              {/if}
+              {#if profileModified && settings.activeProfile !== 'none'}
+                <button class="action-btn action-btn-save" onclick={saveChangesToProfile}>
+                  {t('profileSaveChanges')}
+                </button>
+              {/if}
             </div>
+          {/if}
+          {#if (settings.customProfiles || []).length > 0}
+            <div class="profile-helper">{t('profileRenameHelper')}</div>
           {/if}
           {#if dataFeedback === 'profile'}
             <div class="data-feedback data-feedback-ok" style="margin: 0 10px 8px;">
@@ -1504,7 +2300,7 @@
           {/if}
         </SettingsSection>
 
-        <SettingsSection title={t('sectionPlayer')} icon={ICON.play_circle} hidden={!sectionVisible(['sectionPlayer', 'settingPlaybackSpeed', 'settingDefaultQuality', 'settingClassicPlayer', 'settingWidePlayer', 'settingClassicLikeIcons', 'settingAdaptiveDescription'])}>
+        <SettingsSection title={t('sectionPlayer')} icon={ICON.play_circle} hidden={!sectionVisible(['sectionPlayer', 'settingPlaybackSpeed', 'settingClassicPlayer', 'settingWidePlayer', 'settingClassicLikeIcons', 'settingAdaptiveDescription'])}>
           <Slider
             label={t('settingPlaybackSpeed')}
             value={speedToSlider(settings.playbackSpeed)}
@@ -1515,23 +2311,19 @@
             parseInput={parseSpeed}
             onchange={(v) => update('playbackSpeed', sliderToSpeed(v))}
           />
-          <Slider
-            label={t('settingDefaultQuality')}
-            value={qualityToSlider(settings.defaultQuality)}
-            min={0}
-            max={9}
-            defaultLabel={t('qualityAuto')}
-            formatDisplay={formatQuality}
-            onchange={(v) => update('defaultQuality', sliderToQuality(v))}
-          />
           <Toggle label={t('settingClassicPlayer')} checked={settings.classicPlayer} onchange={(v) => update('classicPlayer', v)} />
           <Toggle label={t('settingWidePlayer')} checked={settings.widePlayer} onchange={(v) => update('widePlayer', v)} />
           <Toggle label={t('settingAdaptiveDescription')} checked={settings.adaptiveColorsDescription} onchange={(v) => update('adaptiveColorsDescription', v)} />
           <Toggle label={t('settingClassicLikeIcons')} checked={settings.classicLikeIcons} onchange={(v) => update('classicLikeIcons', v)} />
         </SettingsSection>
 
-        <SettingsSection title={t('sectionWatchPage')} icon={ICON.visibility} hidden={!sectionVisible(['sectionWatchPage', 'settingHideJoinButton', 'settingHideSubscribeButton', 'settingHideLikeDislike', 'settingHideShareButton', 'settingHideDownloadButton', 'settingHideClipButton', 'settingHideThanksButton', 'settingHideSaveButton', 'sectionBannerStyle'])}>
+        <SettingsSection title={t('sectionWatchPage')} icon={ICON.visibility} hidden={!sectionVisible(['sectionWatchPage', 'settingHideJoinButton', 'settingHideSubscribeButton', 'settingHideLikeDislike', 'settingHideShareButton', 'settingHideDownloadButton', 'settingHideClipButton', 'settingHideThanksButton', 'settingHideSaveButton', 'sectionBannerStyle', 'settingDownloadThumbnail', 'settingBetaVideoFrameScreenshot', 'settingBetaScreenshotInstantDownload'])}>
           <ChipGroup filters={visibleFilters(videoButtonFilters)} />
+          <Toggle label={t('settingDownloadThumbnail')} checked={settings.downloadThumbnailButton} onchange={(v) => void applySettingsPatch({ downloadThumbnailButton: v })} />
+          <Toggle label={t('settingBetaVideoFrameScreenshot')} checked={settings.betaVideoFrameScreenshot} onchange={toggleBetaVideoFrameScreenshot} />
+          {#if settings.betaVideoFrameScreenshot}
+            <Toggle label={t('settingBetaScreenshotInstantDownload')} checked={settings.betaScreenshotInstantDownload} onchange={(v) => void applySettingsPatch({ betaScreenshotInstantDownload: v })} />
+          {/if}
           <div class="sub-label">{t('sectionBannerStyle')}</div>
           <div class="effect-picker">
             {#each BANNER_STYLES as style (style.id)}
@@ -1540,7 +2332,7 @@
                 class:active={settings.bannerStyle === style.id}
                 onclick={() => update('bannerStyle', style.id)}
               >
-                {t(style.label)}
+                <span class="effect-option-label">{t(style.label)}</span>
               </button>
             {/each}
           </div>
@@ -1577,16 +2369,30 @@
           <ChipGroup filters={visibleFilters(searchFilters)} />
         </SettingsSection>
 
-        <SettingsSection title={t('sectionTopBar')} icon={ICON.web_asset} hidden={!sectionVisible(['sectionTopBar', 'settingHideTopbarCreate', 'settingHideTopbarVoiceSearch', 'settingHideTopbarNotifications', 'settingHideTopbarSearch', 'settingHideCountryCode', 'settingCustomLogo', 'settingCustomLogoSize', 'settingHideLogoAnimation'])}>
+        <SettingsSection title={t('sectionTopBar')} icon={ICON.web_asset} hidden={!sectionVisible(['sectionTopBar', 'settingHideTopbarCreate', 'settingHideTopbarVoiceSearch', 'settingHideTopbarNotifications', 'settingHideTopbarSearch', 'settingHideCountryCode', 'settingCustomLogo', 'settingLogoVariant', 'settingCustomLogoSize', 'settingHideLogoAnimation'])}>
           <ChipGroup filters={visibleFilters(topbarFilters)} />
+          <div class="sub-label">{t('settingLogoVariant')}</div>
+          <div class="effect-picker">
+            {#each LOGO_VARIANTS as variant (variant)}
+              <button
+                class="effect-option"
+                class:active={settings.logoVariant === variant}
+                onclick={() => selectLogoVariant(variant)}
+              >
+                <span class="effect-option-label">{getLogoPresetLabel(variant)}</span>
+              </button>
+            {/each}
+          </div>
           <div class="inline-row">
             <span class="inline-label">{t('settingCustomLogo')}</span>
             <div class="inline-actions">
-              {#if settings.customLogo}
-                {#if isVideoLogo(settings.customLogo)}
-                  <video src={settings.customLogo} class="logo-preview" muted autoplay loop playsinline></video>
+              {#if settings.logoVariant === 'rewind'}
+                <span class="logo-preview logo-preview-rewind" aria-hidden="true"></span>
+              {:else if getEffectiveLogoSource(settings.logoVariant, settings.customLogo)}
+                {#if isVideoLogo(getEffectiveLogoSource(settings.logoVariant, settings.customLogo))}
+                  <video src={getEffectiveLogoSource(settings.logoVariant, settings.customLogo)} class="logo-preview" muted autoplay loop playsinline></video>
                 {:else}
-                  <img src={settings.customLogo} alt="" class="logo-preview" />
+                  <img src={getEffectiveLogoSource(settings.logoVariant, settings.customLogo)} alt="" class="logo-preview" />
                 {/if}
               {/if}
               <button class="action-btn" onclick={openLogoPage}>{t('customLogoUpload')}</button>
@@ -1595,25 +2401,38 @@
               {/if}
             </div>
           </div>
-          {#if settings.customLogo}
-            <Slider
-              label={t('settingCustomLogoSize')}
-              value={settings.customLogoScale}
-              min={40}
-              max={220}
-              formatDisplay={formatPercent}
-              parseInput={parsePercent}
-              onchange={(v) => update('customLogoScale', v)}
-            />
+          <Slider
+            label={t('settingCustomLogoSize')}
+            value={getLogoScaleValue(settings, settings.logoVariant)}
+            min={40}
+            max={220}
+            formatDisplay={formatPercent}
+            parseInput={parsePercent}
+            onchange={(v) => updateLogoScale(settings.logoVariant, v)}
+          />
+          <div class="sheet-actions-row sheet-actions-inline">
+            <button class="action-btn" onclick={() => resetLogoScale(settings.logoVariant)}>
+              {t('resetSettings')}
+            </button>
+          </div>
+          <Toggle label={t('settingHideLogoAnimation')} checked={settings.hideLogoAnimation} onchange={toggleHideLogoAnimation} />
+          {#if logoAnimationConfirmOpen}
+            <div class="inline-confirm inline-confirm-warning">
+              <div class="inline-confirm-title">{t('logoAnimationWarningTitle')}</div>
+              <div class="inline-confirm-message">{t('logoAnimationCustomWarning')}</div>
+              <div class="inline-confirm-actions">
+                <button class="action-btn" onclick={cancelLogoAnimationConfirm}>{t('logoAnimationWarningCancel')}</button>
+                <button class="action-btn action-btn-save" onclick={confirmLogoAnimationEnable}>{t('logoAnimationWarningConfirm')}</button>
+              </div>
+            </div>
           {/if}
-          <Toggle label={t('settingHideLogoAnimation')} checked={settings.hideLogoAnimation} onchange={(v) => update('hideLogoAnimation', v)} />
         </SettingsSection>
 
         <SettingsSection title={t('sectionSidebarFilter')} icon={ICON.view_sidebar} hidden={!sectionVisible(['sectionSidebarFilter', 'settingHideSidebarSubscriptions', 'settingHideSidebarYou', 'settingHideSidebarExplore', 'settingHideSidebarMoreFromYT', 'settingHideSidebarReportHistory', 'settingHideSidebarFooter'])}>
           <ChipGroup filters={visibleFilters(sidebarFilters)} />
         </SettingsSection>
 
-        <SettingsSection title={t('sectionThumbnailEffect')} icon={ICON.image} hidden={!sectionVisible(['sectionThumbnailEffect', 'thumbnailHoverReveal', 'settingDisableHoverAnimation', 'sectionThumbnailShape'])}>
+        <SettingsSection title={t('sectionThumbnailEffect')} icon={ICON.image} hidden={!sectionVisible(['sectionThumbnailEffect', 'thumbnailHoverReveal', 'settingDisableThumbnailPreview', 'settingDisableHoverAnimation', 'sectionThumbnailShape'])}>
           <div class="effect-picker">
             {#each THUMBNAIL_EFFECTS as effect (effect.id)}
               <button
@@ -1621,95 +2440,193 @@
                 class:active={settings.thumbnailEffect === effect.id}
                 onclick={() => update('thumbnailEffect', effect.id)}
               >
-                {t(effect.label)}
+                <span class="effect-option-label">{t(effect.label)}</span>
               </button>
             {/each}
           </div>
           {#if settings.thumbnailEffect !== 'none'}
             <Toggle label={t('thumbnailHoverReveal')} checked={settings.thumbnailHoverReveal} onchange={(v) => update('thumbnailHoverReveal', v)} />
           {/if}
+          <Toggle label={t('settingDisableThumbnailPreview')} checked={settings.disableThumbnailPreview} onchange={(v) => update('disableThumbnailPreview', v)} />
           <Toggle label={t('settingDisableHoverAnimation')} checked={settings.disableHoverAnimation} onchange={(v) => update('disableHoverAnimation', v)} />
           <div class="sub-label">{t('sectionThumbnailShape')}</div>
-          <div class="effect-picker">
-            {#each THUMBNAIL_SHAPES as shape (shape.id)}
-              <button
-                class="effect-option"
-                class:active={settings.thumbnailShape === shape.id}
-                onclick={() => update('thumbnailShape', shape.id)}
-              >
-                {t(shape.label)}
-              </button>
-            {/each}
-          </div>
+          <ShapePicker
+            variant="thumbnail"
+            value={settings.thumbnailShape}
+            onchange={(v) => update('thumbnailShape', v)}
+            items={THUMBNAIL_SHAPE_ITEMS.map((shape) => ({ ...shape, label: t(shape.labelKey) }))}
+          />
         </SettingsSection>
 
         <SettingsSection title={t('sectionAvatarShape')} icon={ICON.person} hidden={!sectionVisible(['sectionAvatarShape'], ['avatar', 'shape', 'form'])}>
-          <ShapePicker variant="avatar" value={settings.avatarShape} onchange={(v) => update('avatarShape', v)} />
+          <ShapePicker
+            variant="avatar"
+            value={settings.avatarShape}
+            onchange={(v) => update('avatarShape', v)}
+            items={AVATAR_SHAPE_ITEMS.map((shape) => ({ ...shape, label: t(shape.labelKey) }))}
+          />
         </SettingsSection>
 
-        <SettingsSection title={t('sectionData')} icon={ICON.database} hidden={!sectionVisible(['sectionData', 'exportLabel', 'importLabel', 'exportJSON', 'exportTXT', 'copyClipboard', 'importSettings', 'pasteClipboard', 'resetSettings'])}>
+        <SettingsSection title={t('sectionInterface')} icon={ICON.palette} hidden={!sectionVisible(['sectionInterface', 'settingInterfaceThemeMode', 'settingInterfaceThemePresets', 'settingInterfaceThemeColor', 'settingInterfaceThemeCustomColor', 'settingInterfaceThemeReset', 'themeAuto', 'themeDark', 'themeLight'], ['theme', 'color', 'accent', 'ui'])}>
+          <div class="sub-label">{t('settingInterfaceThemeMode')}</div>
+          <div class="effect-picker">
+            <button
+              class="effect-option"
+              class:active={settings.interfaceThemeMode === 'auto'}
+              onclick={() => switchInterfaceThemeMode('auto')}
+            >
+              <span class="effect-option-label">{t('themeAuto')}</span>
+            </button>
+            <button
+              class="effect-option"
+              class:active={settings.interfaceThemeMode === 'dark'}
+              onclick={() => switchInterfaceThemeMode('dark')}
+            >
+              <span class="effect-option-label">{t('themeDark')}</span>
+            </button>
+            <button
+              class="effect-option"
+              class:active={settings.interfaceThemeMode === 'light'}
+              onclick={() => switchInterfaceThemeMode('light')}
+            >
+              <span class="effect-option-label">{t('themeLight')}</span>
+            </button>
+          </div>
+          <div class="sub-label">{t('settingInterfaceThemePresets')}</div>
+          <div class="effect-picker interface-theme-presets">
+            {#each THEME_PRESETS as preset (preset.id)}
+              <button
+                class="effect-option interface-theme-preset"
+                class:active={isThemePresetActive(preset)}
+                onclick={() => applyThemePreset(preset)}
+              >
+                <span class="interface-theme-preset-swatch" style={`background:${getThemePresetColor(preset)}`}></span>
+                <span class="effect-option-label">{t(preset.label)}</span>
+              </button>
+            {/each}
+          </div>
+          <Slider
+            label={t('settingInterfaceThemeColor')}
+            value={settings.interfaceThemeHue}
+            min={0}
+            max={360}
+            formatDisplay={formatThemeHue}
+            onchange={updateInterfaceThemeHue}
+          />
+          <ColorPicker
+            label={t('settingInterfaceThemeCustomColor')}
+            value={getSeedThemeColor(settings.interfaceThemeColor)}
+            presets={themeColorPresets}
+            floating={isStandaloneView}
+            onchange={commitInterfaceThemeColor}
+          />
+          <div class="interface-theme-actions">
+            <button type="button" class="action-btn interface-theme-reset" onclick={resetInterfaceThemePalette}>
+              {t('settingInterfaceThemeReset')}
+            </button>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection title={t('sectionDeveloper')} icon={ICON.database} hidden={!sectionVisible(['sectionDeveloper', 'settingDeveloperEnabled', 'developerCopyDebug', 'developerClearUpdateCache', 'developerResetWatchTime', 'developerReloadExtension', 'exportLabel', 'importLabel', 'resetSettings'])}>
           <div class="data-section">
-            <div class="data-group">
-              <div class="data-group-label">{t('exportLabel')}</div>
-              <div class="data-actions">
-                <button class="action-btn" onclick={() => exportFile('json')}>{t('exportJSON')}</button>
-                <button class="action-btn" onclick={() => exportFile('txt')}>{t('exportTXT')}</button>
-                <button class="action-btn" onclick={copyToClipboard}>{t('copyClipboard')}</button>
+            <div class="data-toggle-wrap">
+              <Toggle label={t('settingDeveloperEnabled')} checked={settings.developerEnabled} onchange={toggleDeveloperTools} />
+            </div>
+            {#if settings.developerEnabled}
+              <div class="data-group">
+                <div class="data-group-label">{t('exportLabel')}</div>
+                <div class="data-actions">
+                  <button class="action-btn" onclick={() => exportFile('json')}>{t('exportJSON')}</button>
+                  <button class="action-btn" onclick={() => exportFile('txt')}>{t('exportTXT')}</button>
+                  <button class="action-btn" onclick={copyToClipboard}>{t('copyClipboard')}</button>
+                </div>
               </div>
-            </div>
-            <div class="data-divider"></div>
-            <div class="data-group">
-              <div class="data-group-label">{t('importLabel')}</div>
-              <div class="data-actions">
-                <button class="action-btn" onclick={openImportPage}>{t('importSettings')}</button>
-                <button class="action-btn" onclick={pasteFromClipboard}>{t('pasteClipboard')}</button>
+              <div class="data-divider"></div>
+              <div class="data-group">
+                <div class="data-group-label">{t('importLabel')}</div>
+                <div class="data-actions">
+                  <button class="action-btn" onclick={openImportPage}>{t('importSettings')}</button>
+                  <button class="action-btn" onclick={pasteFromClipboard}>{t('pasteClipboard')}</button>
+                </div>
               </div>
-            </div>
-            <div class="data-divider"></div>
-            <div class="data-group">
-              <button class="action-btn action-btn-danger" onclick={() => { showResetConfirm = true; }}>{t('resetSettings')}</button>
-            </div>
+              <div class="data-divider"></div>
+              <div class="data-group">
+                <div class="data-group-label">{t('developerDiagnostics')}</div>
+                <div class="data-actions">
+                  <button class="action-btn" onclick={() => void copyDeveloperSnapshot()}>{t('developerCopyDebug')}</button>
+                  <button class="action-btn" onclick={() => void clearDeveloperUpdateCache()}>{t('developerClearUpdateCache')}</button>
+                  <button class="action-btn" onclick={() => void resetDeveloperWatchTime()}>{t('developerResetWatchTime')}</button>
+                </div>
+              </div>
+              <div class="data-divider"></div>
+              <div class="data-group">
+                <div class="data-group-label">{t('developerMaintenance')}</div>
+                <div class="data-actions">
+                  <button class="action-btn" onclick={reloadExtension}>{t('developerReloadExtension')}</button>
+                  <button class="action-btn action-btn-danger" onclick={() => { showResetConfirm = true; }}>{t('resetSettings')}</button>
+                </div>
+              </div>
+            {/if}
+            {#if developerConfirmOpen}
+              <div class="inline-confirm inline-confirm-warning">
+                <div class="inline-confirm-title">{t('developerEnableTitle')}</div>
+                <div class="inline-confirm-message">{t('developerEnableMessage')}</div>
+                <div class="inline-confirm-actions">
+                  <button class="action-btn" onclick={cancelDeveloperEnable}>{t('developerEnableCancel')}</button>
+                  <button class="action-btn action-btn-save" onclick={confirmDeveloperEnable}>{t('developerEnableConfirm')}</button>
+                </div>
+              </div>
+            {/if}
             {#if showResetConfirm}
-              <div class="reset-confirm">
-                <div class="reset-confirm-title">{t('resetConfirmTitle')}</div>
-                <div class="reset-confirm-message">{t('resetConfirmMessage')}</div>
-                <div class="reset-confirm-actions">
+              <div class="inline-confirm inline-confirm-danger">
+                <div class="inline-confirm-title">{t('resetConfirmTitle')}</div>
+                <div class="inline-confirm-message">{t('resetConfirmMessage')}</div>
+                <div class="inline-confirm-actions">
                   <button class="action-btn" onclick={() => { showResetConfirm = false; }}>{t('resetCancelButton')}</button>
                   <button class="action-btn action-btn-danger" onclick={resetAllSettings}>{t('resetConfirmButton')}</button>
                 </div>
               </div>
             {/if}
             {#if dataFeedback && dataFeedback !== 'profile'}
-              <div class="data-feedback" class:data-feedback-ok={dataFeedback === 'copied' || dataFeedback === 'imported'} class:data-feedback-err={dataFeedback === 'error'}>
-                {dataFeedback === 'copied' ? t('copiedToClipboard') : dataFeedback === 'imported' ? t('importSuccess') : t('importError')}
+              <div class="data-feedback" class:data-feedback-ok={dataFeedback === 'copied' || dataFeedback === 'imported' || dataFeedback === 'reset'} class:data-feedback-err={dataFeedback === 'error'}>
+                {dataFeedback === 'copied'
+                  ? t('copiedToClipboard')
+                  : dataFeedback === 'imported'
+                    ? t('importSuccess')
+                    : dataFeedback === 'reset'
+                      ? t('resetDone')
+                      : t('importError')}
+              </div>
+            {/if}
+            {#if developerFeedback}
+              <div class="data-feedback" class:data-feedback-ok={developerFeedback.type === 'ok'} class:data-feedback-err={developerFeedback.type === 'error'}>
+                {developerFeedback.text}
               </div>
             {/if}
           </div>
         </SettingsSection>
 
-        <SettingsSection title={t('sectionBeta')} icon={ICON.info} hidden={!sectionVisible(['sectionBeta', 'settingBetaEnabled', 'settingDownloadThumbnail', 'settingDisableAvatarLive', 'settingBetaStandalonePage', 'settingBetaHomepageRevealAnimation', 'settingBetaVideoFrameScreenshot', 'settingBetaScreenshotOpenPreview'])}>
+        <SettingsSection title={t('sectionBeta')} icon={ICON.info} hidden={!sectionVisible(['sectionBeta', 'settingBetaEnabled', 'settingDefaultQuality', 'settingDisableAvatarLive', 'settingBetaHomepageRevealAnimation'])}>
           <Toggle label={t('settingBetaEnabled')} checked={settings.betaEnabled} onchange={toggleBetaFeatures} />
           {#if settings.betaEnabled}
-            <Toggle label={t('settingDownloadThumbnail')} checked={settings.downloadThumbnailButton} onchange={(v) => void applySettingsPatch({ downloadThumbnailButton: v })} />
+            <Slider
+              label={t('settingDefaultQuality')}
+              value={qualityToSlider(settings.defaultQuality)}
+              min={0}
+              max={9}
+              defaultLabel={t('qualityAuto')}
+              formatDisplay={formatQuality}
+              onchange={(v) => update('defaultQuality', sliderToQuality(v))}
+            />
             <Toggle label={t('settingDisableAvatarLive')} checked={settings.disableAvatarLiveRedirect} onchange={(v) => void applySettingsPatch({ disableAvatarLiveRedirect: v })} />
-            <Toggle label={t('settingBetaStandalonePage')} checked={settings.betaStandalonePage} onchange={toggleBetaStandalonePage} />
             <Toggle label={t('settingBetaHomepageRevealAnimation')} checked={settings.betaHomepageRevealAnimation} onchange={(v) => void applySettingsPatch({ betaHomepageRevealAnimation: v })} />
-            <Toggle label={t('settingBetaVideoFrameScreenshot')} checked={settings.betaVideoFrameScreenshot} onchange={toggleBetaVideoFrameScreenshot} />
-            {#if settings.betaVideoFrameScreenshot}
-              <Toggle label={t('settingBetaScreenshotOpenPreview')} checked={settings.betaScreenshotOpenPreview} onchange={(v) => void applySettingsPatch({ betaScreenshotOpenPreview: v })} />
-            {/if}
-            {#if settings.betaStandalonePage}
-              <div class="beta-actions">
-                <button class="action-btn" onclick={openStandalonePage}>{t('betaOpenStandalone')}</button>
-              </div>
-            {/if}
           {/if}
 
           {#if betaConfirmOpen}
-            <div class="beta-confirm">
-              <div class="beta-confirm-title">{t('betaEnableTitle')}</div>
-              <div class="beta-confirm-message">{t('betaEnableMessage')}</div>
-              <div class="beta-confirm-actions">
+            <div class="inline-confirm inline-confirm-warning">
+              <div class="inline-confirm-title">{t('betaEnableTitle')}</div>
+              <div class="inline-confirm-message">{t('betaEnableMessage')}</div>
+              <div class="inline-confirm-actions">
                 <button class="action-btn" onclick={cancelBetaEnable}>{t('betaEnableCancel')}</button>
                 <button class="action-btn action-btn-save" onclick={confirmBetaEnable}>{t('betaEnableConfirm')}</button>
               </div>
@@ -1723,15 +2640,15 @@
         <div class="about-links">
           <a class="about-link" href="https://t.me/ytrewind_extension" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-            {t('aboutTelegram')}
+            <span>{t('aboutTelegram')}</span>
           </a>
           <a class="about-link" href="https://addons.mozilla.org/firefox/addon/youtube-rewind/" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8.824 7.287c.008 0 .004 0 0 0zm-2.8-1.4c.006 0 .003 0 0 0zm16.754 2.161c-.505-1.215-1.53-2.528-2.333-2.943.654 1.283 1.033 2.57 1.177 3.53l.002.02c-1.314-3.278-3.544-4.6-5.366-7.477-.091-.147-.184-.292-.273-.446a3.545 3.545 0 01-.13-.24 2.118 2.118 0 01-.172-.46.03.03 0 00-.027-.03.038.038 0 00-.021 0l-.006.001a.037.037 0 00-.01.005L15.624 0c-2.585 1.515-3.657 4.168-3.932 5.856a6.197 6.197 0 00-2.305.587.297.297 0 00-.147.37c.057.162.24.24.396.17a5.622 5.622 0 012.008-.523l.067-.005a5.847 5.847 0 011.957.222l.095.03a5.816 5.816 0 01.616.228c.08.036.16.073.238.112l.107.055a5.835 5.835 0 01.368.211 5.953 5.953 0 012.034 2.104c-.62-.437-1.733-.868-2.803-.681 4.183 2.09 3.06 9.292-2.737 9.02a5.164 5.164 0 01-1.513-.292 4.42 4.42 0 01-.538-.232c-1.42-.735-2.593-2.121-2.74-3.806 0 0 .537-2 3.845-2 .357 0 1.38-.998 1.398-1.287-.005-.095-2.029-.9-2.817-1.677-.422-.416-.622-.616-.8-.767a3.47 3.47 0 00-.301-.227 5.388 5.388 0 01-.032-2.842c-1.195.544-2.124 1.403-2.8 2.163h-.006c-.46-.584-.428-2.51-.402-2.913-.006-.025-.343.176-.389.206-.406.29-.787.616-1.136.974-.397.403-.76.839-1.085 1.303a9.816 9.816 0 00-1.562 3.52c-.003.013-.11.487-.19 1.073-.013.09-.026.181-.037.272a7.8 7.8 0 00-.069.667l-.002.034-.023.387-.001.06C.386 18.795 5.593 24 12.016 24c5.752 0 10.527-4.176 11.463-9.661.02-.149.035-.298.052-.448.232-1.994-.025-4.09-.753-5.844z"/></svg>
-            {t('aboutFirefox')}
+            <span>{t('aboutFirefox')}</span>
           </a>
           <a class="about-link" href="https://github.com/crixqq/YouTube-Rewind" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
-            {t('aboutGitHub')}
+            <span>{t('aboutGitHub')}</span>
           </a>
         </div>
         <div class="about-creator">
@@ -1739,186 +2656,199 @@
         </div>
         <a class="footer-link" href="https://github.com/crixqq/YouTube-Rewind/blob/main/LICENSE" target="_blank" rel="noopener">GPL-3.0</a>
       </footer>
-      {/if}
 
-      {#if activeSheet}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="sheet-backdrop" onclick={(event) => { if (event.target === event.currentTarget) clearSheetState(); }}>
-          <div class="sheet-card" role="dialog" aria-modal="true">
-            <div class="sheet-header">
-              <div class="sheet-title-wrap">
-                <div class="sheet-kicker">{activeSheet === 'logo' ? t('settingCustomLogo') : activeSheet === 'profile-import' ? t('profileFromFile') : t('importSettings')}</div>
-                <h2 class="sheet-title">
-                  {activeSheet === 'logo'
-                    ? t('settingCustomLogo')
-                    : activeSheet === 'profile-import'
-                      ? t('profileFromFile')
-                      : t('importSettings')}
-                </h2>
-              </div>
-              <button class="sheet-close" onclick={clearSheetState} aria-label={t('resetCancelButton')}>
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
+  </div>
+  {#if activeSheet}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="sheet-backdrop" onclick={(event) => { if (event.target === event.currentTarget) clearSheetState(); }}>
+      <div class="sheet-card" role="dialog" aria-modal="true">
+        <div class="sheet-header">
+          <div class="sheet-title-wrap">
+            <div class="sheet-kicker">{activeSheet === 'logo' ? t('settingCustomLogo') : activeSheet === 'profile-import' ? t('profileFromFile') : t('importSettings')}</div>
+            <h2 class="sheet-title">
+              {activeSheet === 'logo'
+                ? t('settingCustomLogo')
+                : activeSheet === 'profile-import'
+                  ? t('profileFromFile')
+                  : t('importSettings')}
+            </h2>
+          </div>
+          <button class="sheet-close" onclick={clearSheetState} aria-label={t('resetCancelButton')}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="sheet-content">
+          {#if activeSheet === 'import'}
+            <label
+              class="sheet-drop-zone"
+              class:dragging={importDragging}
+              ondrop={(event) => {
+                event.preventDefault();
+                importDragging = false;
+                const file = event.dataTransfer?.files?.[0];
+                if (file) void loadImportFile(file, 'import');
+              }}
+              ondragover={(event) => {
+                event.preventDefault();
+                importDragging = true;
+              }}
+              ondragleave={() => { importDragging = false; }}
+            >
+              <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="18" x2="12" y2="12"/>
+                <polyline points="9 15 12 12 15 15"/>
+              </svg>
+              <span class="sheet-drop-title">{t('importDrop')}</span>
+              <span class="sheet-drop-hint">{t('importHint')}</span>
+              <input class="sheet-file-input" type="file" accept=".json,.txt" onchange={(event) => onImportFileInput(event, 'import')} />
+            </label>
+            <div class="sheet-actions-row">
+              <button class="action-btn" class:is-loading={importPasting} onclick={() => void pasteSettingsIntoSheet()}>
+                {t('pasteClipboard')}
               </button>
             </div>
-
-            <div class="sheet-content">
-              {#if activeSheet === 'import'}
-                <label
-                  class="sheet-drop-zone"
-                  class:dragging={importDragging}
-                  ondrop={(event) => {
-                    event.preventDefault();
-                    importDragging = false;
-                    const file = event.dataTransfer?.files?.[0];
-                    if (file) void loadImportFile(file, 'import');
+          {:else if activeSheet === 'profile-import'}
+            {#if pendingProfileText}
+              <div class="sheet-profile-confirm">
+                <div class="sheet-field-label">{t('profileNamePlaceholder')}</div>
+                <input
+                  class="profile-name-input"
+                  type="text"
+                  placeholder={t('profileNamePlaceholder')}
+                  bind:value={sheetProfileNameInput}
+                  onkeydown={(event) => {
+                    if (event.key === 'Enter') void confirmSheetProfileImport();
+                    if (event.key === 'Escape') cancelSheetProfileImport();
                   }}
-                  ondragover={(event) => {
-                    event.preventDefault();
-                    importDragging = true;
-                  }}
-                  ondragleave={() => { importDragging = false; }}
-                >
-                  <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="12" y1="18" x2="12" y2="12"/>
-                    <polyline points="9 15 12 12 15 15"/>
-                  </svg>
-                  <span class="sheet-drop-title">{t('importDrop')}</span>
-                  <span class="sheet-drop-hint">{t('importHint')}</span>
-                  <input class="sheet-file-input" type="file" accept=".json,.txt" onchange={(event) => onImportFileInput(event, 'import')} />
-                </label>
-                <div class="sheet-actions-row">
-                  <button class="action-btn" class:is-loading={importPasting} onclick={() => void pasteSettingsIntoSheet()}>
-                    {t('pasteClipboard')}
-                  </button>
+                />
+                <div class="sheet-file-name">{pendingProfileFileName}</div>
+                <div class="sheet-actions-row sheet-actions-end">
+                  <button class="action-btn" onclick={cancelSheetProfileImport}>{t('resetCancelButton')}</button>
+                  <button class="action-btn action-btn-save" onclick={() => void confirmSheetProfileImport()}>{t('profileSaveCurrent')}</button>
                 </div>
-              {:else if activeSheet === 'profile-import'}
-                {#if pendingProfileText}
-                  <div class="sheet-profile-confirm">
-                    <div class="sheet-field-label">{t('profileNamePlaceholder')}</div>
-                    <input
-                      class="profile-name-input"
-                      type="text"
-                      placeholder={t('profileNamePlaceholder')}
-                      bind:value={sheetProfileNameInput}
-                      onkeydown={(event) => {
-                        if (event.key === 'Enter') void confirmSheetProfileImport();
-                        if (event.key === 'Escape') cancelSheetProfileImport();
-                      }}
-                    />
-                    <div class="sheet-file-name">{pendingProfileFileName}</div>
-                    <div class="sheet-actions-row sheet-actions-end">
-                      <button class="action-btn" onclick={cancelSheetProfileImport}>{t('resetCancelButton')}</button>
-                      <button class="action-btn action-btn-save" onclick={() => void confirmSheetProfileImport()}>{t('profileSaveCurrent')}</button>
-                    </div>
-                  </div>
+              </div>
+            {:else}
+              <label
+                class="sheet-drop-zone"
+                class:dragging={importDragging}
+                ondrop={(event) => {
+                  event.preventDefault();
+                  importDragging = false;
+                  const file = event.dataTransfer?.files?.[0];
+                  if (file) void loadImportFile(file, 'profile-import');
+                }}
+                ondragover={(event) => {
+                  event.preventDefault();
+                  importDragging = true;
+                }}
+                ondragleave={() => { importDragging = false; }}
+              >
+                <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="12" y1="18" x2="12" y2="12"/>
+                  <polyline points="9 15 12 12 15 15"/>
+                </svg>
+                <span class="sheet-drop-title">{t('profileFromFile')}</span>
+                <span class="sheet-drop-hint">{t('importHint')}</span>
+                <input class="sheet-file-input" type="file" accept=".json,.txt" onchange={(event) => onImportFileInput(event, 'profile-import')} />
+              </label>
+              <div class="sheet-actions-row">
+                <button class="action-btn" class:is-loading={importPasting} onclick={() => void pasteProfileIntoSheet()}>
+                  {t('pasteClipboard')}
+                </button>
+              </div>
+            {/if}
+          {:else if activeSheet === 'logo'}
+            <label
+              class="sheet-drop-zone"
+              class:dragging={logoDragging}
+              class:sheet-drop-zone-media={!!logoDraftUrl}
+              ondrop={(event) => {
+                event.preventDefault();
+                logoDragging = false;
+                const file = event.dataTransfer?.files?.[0];
+                if (file) void processLogoFile(file);
+              }}
+              ondragover={(event) => {
+                event.preventDefault();
+                logoDragging = true;
+              }}
+              ondragleave={() => { logoDragging = false; }}
+            >
+              {#if logoDraftUrl}
+                {#if isVideoLogo(logoDraftUrl)}
+                  <video src={logoDraftUrl} class="sheet-logo-preview" muted autoplay loop playsinline></video>
                 {:else}
-                  <label
-                    class="sheet-drop-zone"
-                    class:dragging={importDragging}
-                    ondrop={(event) => {
-                      event.preventDefault();
-                      importDragging = false;
-                      const file = event.dataTransfer?.files?.[0];
-                      if (file) void loadImportFile(file, 'profile-import');
-                    }}
-                    ondragover={(event) => {
-                      event.preventDefault();
-                      importDragging = true;
-                    }}
-                    ondragleave={() => { importDragging = false; }}
-                  >
-                    <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                      <polyline points="14 2 14 8 20 8"/>
-                      <line x1="12" y1="18" x2="12" y2="12"/>
-                      <polyline points="9 15 12 12 15 15"/>
-                    </svg>
-                    <span class="sheet-drop-title">{t('profileFromFile')}</span>
-                    <span class="sheet-drop-hint">{t('importHint')}</span>
-                    <input class="sheet-file-input" type="file" accept=".json,.txt" onchange={(event) => onImportFileInput(event, 'profile-import')} />
-                  </label>
-                  <div class="sheet-actions-row">
-                    <button class="action-btn" class:is-loading={importPasting} onclick={() => void pasteProfileIntoSheet()}>
-                      {t('pasteClipboard')}
-                    </button>
-                  </div>
+                  <img src={logoDraftUrl} alt="" class="sheet-logo-preview" />
                 {/if}
-              {:else if activeSheet === 'logo'}
-                <label
-                  class="sheet-drop-zone"
-                  class:dragging={logoDragging}
-                  class:sheet-drop-zone-media={!!logoDraftUrl}
-                  ondrop={(event) => {
-                    event.preventDefault();
-                    logoDragging = false;
-                    const file = event.dataTransfer?.files?.[0];
-                    if (file) void processLogoFile(file);
-                  }}
-                  ondragover={(event) => {
-                    event.preventDefault();
-                    logoDragging = true;
-                  }}
-                  ondragleave={() => { logoDragging = false; }}
-                >
-                  {#if logoDraftUrl}
-                    {#if isVideoLogo(logoDraftUrl)}
-                      <video src={logoDraftUrl} class="sheet-logo-preview" muted autoplay loop playsinline></video>
-                    {:else}
-                      <img src={logoDraftUrl} alt="" class="sheet-logo-preview" />
-                    {/if}
-                  {:else}
-                    <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                      <polyline points="17 8 12 3 7 8"/>
-                      <line x1="12" y1="3" x2="12" y2="15"/>
-                    </svg>
-                    <span class="sheet-drop-title">{t('customLogoDrop')}</span>
-                    <span class="sheet-drop-hint">{t('customLogoHint')}</span>
-                  {/if}
+              {:else}
+                <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <span class="sheet-drop-title">{t('customLogoDrop')}</span>
+                <span class="sheet-drop-hint">{t('customLogoHint')}</span>
+              {/if}
+              <input class="sheet-file-input" type="file" accept={LOGO_ACCEPT} onchange={onLogoFileInput} />
+            </label>
+            <div class="sheet-actions-row">
+              {#if logoDraftUrl}
+                <label class="action-btn action-btn-file">
+                  {t('customLogoUpload')}
                   <input class="sheet-file-input" type="file" accept={LOGO_ACCEPT} onchange={onLogoFileInput} />
                 </label>
-                <div class="sheet-actions-row">
-                  {#if logoDraftUrl}
-                    <label class="action-btn action-btn-file">
-                      {t('customLogoUpload')}
-                      <input class="sheet-file-input" type="file" accept={LOGO_ACCEPT} onchange={onLogoFileInput} />
-                    </label>
-                  {/if}
-                  <button class="action-btn" class:is-loading={logoPasting} onclick={() => void pasteLogoFromClipboard()}>
-                    {t('pasteClipboard')}
-                  </button>
-                  {#if logoDraftUrl}
-                    <button class="action-btn action-btn-danger" onclick={() => void removeLogoFromSheet()}>{t('customLogoRemove')}</button>
-                  {/if}
-                </div>
               {/if}
-
-              {#if sheetFeedback}
-                <div class="sheet-feedback" class:sheet-feedback-ok={sheetFeedback.type === 'ok'} class:sheet-feedback-err={sheetFeedback.type === 'error'}>
-                  {sheetFeedback.text}
-                </div>
+              <button class="action-btn" class:is-loading={logoPasting} onclick={() => void pasteLogoFromClipboard()}>
+                {t('pasteClipboard')}
+              </button>
+              {#if logoDraftUrl}
+                <button class="action-btn action-btn-danger" onclick={() => void removeLogoFromSheet()}>{t('customLogoRemove')}</button>
               {/if}
             </div>
-          </div>
+            <Slider
+              label={t('settingCustomLogoSize')}
+              value={settings.customLogoScale}
+              min={40}
+              max={220}
+              formatDisplay={formatPercent}
+              parseInput={parsePercent}
+              onchange={(v) => update('customLogoScale', v)}
+            />
+            <div class="sheet-actions-row">
+              <button class="action-btn" onclick={() => update('customLogoScale', 100)}>
+                {t('resetSettings')}
+              </button>
+            </div>
+          {/if}
+
+          {#if sheetFeedback}
+            <div class="sheet-feedback" class:sheet-feedback-ok={sheetFeedback.type === 'ok'} class:sheet-feedback-err={sheetFeedback.type === 'error'}>
+              {sheetFeedback.text}
+            </div>
+          {/if}
         </div>
-      {/if}
-  </div>
+      </div>
+    </div>
+  {/if}
 {/if}
 
 <style>
   :root {
     /* Material Design 3 tokens — Light */
-    --md-primary: #5b5091;
+    --md-primary: #443795;
     --md-on-primary: #ffffff;
-    --md-primary-container: #e5deff;
+    --md-primary-container: #e8ddff;
     --md-on-primary-container: #170065;
-    --md-secondary: #5e5c71;
+    --md-secondary: #625b79;
     --md-on-secondary: #ffffff;
-    --md-secondary-container: #e4dff9;
+    --md-secondary-container: #e7e0f4;
     --md-on-secondary-container: #1b1a2c;
     --md-surface: #fdf8ff;
     --md-surface-dim: #ddd8e0;
@@ -1934,10 +2864,10 @@
     --md-error: #ba1a1a;
 
     /* Shape */
-    --md-shape-xs: 4px;
-    --md-shape-sm: 8px;
-    --md-shape-md: 12px;
-    --md-shape-lg: 16px;
+    --md-shape-xs: 6px;
+    --md-shape-sm: 10px;
+    --md-shape-md: 14px;
+    --md-shape-lg: 20px;
     --md-shape-xl: 28px;
     --md-shape-full: 9999px;
 
@@ -2020,6 +2950,20 @@
     width: auto;
     min-height: 100vh;
     max-height: none;
+    animation: none;
+    transform: none !important;
+    scroll-behavior: auto;
+  }
+
+  :global(body[data-ytr-layout="page"]::-webkit-scrollbar-thumb) {
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--md-primary) 78%, white 22%),
+        color-mix(in srgb, var(--md-primary) 62%, white 38%)
+      );
+    background-size: 100% 100%;
+    animation: none;
   }
 
   :global(#app) {
@@ -2041,20 +2985,21 @@
         color-mix(in srgb, var(--md-primary) 80%, white 20%) 0 10px,
         color-mix(in srgb, var(--md-primary) 62%, white 38%) 10px 22px,
         color-mix(in srgb, var(--md-primary) 88%, white 12%) 22px 34px
-      );
+    );
     background-size: 100% 180%;
     background-position: 50% 0%;
     background-clip: content-box;
-    animation: popupScrollbarWave 4.8s linear infinite;
-    will-change: background-position;
+    transition: filter 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
   }
 
   :global(body::-webkit-scrollbar-thumb:hover) {
-    animation-duration: 3.2s;
+    filter: brightness(1.04);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-primary) 34%, transparent);
   }
 
   :global(body::-webkit-scrollbar-thumb:active) {
-    animation-duration: 2.2s;
+    filter: brightness(1.08);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-primary) 42%, transparent);
   }
 
   :global(body::-webkit-scrollbar-track) {
@@ -2089,11 +3034,6 @@
     to { opacity: 1; transform: scale(1); }
   }
 
-  @keyframes popupScrollbarWave {
-    from { background-position: 50% 0%; }
-    to { background-position: 50% 180%; }
-  }
-
   @keyframes searchBarSlideIn {
     from { opacity: 0; transform: translateY(-6px) scaleX(0.95); }
     to { opacity: 1; transform: translateY(0) scaleX(1); }
@@ -2124,16 +3064,14 @@
 
   .app-logo {
     height: 30px;
-    width: auto;
-    object-fit: contain;
+    width: calc(30px * 3464 / 608);
+    flex-shrink: 0;
+    display: inline-block;
     user-select: none;
     -webkit-user-drag: none;
-  }
-
-  @media (prefers-color-scheme: light) {
-    .app-logo {
-      filter: invert(1);
-    }
+    background: var(--ytr-logo-color, var(--md-primary));
+    mask: url('/logo-header.png') center / contain no-repeat;
+    -webkit-mask: url('/logo-header.png') center / contain no-repeat;
   }
 
   .header-actions {
@@ -2157,18 +3095,23 @@
     background: transparent;
     color: var(--md-on-surface-variant);
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+    transition:
+      transform 0.2s cubic-bezier(0.2, 0, 0, 1),
+      background-color 0.2s cubic-bezier(0.2, 0, 0, 1),
+      color 0.2s cubic-bezier(0.2, 0, 0, 1);
+    transform-origin: center;
+    backface-visibility: hidden;
   }
 
   .lang-button:hover {
     background: var(--md-surface-container-high);
-    transform: scale(1.06);
+    transform: scale(1.04);
     color: var(--md-primary);
   }
 
   .lang-button:active {
     background: var(--md-surface-container-highest);
-    transform: scale(0.85);
+    transform: scale(0.96);
     transition-duration: 0.06s;
   }
 
@@ -2205,20 +3148,21 @@
         color-mix(in srgb, var(--md-primary) 80%, white 20%) 0 10px,
         color-mix(in srgb, var(--md-primary) 62%, white 38%) 10px 22px,
         color-mix(in srgb, var(--md-primary) 88%, white 12%) 22px 34px
-      );
+    );
     background-size: 100% 180%;
     background-position: 50% 0%;
     background-clip: content-box;
-    animation: popupScrollbarWave 4.8s linear infinite;
-    will-change: background-position;
+    transition: filter 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
   }
 
   .lang-menu::-webkit-scrollbar-thumb:hover {
-    animation-duration: 3.2s;
+    filter: brightness(1.04);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-primary) 34%, transparent);
   }
 
   .lang-menu::-webkit-scrollbar-thumb:active {
-    animation-duration: 2.2s;
+    filter: brightness(1.08);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-primary) 42%, transparent);
   }
 
   .lang-menu::-webkit-scrollbar-track {
@@ -2256,9 +3200,14 @@
     font-size: 14px;
     font-family: inherit;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    transition:
+      transform 0.18s cubic-bezier(0.2, 0, 0, 1),
+      background-color 0.18s cubic-bezier(0.2, 0, 0, 1),
+      color 0.18s cubic-bezier(0.2, 0, 0, 1);
     text-align: left;
     position: relative;
+    transform-origin: center;
+    backface-visibility: hidden;
   }
 
   .lang-menu-item-copy {
@@ -2266,6 +3215,7 @@
     flex-direction: column;
     min-width: 0;
     align-items: flex-start;
+    transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
   }
 
   .lang-menu-item-label {
@@ -2285,9 +3235,13 @@
     transform: scale(1.01);
   }
 
+  .lang-menu-item:hover .lang-menu-item-copy {
+    transform: translateY(-1px);
+  }
+
   .lang-menu-item:active {
     background: var(--md-surface-container-highest);
-    transform: scale(0.97);
+    transform: scale(0.99);
     transition-duration: 0.06s;
   }
 
@@ -2310,17 +3264,22 @@
     border-radius: var(--md-shape-full);
     font-family: monospace;
     cursor: pointer;
-    transition: all 0.15s cubic-bezier(0.2, 0, 0, 1);
+    transition:
+      transform 0.15s cubic-bezier(0.2, 0, 0, 1),
+      background-color 0.15s cubic-bezier(0.2, 0, 0, 1),
+      color 0.15s cubic-bezier(0.2, 0, 0, 1);
+    transform-origin: center;
+    backface-visibility: hidden;
   }
 
   .version-button:hover {
     background: var(--md-surface-container-high);
-    transform: scale(1.03);
+    transform: scale(1.04);
   }
 
   .version-button:active {
     background: var(--md-surface-container-highest);
-    transform: scale(0.92);
+    transform: scale(0.97);
     transition-duration: 0.06s;
   }
 
@@ -2398,8 +3357,15 @@
     font-weight: 500;
     text-decoration: none;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+    transition:
+      transform 0.2s cubic-bezier(0.2, 0, 0, 1),
+      background-color 0.2s cubic-bezier(0.2, 0, 0, 1),
+      color 0.2s cubic-bezier(0.2, 0, 0, 1),
+      opacity 0.2s cubic-bezier(0.2, 0, 0, 1);
     justify-content: center;
+    line-height: 1.1;
+    transform-origin: center;
+    backface-visibility: hidden;
   }
 
   .update-download:hover {
@@ -2409,8 +3375,16 @@
     background: color-mix(in srgb, var(--md-primary) 92%, white 8%);
   }
 
+  .update-download > * {
+    transition: transform 0.24s cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .update-download:hover > * {
+    transform: translateY(-1px);
+  }
+
   .update-download:active {
-    transform: scale(0.96);
+    transform: scale(0.98);
     transition-duration: 0.06s;
   }
 
@@ -2448,6 +3422,15 @@
     transform: scale(1.08);
   }
 
+  .logo-preview-rewind {
+    width: calc(20px * 3464 / 608);
+    max-width: none;
+    border: none;
+    background: var(--ytr-logo-color, var(--md-primary));
+    mask: url('/logo-header.png') center / contain no-repeat;
+    -webkit-mask: url('/logo-header.png') center / contain no-repeat;
+  }
+
   .sub-label {
     font-size: 11px;
     font-weight: 600;
@@ -2466,17 +3449,30 @@
   }
 
   .effect-option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     font-size: 12px;
     font-family: inherit;
+    line-height: 1.1;
+    min-height: 32px;
     padding: 6px 14px;
     border: 1px solid var(--md-outline-variant);
     border-radius: var(--md-shape-full);
     background: transparent;
     color: var(--md-on-surface-variant);
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    transition:
+      transform 0.2s cubic-bezier(0.2, 0, 0, 1),
+      background-color 0.2s cubic-bezier(0.2, 0, 0, 1),
+      color 0.2s cubic-bezier(0.2, 0, 0, 1),
+      border-color 0.2s cubic-bezier(0.2, 0, 0, 1),
+      box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1);
     position: relative;
     overflow: hidden;
+    transform-origin: center;
+    backface-visibility: hidden;
   }
 
   .effect-option::after {
@@ -2499,15 +3495,26 @@
     transform: scale(1.03);
   }
 
+  .effect-option-label {
+    position: relative;
+    z-index: 1;
+    transition: transform 0.24s cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .effect-option:hover .effect-option-label {
+    transform: translateY(-1px);
+  }
+
   .effect-option:active {
-    transform: scale(0.91);
+    transform: scale(0.98);
     transition-duration: 0.06s;
   }
 
   .effect-option.active {
     background: var(--md-primary);
     color: var(--md-on-primary);
-    border-color: var(--md-primary);
+    border-color: transparent;
+    box-shadow: none;
     animation: chipSelect 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
   }
 
@@ -2522,7 +3529,16 @@
   }
 
   .effect-option.active:active {
-    transform: scale(0.93);
+    transform: scale(0.98);
+  }
+
+  :global(body[data-ytr-theme-mode="light"]) .effect-option.active {
+    background: color-mix(in srgb, var(--md-primary-container) 88%, white 12%);
+    color: var(--md-on-primary-container);
+    border-color: color-mix(in srgb, var(--md-primary) 58%, var(--md-primary-container));
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--md-primary) 18%, transparent) inset,
+      0 1px 2px rgba(0, 0, 0, 0.06);
   }
 
   /* --- Search Bar --- */
@@ -2586,9 +3602,12 @@
     transition-duration: 0.06s;
   }
 
-  /* --- Profile Save Changes --- */
+  /* --- Profile Actions --- */
 
-  .profile-save-row {
+  .profile-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     padding: 4px 10px 8px;
     animation: feedbackSlideIn var(--md-duration-short) var(--md-easing-emphasized-decel) both;
   }
@@ -2597,7 +3616,12 @@
     background: var(--md-primary);
     color: var(--md-on-primary);
     border-color: var(--md-primary);
-    transition: all var(--md-duration-short) var(--md-easing-standard);
+    transition:
+      transform var(--md-duration-short) var(--md-easing-standard),
+      background-color var(--md-duration-short) var(--md-easing-standard),
+      border-color var(--md-duration-short) var(--md-easing-standard),
+      color var(--md-duration-short) var(--md-easing-standard),
+      opacity var(--md-duration-short) var(--md-easing-standard);
   }
 
   .action-btn-save:hover {
@@ -2607,7 +3631,7 @@
   }
 
   .action-btn-save:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
   }
 
   .app-body {
@@ -2620,6 +3644,12 @@
     backdrop-filter: blur(18px);
   }
 
+  .app-shell-page .app-header,
+  .app-shell-page .search-bar,
+  .app-shell-page .app-footer {
+    animation: none;
+  }
+
   .app-shell-page .header-content {
     max-width: 1440px;
     margin: 0 auto;
@@ -2628,9 +3658,11 @@
 
   .app-shell-page .app-logo {
     height: 34px;
+    width: calc(34px * 3464 / 608);
   }
 
   .app-shell-page .search-bar {
+    width: min(1440px, calc(100% - 48px));
     max-width: 1440px;
     margin: 16px auto 0;
     padding: 10px 16px;
@@ -2650,6 +3682,7 @@
     margin: 0 0 14px;
     break-inside: avoid;
     vertical-align: top;
+    animation: none !important;
   }
 
   .app-shell-page .app-body :global(.settings-section) {
@@ -2664,49 +3697,6 @@
     max-width: 1440px;
     margin: 0 auto;
     padding: 8px 24px 28px;
-  }
-
-  .standalone-locked {
-    display: flex;
-    justify-content: center;
-    padding: 56px 24px;
-  }
-
-  .standalone-locked-card {
-    width: min(520px, 100%);
-    padding: 28px;
-    border-radius: 28px;
-    background: var(--md-surface-container-low);
-    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 75%, transparent);
-    text-align: center;
-  }
-
-  .standalone-locked-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 30px;
-    padding: 0 12px;
-    margin-bottom: 14px;
-    border-radius: var(--md-shape-full);
-    background: color-mix(in srgb, var(--md-primary-container) 86%, transparent);
-    color: var(--md-primary);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .standalone-locked-card h2 {
-    font-size: 24px;
-    margin-bottom: 10px;
-    color: var(--md-on-surface);
-  }
-
-  .standalone-locked-card p {
-    font-size: 14px;
-    line-height: 1.6;
-    color: var(--md-on-surface-variant);
   }
 
   /* M3 stagger animation for sections */
@@ -2791,9 +3781,16 @@
     font-size: 12px;
     font-weight: 500;
     text-decoration: none;
-    transition: all 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    transition:
+      transform 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28),
+      background-color 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28),
+      border-color 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28),
+      color 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
     position: relative;
     overflow: hidden;
+    line-height: 1.1;
+    transform-origin: center;
+    backface-visibility: hidden;
   }
 
   .about-link::before {
@@ -2818,6 +3815,16 @@
     text-decoration: none;
   }
 
+  .about-link > * {
+    position: relative;
+    z-index: 1;
+    transition: transform 0.24s cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .about-link:hover > * {
+    transform: translateY(-1px);
+  }
+
   .about-link:hover svg {
     transform: scale(1.08);
   }
@@ -2828,7 +3835,7 @@
   }
 
   .about-link:active {
-    transform: scale(0.92);
+    transform: scale(0.98);
     transition-duration: 0.06s;
   }
 
@@ -2855,17 +3862,25 @@
     color: var(--md-on-surface-variant);
     text-decoration: none;
     opacity: 0.5;
-    transition: all 0.15s ease;
+    transition:
+      transform 0.15s ease,
+      opacity 0.15s ease,
+      color 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1.1;
+    transform-origin: center;
+    backface-visibility: hidden;
   }
 
   .app-footer .footer-link:hover {
     opacity: 0.8;
     text-decoration: underline;
-    transform: scale(1.05);
+    transform: scale(1.03);
   }
 
   .app-footer .footer-link:active {
-    transform: scale(0.95);
+    transform: scale(0.98);
   }
 
   /* --- Export / Import --- */
@@ -2874,8 +3889,47 @@
     padding: 8px 12px 10px;
   }
 
+  .interface-theme-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 16px 10px;
+    flex-wrap: wrap;
+  }
+
+  .interface-theme-presets {
+    gap: 8px;
+  }
+
+  .interface-theme-preset {
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .interface-theme-preset > span:last-child {
+    position: relative;
+    z-index: 1;
+  }
+
+  .interface-theme-preset-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 82%, transparent);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+    flex-shrink: 0;
+  }
+
+  .interface-theme-reset {
+    min-height: 44px;
+  }
+
   .data-group {
     padding: 6px 0;
+  }
+
+  .data-toggle-wrap {
+    margin: 0 -12px 6px;
   }
 
   .data-group-label {
@@ -2905,15 +3959,23 @@
     font-size: 12px;
     font-family: inherit;
     font-weight: 500;
+    line-height: 1.1;
     padding: 5px 12px;
     border: 1px solid var(--md-outline-variant);
     border-radius: var(--md-shape-full);
     background: transparent;
     color: var(--md-primary);
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    transition:
+      transform 0.2s cubic-bezier(0.2, 0, 0, 1),
+      background-color 0.2s cubic-bezier(0.2, 0, 0, 1),
+      color 0.2s cubic-bezier(0.2, 0, 0, 1),
+      border-color 0.2s cubic-bezier(0.2, 0, 0, 1),
+      box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1);
     position: relative;
     overflow: hidden;
+    transform-origin: center;
+    backface-visibility: hidden;
   }
 
   .action-btn::after {
@@ -2937,8 +3999,18 @@
     border-color: var(--md-outline);
   }
 
+  .action-btn > * {
+    position: relative;
+    z-index: 1;
+    transition: transform 0.24s cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .action-btn:hover > * {
+    transform: translateY(-1px);
+  }
+
   .action-btn:active {
-    transform: scale(0.91);
+    transform: scale(0.98);
     transition-duration: 0.06s;
   }
 
@@ -2995,7 +4067,7 @@
   }
 
   .custom-profile-chip .effect-option {
-    padding-right: 24px;
+    padding-right: 28px;
   }
 
   .profile-rename-input {
@@ -3020,36 +4092,53 @@
 
   .custom-profile-delete {
     position: absolute;
-    right: 4px;
+    right: 7px;
     top: 50%;
     transform: translateY(-50%);
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     border: none;
     border-radius: var(--md-shape-full);
     background: transparent;
-    color: var(--md-on-surface-variant);
+    color: color-mix(in srgb, var(--md-on-surface-variant) 82%, transparent);
     cursor: pointer;
-    opacity: 0.5;
-    transition: all var(--md-duration-short) var(--md-easing-standard);
+    opacity: 0.72;
+    transition:
+      transform var(--md-duration-short) var(--md-easing-standard),
+      color var(--md-duration-short) var(--md-easing-standard),
+      background var(--md-duration-short) var(--md-easing-standard),
+      opacity var(--md-duration-short) var(--md-easing-standard);
+  }
+
+  .custom-profile-chip:hover .custom-profile-delete {
+    transform: translateY(-50%) scale(1.05);
+  }
+
+  .custom-profile-chip .effect-option.active + .custom-profile-delete {
+    color: color-mix(in srgb, var(--md-on-primary) 82%, transparent);
+    opacity: 0.82;
   }
 
   .custom-profile-delete:hover {
     opacity: 1;
     color: var(--md-error);
-    transform: translateY(-50%) scale(1.2);
+    background: color-mix(in srgb, var(--md-error) 12%, transparent);
+    transform: translateY(-50%) scale(1.14);
   }
 
   .custom-profile-delete:active {
-    transform: translateY(-50%) scale(0.8);
+    transform: translateY(-50%) scale(0.92);
     transition-duration: 0.06s;
   }
 
-  .profile-add-trigger {
-    padding: 0 10px 8px;
+  .profile-helper {
+    padding: 0 12px 8px;
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    opacity: 0.82;
   }
 
   .profile-add-card {
@@ -3105,43 +4194,10 @@
     color: var(--md-outline);
   }
 
-  /* --- Reset Confirmation --- */
+  /* --- Inline Confirmations --- */
 
-  .reset-confirm {
-    margin: 8px 0 4px;
-    padding: 16px;
-    border-radius: var(--md-shape-lg);
-    background: var(--md-surface-container-high);
-    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 80%, transparent);
-    animation: feedbackSlideIn var(--md-duration-short) var(--md-easing-emphasized-decel) both;
-  }
-
-  .reset-confirm-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--md-on-surface);
-    margin-bottom: 8px;
-  }
-
-  .reset-confirm-message {
-    font-size: 13px;
-    color: var(--md-on-surface-variant);
-    margin-bottom: 16px;
-    line-height: 1.5;
-  }
-
-  .reset-confirm-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-  }
-
-  .beta-actions {
-    padding: 0 10px 10px;
-  }
-
-  .beta-confirm {
-    margin: 0 10px 10px;
+  .inline-confirm {
+    margin: 8px 10px 10px;
     padding: 16px;
     border-radius: var(--md-shape-lg);
     background: var(--md-surface-container-low);
@@ -3149,20 +4205,30 @@
     animation: feedbackSlideIn var(--md-duration-short) var(--md-easing-emphasized-decel) both;
   }
 
-  .beta-confirm-title {
+  .inline-confirm-warning {
+    background: var(--md-surface-container-low);
+    border-color: color-mix(in srgb, var(--md-outline-variant) 75%, transparent);
+  }
+
+  .inline-confirm-danger {
+    background: var(--md-surface-container-low);
+    border-color: color-mix(in srgb, var(--md-outline-variant) 75%, transparent);
+  }
+
+  .inline-confirm-title {
     font-size: 14px;
     font-weight: 600;
     color: var(--md-on-surface);
     margin-bottom: 8px;
   }
 
-  .beta-confirm-message {
+  .inline-confirm-message {
     font-size: 13px;
     line-height: 1.5;
     color: var(--md-on-surface-variant);
   }
 
-  .beta-confirm-actions {
+  .inline-confirm-actions {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
@@ -3300,6 +4366,14 @@
     padding-top: 14px;
   }
 
+  .sheet-actions-inline {
+    padding: 10px 10px 0;
+  }
+
+  .sheet-actions-inline > * {
+    width: auto;
+  }
+
   .sheet-actions-end {
     justify-content: flex-end;
   }
@@ -3347,11 +4421,11 @@
 
   .action-btn-danger:hover {
     background: rgba(186, 26, 26, 0.08);
-    transform: scale(1.02);
+    transform: scale(1.03);
   }
 
   .action-btn-danger:active {
-    transform: scale(0.93);
+    transform: scale(0.98);
     transition-duration: 0.06s;
   }
 
@@ -3377,6 +4451,10 @@
       columns: 1;
     }
 
+    .app-shell-page .search-bar {
+      width: calc(100% - 32px);
+    }
+
     .sheet-backdrop {
       padding: 12px;
       align-items: flex-end;
@@ -3395,14 +4473,22 @@
     }
 
     .sheet-actions-row,
-    .beta-confirm-actions {
+    .inline-confirm-actions {
       flex-direction: column;
     }
 
     .sheet-actions-row > *,
-    .beta-confirm-actions > * {
+    .inline-confirm-actions > * {
       width: 100%;
       justify-content: center;
+    }
+
+    .sheet-actions-inline {
+      flex-direction: row;
+    }
+
+    .sheet-actions-inline > * {
+      width: auto;
     }
   }
 

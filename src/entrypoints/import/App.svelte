@@ -1,5 +1,6 @@
 <script lang="ts">
   import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings, type CustomProfile } from '@/lib/settings';
+  import { parseSettingsTransfer } from '@/lib/settings-transfer';
   import { t, setLocale } from '@/lib/i18n';
 
   let loaded = $state(false);
@@ -29,31 +30,8 @@
     });
   });
 
-  function parseSettings(text: string): Partial<Settings> | null {
-    try {
-      const obj = JSON.parse(text);
-      if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) return obj;
-    } catch {}
-    try {
-      const lines = text.split('\n').filter((l) => l.includes('='));
-      if (lines.length === 0) return null;
-      const result: Record<string, unknown> = {};
-      for (const line of lines) {
-        const [key, ...rest] = line.split('=');
-        const k = key.trim();
-        const v = rest.join('=').trim();
-        if (v === 'true') result[k] = true;
-        else if (v === 'false') result[k] = false;
-        else if (!isNaN(Number(v)) && v !== '') result[k] = Number(v);
-        else result[k] = v;
-      }
-      return result as Partial<Settings>;
-    } catch {}
-    return null;
-  }
-
   async function applyImport(text: string) {
-    const parsed = parseSettings(text);
+    const parsed = parseSettingsTransfer(text);
     if (!parsed) {
       showToast(t('importError'), 'error');
       return;
@@ -61,7 +39,7 @@
     const known = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
     const filtered: Partial<Settings> = {};
     for (const key of known) {
-      if (key in parsed) (filtered as any)[key] = (parsed as any)[key];
+      if (key in parsed.settings) (filtered as any)[key] = (parsed.settings as any)[key];
     }
     await saveSettings(filtered);
     showToast(t('importSuccess'));
@@ -71,7 +49,7 @@
     if (!file) return;
     const text = await file.text();
     // Validate first
-    const parsed = parseSettings(text);
+    const parsed = parseSettingsTransfer(text);
     if (!parsed) {
       showToast(t('importError'), 'error');
       return;
@@ -80,7 +58,7 @@
       // Show name input before saving profile
       pendingProfileText = text;
       pendingProfileFileName = file.name;
-      profileNameInput = file.name.replace(/\.(json|txt)$/i, '');
+      profileNameInput = parsed.configName || file.name.replace(/\.(json|txt)$/i, '');
     } else {
       await applyImport(text);
     }
@@ -100,7 +78,7 @@
         return;
       }
 
-      const parsed = parseSettings(text);
+      const parsed = parseSettingsTransfer(text);
       if (!parsed) {
         showToast(t('importError'), 'error');
         return;
@@ -109,7 +87,7 @@
       if (isProfileMode) {
         pendingProfileText = text;
         pendingProfileFileName = 'clipboard.json';
-        profileNameInput = 'clipboard-profile';
+        profileNameInput = parsed.configName || 'clipboard-profile';
       } else {
         await applyImport(text);
       }
@@ -123,17 +101,19 @@
   async function confirmProfileImport() {
     const name = profileNameInput.trim();
     if (!name) return;
-    const parsed = parseSettings(pendingProfileText);
+    const parsed = parseSettingsTransfer(pendingProfileText);
     if (!parsed) {
       showToast(t('importError'), 'error');
       return;
     }
     // Strip meta-fields that shouldn't be part of a profile
-    delete (parsed as any).customProfiles;
-    delete (parsed as any).language;
-    delete (parsed as any).activeProfile;
+    delete (parsed.settings as any).customProfiles;
+    delete (parsed.settings as any).language;
+    delete (parsed.settings as any).activeProfile;
+    delete (parsed.settings as any).developerEnabled;
+    delete (parsed.settings as any).betaStandalonePage;
     const current = await loadSettings();
-    const newProfile: CustomProfile = { name, settings: parsed };
+    const newProfile: CustomProfile = { name, settings: parsed.settings };
     const profiles = [...(current.customProfiles || []), newProfile];
     await saveSettings({ customProfiles: profiles });
     showToast(t('profileSaved'));
@@ -306,15 +286,17 @@
     background-position: 50% 0%;
     background-clip: padding-box;
     animation: scrollbarWave 4.8s linear infinite;
-    will-change: background-position;
+    transition: filter 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
   }
 
   :global(body::-webkit-scrollbar-thumb:hover) {
-    animation-duration: 3.2s;
+    filter: brightness(1.04);
+    box-shadow: inset 0 0 0 1px rgba(200, 191, 255, 0.28);
   }
 
   :global(body::-webkit-scrollbar-thumb:active) {
-    animation-duration: 2.2s;
+    filter: brightness(1.08);
+    box-shadow: inset 0 0 0 1px rgba(200, 191, 255, 0.36);
   }
 
   .page {
