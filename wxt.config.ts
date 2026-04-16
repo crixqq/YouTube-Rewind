@@ -16,10 +16,9 @@ export default defineConfig({
         '128': 'icon/128.png',
       },
     },
-    permissions: ['storage', 'unlimitedStorage', 'clipboardRead', 'clipboardWrite', 'activeTab', 'tabs'],
+    permissions: ['storage', 'unlimitedStorage', 'clipboardRead', 'clipboardWrite'],
     host_permissions: [
-      '<all_urls>',
-      'https://img.youtube.com/*',
+      '*://*.youtube.com/*',
       'https://i.ytimg.com/*',
       'https://api.github.com/*',
       'https://addons.mozilla.org/*',
