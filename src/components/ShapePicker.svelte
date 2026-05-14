@@ -22,8 +22,8 @@
 
   const avatarFallbackItems: ShapeItem[] = [
     { id: 'none', label: 'Default', svgContent: '<circle cx="16" cy="16" r="13" fill="currentColor"/>' },
-    { id: 'superellipse', label: 'Squircle', svgContent: '<rect x="3" y="3" width="26" height="26" rx="6" fill="currentColor"/>' },
-    { id: 'rounded-square', label: 'Rounded', svgContent: '<rect x="3" y="3" width="26" height="26" rx="3" fill="currentColor"/>' },
+    { id: 'superellipse', label: 'Squircle', svgContent: '<rect x="3" y="3" width="26" height="26" rx="5" fill="currentColor"/>' },
+    { id: 'rounded-square', label: 'Rounded', svgContent: '<rect x="3" y="3" width="26" height="26" rx="2" fill="currentColor"/>' },
     { id: 'diamond', label: 'Diamond', svgContent: '<rect x="5" y="5" width="22" height="22" rx="5" fill="currentColor" transform="rotate(45 16 16)"/>' },
     { id: 'hexagon', label: 'Hexagon', svgContent: '<path d="M18,1.5 L28,7.2 Q30,8.5,30,11 L30,21 Q30,23.5,28,24.8 L18,30.5 Q16,31.7,14,30.5 L4,24.8 Q2,23.5,2,21 L2,11 Q2,8.5,4,7.2 L14,1.5 Q16,0.3,18,1.5Z" fill="currentColor"/>' },
     { id: 'octagon', label: 'Octagon', svgContent: '<path d="M11,2 L21,2 Q23,2,25,4 L28,7 Q30,9,30,11 L30,21 Q30,23,28,25 L25,28 Q23,30,21,30 L11,30 Q9,30,7,28 L4,25 Q2,23,2,21 L2,11 Q2,9,4,7 L7,4 Q9,2,11,2Z" fill="currentColor"/>' },
@@ -44,6 +44,26 @@
   let fallbackItems = $derived(variant === 'thumbnail' ? thumbnailFallbackItems : avatarFallbackItems);
   let resolvedItems = $derived(items.length ? items : fallbackItems);
   let pickerLabel = $derived(variant === 'thumbnail' ? 'Thumbnail shape picker' : 'Avatar shape picker');
+
+  function renderSvgContent(node: SVGSVGElement, markup: string) {
+    const apply = (value: string) => {
+      const parsed = new DOMParser().parseFromString(
+        `<svg xmlns="http://www.w3.org/2000/svg">${value}</svg>`,
+        'image/svg+xml',
+      );
+      const nextChildren = Array.from(parsed.documentElement.childNodes)
+        .map((child) => document.importNode(child, true));
+      node.replaceChildren(...nextChildren);
+    };
+
+    apply(markup);
+
+    return {
+      update(nextMarkup: string) {
+        apply(nextMarkup);
+      },
+    };
+  }
 </script>
 
 <div class="shape-picker" class:shape-picker-thumbnail={variant === 'thumbnail'} role="radiogroup" aria-label={pickerLabel}>
@@ -64,8 +84,8 @@
         width={variant === 'thumbnail' ? '52' : '36'}
         height={variant === 'thumbnail' ? '32' : '36'}
         class="shape-icon"
+        use:renderSvgContent={shape.svgContent}
       >
-        {@html shape.svgContent}
       </svg>
     </button>
   {/each}

@@ -1,0 +1,1492 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Video Sense AI Settings</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="./icon/32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="./icon/16.png">
+    <style>
+      :root {
+        color-scheme: dark;
+        --md-primary: #c8bfff;
+        --md-on-primary: #2c2060;
+        --md-primary-container: #433978;
+        --md-on-primary-container: #e5deff;
+        --md-secondary: #c8c3dc;
+        --md-on-secondary: #302e41;
+        --md-secondary-container: #474459;
+        --md-on-secondary-container: #e4dff9;
+        --md-surface: #141318;
+        --md-surface-dim: #141318;
+        --md-surface-container-lowest: #0f0d13;
+        --md-surface-container-low: #1c1b20;
+        --md-surface-container: #201f25;
+        --md-surface-container-high: #2b292f;
+        --md-surface-container-highest: #36343a;
+        --md-on-surface: #e6e1e9;
+        --md-on-surface-variant: #c9c5d0;
+        --md-outline: #938f99;
+        --md-outline-variant: #48454e;
+        --md-error: #ffb4ab;
+        --md-shape-xs: 6px;
+        --md-shape-sm: 10px;
+        --md-shape-md: 14px;
+        --md-shape-lg: 20px;
+        --md-shape-xl: 28px;
+        --md-shape-full: 9999px;
+        --md-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+        --md-easing-emphasized-decel: cubic-bezier(0.05, 0.7, 0.1, 1);
+        --md-duration-short: 0.2s;
+        --md-duration-medium: 0.35s;
+        font-family: "Google Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+        font-size: 14px;
+        line-height: 1.43;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        min-height: 100%;
+        margin: 0;
+      }
+
+      body {
+        overflow-y: auto;
+        background: var(--md-surface);
+        color: var(--md-on-surface);
+        scrollbar-width: thin;
+        scrollbar-color: var(--md-primary) transparent;
+      }
+
+      body::-webkit-scrollbar { width: 10px; }
+
+      body::-webkit-scrollbar-thumb {
+        border-radius: var(--md-shape-full);
+        border: 2px solid transparent;
+        background: color-mix(in srgb, var(--md-primary) 76%, white 24%);
+        background-clip: content-box;
+      }
+
+      body::-webkit-scrollbar-track {
+        background: color-mix(in srgb, var(--md-surface-container-high) 50%, transparent);
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      .app-shell {
+        min-height: 100vh;
+      }
+
+      .app-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--md-surface);
+        border-bottom: 1px solid var(--md-outline-variant);
+        backdrop-filter: blur(18px);
+      }
+
+      .header-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 12px 16px;
+      }
+
+      .header-brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .app-logo {
+        height: 30px;
+        width: calc(30px * 3464 / 608);
+        flex-shrink: 0;
+        display: inline-block;
+        user-select: none;
+        -webkit-user-drag: none;
+        background: var(--ytr-logo-color, var(--md-primary));
+        mask: url('./logo-header.png') center / contain no-repeat;
+        -webkit-mask: url('./logo-header.png') center / contain no-repeat;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .info-button,
+      .lang-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border: none;
+        border-radius: var(--md-shape-full);
+        background: transparent;
+        color: var(--md-on-surface-variant);
+        cursor: pointer;
+        transition:
+          transform 0.2s cubic-bezier(0.2, 0, 0, 1),
+          background-color 0.2s cubic-bezier(0.2, 0, 0, 1),
+          color 0.2s cubic-bezier(0.2, 0, 0, 1);
+        transform-origin: center;
+        backface-visibility: hidden;
+      }
+
+      .info-button:hover,
+      .lang-button:hover {
+        background: var(--md-surface-container-high);
+        color: var(--md-primary);
+        transform: scale(1.04);
+      }
+
+      .info-button:active,
+      .lang-button:active {
+        background: var(--md-surface-container-highest);
+        transform: scale(0.96);
+        transition-duration: 0.06s;
+      }
+
+      .lang-wrapper {
+        position: relative;
+      }
+
+      .lang-menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        z-index: 30;
+        min-width: 154px;
+        max-height: 360px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 4px 0;
+        border: 1px solid color-mix(in srgb, var(--md-outline-variant) 82%, transparent);
+        border-radius: var(--md-shape-md);
+        background: var(--md-surface-container);
+        scrollbar-width: thin;
+        scrollbar-color: var(--md-primary) transparent;
+        animation: menuFadeIn 0.12s var(--md-easing-emphasized-decel);
+        transform-origin: top right;
+      }
+
+      @keyframes menuFadeIn {
+        0% { opacity: 0; transform: scaleY(0.7) scaleX(0.92); }
+        60% { opacity: 1; transform: scaleY(1.02) scaleX(1.01); }
+        100% { opacity: 1; transform: scaleY(1) scaleX(1); }
+      }
+
+      .lang-menu-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        height: 48px;
+        padding: 0 12px;
+        border: none;
+        background: transparent;
+        color: var(--md-on-surface);
+        font: inherit;
+        font-size: 14px;
+        cursor: pointer;
+        text-align: left;
+        transition:
+          transform 0.18s cubic-bezier(0.2, 0, 0, 1),
+          background-color 0.18s cubic-bezier(0.2, 0, 0, 1),
+          color 0.18s cubic-bezier(0.2, 0, 0, 1);
+      }
+
+      .lang-menu-item:hover {
+        background: var(--md-surface-container-high);
+        transform: scale(1.01);
+      }
+
+      .lang-menu-item.active {
+        color: var(--md-primary);
+        font-weight: 600;
+      }
+
+      .lang-menu-item-copy {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .lang-menu-item-note {
+        color: var(--md-on-surface-variant);
+        font-size: 11px;
+        opacity: 0.75;
+      }
+
+      .icon-button {
+        display: inline-grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border: 0;
+        border-radius: var(--md-shape-full);
+        background: transparent;
+        color: var(--md-on-surface-variant);
+        cursor: pointer;
+        text-decoration: none;
+      }
+
+      .icon-button:hover {
+        background: var(--md-surface-container-high);
+        color: var(--md-on-surface);
+      }
+
+      .version-wrapper {
+        position: relative;
+      }
+
+      .version-button {
+        position: relative;
+        padding: 2px 8px;
+        border: none;
+        border-radius: var(--md-shape-full);
+        background: var(--md-surface-container);
+        color: var(--md-on-surface-variant);
+        font: 11px ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+        cursor: pointer;
+        transition:
+          transform 0.15s cubic-bezier(0.2, 0, 0, 1),
+          background-color 0.15s cubic-bezier(0.2, 0, 0, 1),
+          color 0.15s cubic-bezier(0.2, 0, 0, 1);
+        transform-origin: center;
+        backface-visibility: hidden;
+      }
+
+      .version-button:hover {
+        background: var(--md-surface-container-high);
+        transform: scale(1.04);
+      }
+
+      .version-button:active {
+        background: var(--md-surface-container-highest);
+        transform: scale(0.97);
+        transition-duration: 0.06s;
+      }
+
+      .update-dot {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        width: 8px;
+        height: 8px;
+        border: 1.5px solid var(--md-surface);
+        border-radius: 50%;
+        background: var(--md-error);
+        animation: dotPulse 2s ease-in-out infinite;
+      }
+
+      @keyframes dotPulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.3); }
+      }
+
+      .update-menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        z-index: 30;
+        min-width: 200px;
+        padding: 4px 0;
+        border: 1px solid color-mix(in srgb, var(--md-outline-variant) 82%, transparent);
+        border-radius: var(--md-shape-md);
+        background: var(--md-surface-container);
+        animation: menuFadeIn 0.12s var(--md-easing-emphasized-decel);
+        transform-origin: top right;
+      }
+
+      .update-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        color: var(--md-on-surface-variant);
+        font-size: 13px;
+      }
+
+      .update-note {
+        padding: 0 8px 8px;
+        color: var(--md-on-surface-variant);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .update-download {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin: 4px 8px;
+        padding: 8px 12px;
+        border-radius: var(--md-shape-sm);
+        background: var(--md-primary);
+        color: var(--md-on-primary);
+        font-size: 13px;
+        font-weight: 500;
+        text-decoration: none;
+        transition:
+          transform 0.2s cubic-bezier(0.2, 0, 0, 1),
+          background-color 0.2s cubic-bezier(0.2, 0, 0, 1),
+          opacity 0.2s cubic-bezier(0.2, 0, 0, 1);
+      }
+
+      .update-download:hover {
+        opacity: 0.9;
+        transform: scale(1.02);
+        background: color-mix(in srgb, var(--md-primary) 92%, white 8%);
+      }
+
+      .update-download:active {
+        transform: scale(0.98);
+        transition-duration: 0.06s;
+      }
+
+      .search-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: min(1440px, calc(100% - 48px));
+        max-width: 1440px;
+        margin: 16px auto 0;
+        padding: 10px 16px;
+        border: 1.5px solid transparent;
+        border-radius: var(--md-shape-full);
+        background: var(--md-surface-container-low);
+        color: var(--md-on-surface-variant);
+      }
+
+      .search-bar svg {
+        flex: 0 0 auto;
+      }
+
+      .search-label {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--md-outline);
+        font-size: 13px;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .app-body {
+        columns: 340px;
+        column-gap: 16px;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 16px 24px 28px;
+      }
+
+      .settings-section {
+        display: inline-block;
+        width: 100%;
+        margin: 0 0 14px;
+        padding: 0 6px 4px;
+        break-inside: avoid;
+        vertical-align: top;
+      }
+
+      .section-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        padding: 12px 0 4px;
+        color: var(--md-primary);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+      }
+
+      .section-icon {
+        flex: 0 0 auto;
+        opacity: 0.9;
+      }
+
+      .section-content {
+        display: grid;
+        gap: 0;
+        overflow: hidden;
+        padding: 6px 0;
+        border: 1px solid color-mix(in srgb, var(--md-outline-variant) 46%, transparent);
+        border-radius: var(--md-shape-lg);
+        background: var(--md-surface-container);
+      }
+
+      .setting-row {
+        display: grid;
+        gap: 8px;
+        padding: 10px 16px;
+      }
+
+      .slider-setting-row {
+        padding: 0;
+      }
+
+      .setting-copy {
+        margin: 0;
+        color: var(--md-on-surface-variant);
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+
+      .field label,
+      .setting-label {
+        color: var(--md-on-surface-variant);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .field input,
+      .field textarea {
+        width: 100%;
+        min-height: 42px;
+        padding: 0 12px;
+        border: 1px solid var(--md-outline-variant);
+        border-radius: var(--md-shape-sm);
+        outline: none;
+        background: var(--md-surface-container-low);
+        color: var(--md-on-surface);
+        font-size: 14px;
+        font-weight: 500;
+        transition:
+          border-color var(--md-duration-short) var(--md-easing-standard),
+          box-shadow var(--md-duration-short) var(--md-easing-standard);
+      }
+
+      .field textarea {
+        min-height: 172px;
+        padding: 12px;
+        resize: none;
+        overflow: hidden;
+      }
+
+      .field input:focus,
+      .field textarea:focus {
+        border-color: var(--md-primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-primary) 18%, transparent);
+      }
+
+      .ytr-slider-row {
+        padding: 10px 16px;
+      }
+
+      .ytr-slider-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+
+      .ytr-slider-label {
+        color: var(--md-on-surface);
+        font-size: 14px;
+        font-weight: 500;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      .ytr-slider-value {
+        width: auto;
+        min-width: 32px;
+        max-width: 72px;
+        flex: 0 0 auto;
+        padding: 0 0 1px;
+        border: 0;
+        border-bottom: 1px dashed var(--md-outline-variant);
+        border-radius: var(--md-shape-xs);
+        outline: none;
+        background: transparent;
+        color: var(--md-primary);
+        font-size: 14px;
+        font-weight: 600;
+        text-align: right;
+        cursor: pointer;
+        transition:
+          color 0.15s ease,
+          border-color 0.15s ease;
+      }
+
+      .ytr-slider-value:hover {
+        color: var(--md-on-surface);
+        border-color: var(--md-primary);
+      }
+
+      .ytr-slider-value:active {
+        transform: scale(0.95);
+      }
+
+      .ytr-slider-value:focus {
+        width: 72px;
+        padding: 2px 6px;
+        border: 0;
+        border-bottom: 1px dashed var(--md-primary);
+        background: var(--md-surface-container);
+        box-shadow: none;
+        animation: inputPop 0.15s cubic-bezier(0.18, 0.89, 0.32, 1.28) both;
+      }
+
+      @keyframes inputPop {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
+      }
+
+      .ytr-slider-track {
+        position: relative;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+      }
+
+      .ytr-slider-svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 24px;
+        overflow: visible;
+        pointer-events: none;
+      }
+
+      .ytr-slider-thumb {
+        position: absolute;
+        top: 50%;
+        left: var(--slider-percent, 0%);
+        z-index: 2;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+      }
+
+      .ytr-slider-thumb::before {
+        content: "";
+        width: var(--slider-thumb-size, 20px);
+        height: var(--slider-thumb-size, 20px);
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--md-primary) calc(100% - var(--slider-thumb-lift, 0%)), white var(--slider-thumb-lift, 0%));
+        transition:
+          width 0.18s ease,
+          height 0.18s ease,
+          transform var(--md-duration-short) var(--md-easing-standard),
+          background var(--md-duration-short) var(--md-easing-standard);
+      }
+
+      .ytr-slider-track:hover .ytr-slider-thumb::before {
+        background: color-mix(in srgb, var(--md-primary) 82%, white 18%);
+        transform: scale(1.12);
+      }
+
+      .ytr-slider-range {
+        position: absolute;
+        inset: 0;
+        z-index: 3;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+
+      .ytr-slider-value::-webkit-outer-spin-button,
+      .ytr-slider-value::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+
+      .ytr-slider-value {
+        appearance: textfield;
+        -moz-appearance: textfield;
+      }
+
+      .inline-help-link {
+        justify-self: start;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--md-primary);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .inline-help-link:hover {
+        text-decoration: underline;
+      }
+
+      .prompt-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      [hidden],
+      .prompt-toolbar[hidden] {
+        display: none !important;
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 16px;
+        cursor: pointer;
+        transition: background var(--md-duration-short) var(--md-easing-standard);
+      }
+
+      .toggle-row:hover {
+        background: var(--md-surface-container-high);
+      }
+
+      .toggle-row:active {
+        background: var(--md-surface-container-highest);
+      }
+
+      .toggle-row:hover .toggle-title {
+        color: var(--md-on-surface);
+      }
+
+      .toggle-row:active .toggle-track {
+        transform: scale(1.05);
+      }
+
+      .toggle-row:active .toggle-track:not(.active) .toggle-thumb {
+        width: 28px;
+        height: 20px;
+      }
+
+      .toggle-row:active .toggle-track.active .toggle-thumb {
+        left: calc(100% - 31px);
+        width: 29px;
+        height: 27px;
+      }
+
+      .toggle-copy {
+        display: grid;
+        gap: 2px;
+      }
+
+      .toggle-title {
+        color: var(--md-on-surface);
+        font-weight: 500;
+      }
+
+      .toggle-description {
+        color: var(--md-on-surface-variant);
+        font-size: 12px;
+      }
+
+      .toggle-track {
+        position: relative;
+        width: 52px;
+        height: 32px;
+        border: 2px solid var(--md-outline);
+        border-radius: var(--md-shape-full);
+        background: var(--md-surface-container-highest);
+        transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+        flex-shrink: 0;
+      }
+
+      .toggle-track.active {
+        border-color: var(--md-primary);
+        background: var(--md-primary);
+      }
+
+      .toggle-input {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+        margin: 0;
+      }
+
+      .toggle-thumb {
+        position: absolute;
+        top: 50%;
+        left: 6px;
+        width: 16px;
+        height: 16px;
+        border-radius: var(--md-shape-full);
+        background: var(--md-outline);
+        transform: translateY(-50%);
+        transition:
+          left 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28),
+          width 0.25s cubic-bezier(0.2, 0, 0, 1),
+          height 0.25s cubic-bezier(0.2, 0, 0, 1),
+          background 0.2s cubic-bezier(0.2, 0, 0, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .toggle-track.active .toggle-thumb {
+        left: calc(100% - 26px);
+        width: 24px;
+        height: 24px;
+        background: var(--md-on-primary);
+      }
+
+      .toggle-check {
+        color: var(--md-primary);
+        opacity: 0;
+        transform: scale(0) rotate(-45deg);
+        transition:
+          opacity 0.2s cubic-bezier(0.2, 0, 0, 1),
+          transform 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      }
+
+      .toggle-track.active .toggle-check {
+        opacity: 1;
+        transform: scale(1) rotate(0);
+      }
+
+      .choice-group,
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .choice,
+      .action {
+        appearance: none;
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 32px;
+        padding: 0 12px;
+        border: 1px solid var(--md-outline-variant);
+        border-radius: var(--md-shape-sm);
+        background: transparent;
+        color: var(--md-on-surface-variant);
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.1;
+        text-decoration: none;
+        cursor: pointer;
+        user-select: none;
+        overflow: hidden;
+        transition:
+          transform var(--md-duration-short) var(--md-easing-standard),
+          background-color var(--md-duration-short) var(--md-easing-standard),
+          color var(--md-duration-short) var(--md-easing-standard),
+          border-color var(--md-duration-short) var(--md-easing-standard);
+      }
+
+      .choice-select {
+        width: 100%;
+        min-height: 42px;
+        padding: 0 38px 0 14px;
+        border: 1px solid var(--md-outline-variant);
+        border-radius: var(--md-shape-full);
+        outline: none;
+        background:
+          linear-gradient(45deg, transparent 50%, currentColor 50%) calc(100% - 18px) 50% / 6px 6px no-repeat,
+          linear-gradient(135deg, currentColor 50%, transparent 50%) calc(100% - 14px) 50% / 6px 6px no-repeat,
+          transparent;
+        color: var(--md-on-surface);
+        font-weight: 700;
+        appearance: none;
+        cursor: pointer;
+      }
+
+      .choice-select:focus {
+        border-color: var(--md-primary);
+        box-shadow: none;
+      }
+
+      .choice::after,
+      .action::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: currentColor;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
+      }
+
+      .choice:hover,
+      .action:hover {
+        background: var(--md-surface-container-high);
+        color: var(--md-on-surface);
+        transform: scale(1.03);
+      }
+
+      .choice:hover::after,
+      .action:hover::after {
+        opacity: 0.06;
+      }
+
+      .choice:active,
+      .action:active {
+        transform: scale(0.97);
+        transition-duration: 0.08s;
+      }
+
+      .choice[aria-pressed="true"] {
+        padding-left: 12px;
+        border-color: transparent;
+        background: var(--md-secondary-container);
+        color: var(--md-on-secondary-container);
+      }
+
+      .provider-icon {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--md-surface-container-highest) center / contain no-repeat;
+        flex: 0 0 auto;
+      }
+
+      .choice .provider-icon {
+        margin-left: -1px;
+      }
+
+      .provider-icon-openrouter {
+        background-image: url("https://www.google.com/s2/favicons?domain=openrouter.ai&sz=64");
+      }
+
+      .provider-icon-openai {
+        background-image: url("https://www.google.com/s2/favicons?domain=openai.com&sz=64");
+      }
+
+      .provider-icon-anthropic {
+        background-image: url("https://www.google.com/s2/favicons?domain=claude.ai&sz=64");
+      }
+
+      .provider-icon-perplexity {
+        background-image: url("https://www.google.com/s2/favicons?domain=perplexity.ai&sz=64");
+      }
+
+      .model-icon {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--md-surface-container-highest) center / contain no-repeat;
+        flex: 0 0 auto;
+      }
+
+      .model-input-wrap {
+        display: grid;
+        grid-template-columns: 22px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px;
+      }
+
+      .model-input-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        object-fit: contain;
+        background: var(--md-surface-container-highest);
+      }
+
+      #ai-prompt {
+        min-height: 180px;
+        max-height: 320px;
+        overflow-y: auto;
+        resize: none;
+      }
+
+      .provider-guide-jumps {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 14px 0 0;
+      }
+
+      .provider-guide-jump {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 32px;
+        padding: 0 12px;
+        border: 1px solid var(--md-outline-variant);
+        border-radius: var(--md-shape-full);
+        background: transparent;
+        color: var(--md-on-surface);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition:
+          background-color var(--md-duration-short) var(--md-easing-standard),
+          transform var(--md-duration-short) var(--md-easing-standard);
+      }
+
+      .provider-guide-jump:hover {
+        background: var(--md-surface-container-high);
+        transform: scale(1.03);
+      }
+
+      .action-primary {
+        min-height: 38px;
+        padding: 0 16px;
+        border-color: var(--md-primary);
+        background: var(--md-primary);
+        color: var(--md-on-primary);
+        border-radius: var(--md-shape-full);
+      }
+
+      .action-primary:hover {
+        background: var(--md-primary);
+        color: var(--md-on-primary);
+        opacity: 0.92;
+      }
+
+      .form-footer {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 0 30px 36px;
+      }
+
+      .form-status {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 0 10px;
+        border-radius: var(--md-shape-full);
+        color: var(--md-on-surface-variant);
+        font-size: 12px;
+        font-weight: 700;
+        opacity: 0;
+        transform: translateX(-4px);
+        transition:
+          opacity var(--md-duration-short) var(--md-easing-standard),
+          transform var(--md-duration-short) var(--md-easing-standard),
+          background var(--md-duration-short) var(--md-easing-standard);
+      }
+
+      .form-status[data-state="visible"] {
+        color: var(--md-on-surface);
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      .form-status[data-tone="error"][data-state="visible"] {
+        color: var(--md-error);
+      }
+
+      .app-footer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 20px 24px 28px;
+        color: var(--md-on-surface-variant);
+        font-size: 13px;
+        animation: footerFadeIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.18s both;
+      }
+
+      .about-description {
+        max-width: 420px;
+        margin: 0;
+        text-align: center;
+        opacity: 0.8;
+      }
+
+      .about-links {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .about-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 16px;
+        border: 1px solid var(--md-outline-variant);
+        border-radius: var(--md-shape-full);
+        background: transparent;
+        color: var(--md-primary);
+        text-decoration: none;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1.1;
+        position: relative;
+        overflow: hidden;
+        transform-origin: center;
+        backface-visibility: hidden;
+        transition:
+          transform 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28),
+          background-color 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28),
+          border-color 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28),
+          color 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      }
+
+      .about-link::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--md-primary);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+
+      .about-link:hover::before {
+        opacity: 0.08;
+      }
+
+      .about-link:hover {
+        background: var(--md-surface-container-high);
+        border-color: var(--md-outline);
+        transform: scale(1.03);
+        text-decoration: none;
+      }
+
+      .about-link > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .about-link svg {
+        flex-shrink: 0;
+        transition: transform 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      }
+
+      .about-link:hover svg {
+        transform: scale(1.08);
+      }
+
+      .about-link:active {
+        transform: scale(0.98);
+        transition-duration: 0.06s;
+      }
+
+      .about-creator a,
+      .footer-link {
+        color: var(--md-primary);
+        text-decoration: none;
+      }
+
+      .about-creator a:hover,
+      .footer-link:hover {
+        text-decoration: underline;
+      }
+
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: rgb(0 0 0 / 0.52);
+      }
+
+      .modal-backdrop[hidden] {
+        display: none !important;
+      }
+
+      .modal-card {
+        width: min(720px, 100%);
+        max-height: min(720px, calc(100vh - 48px));
+        overflow: auto;
+        padding: 20px;
+        border: 1px solid var(--md-outline-variant);
+        border-radius: var(--md-shape-lg);
+        background: var(--md-surface-container);
+        box-shadow: 0 22px 60px rgb(0 0 0 / 0.38);
+      }
+
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 12px;
+      }
+
+      .modal-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0;
+        color: var(--md-on-surface);
+        font-size: 18px;
+      }
+
+      .modal-body {
+        display: grid;
+        gap: 12px;
+        color: var(--md-on-surface-variant);
+        line-height: 1.55;
+      }
+
+      .modal-body a {
+        color: var(--md-primary);
+      }
+
+      @media (max-width: 720px) {
+        .header-content {
+          padding: 14px 16px;
+        }
+
+        .search-bar {
+          width: calc(100% - 32px);
+        }
+
+        .app-body {
+          columns: auto;
+          padding: 12px 10px 20px;
+        }
+
+        .form-footer {
+          padding: 0 16px 28px;
+        }
+      }
+    </style>
+    <script src="./openrouter-guide.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell app-shell-page">
+      <header class="app-header">
+        <div class="header-content">
+          <a class="header-brand" href="./popup.html?view=page" aria-label="YouTube Rewind settings">
+            <span class="app-logo" role="img" aria-label="YouTube Rewind"></span>
+          </a>
+          <div class="header-actions">
+            <button class="info-button" type="button" data-role="about-button" data-i18n-title="sectionAbout" data-i18n-aria="sectionAbout">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+            </button>
+            <div class="lang-wrapper">
+              <button class="lang-button" type="button" data-role="lang-button" aria-haspopup="true" aria-expanded="false">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M2 12h20"></path>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                </svg>
+              </button>
+              <div class="lang-menu" data-role="lang-menu" role="menu" hidden></div>
+            </div>
+            <div class="version-wrapper">
+              <button class="version-button" type="button" data-role="version-button" aria-haspopup="true" aria-expanded="false">v0.6.0</button>
+              <div class="update-menu" data-role="update-menu" hidden></div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="search-bar" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <span class="search-label" data-i18n="searchLabel">Assistant provider, model, prompt and generation settings</span>
+      </div>
+
+      <main class="app-body">
+        <section class="settings-section">
+          <h2 class="section-title">
+            <svg class="section-icon" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor"><path d="M180-120q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h600q24 0 42 18t18 42v600q0 24-18 42t-42 18H180Zm0-60h600v-600H180v600Zm80-100h440v-60H260v60Zm0-120h440v-60H260v60Zm0-120h260v-60H260v60Zm0-120h440v-60H260v60Zm-80 360v-600 600Z"></path></svg>
+            <span data-i18n="sectionProvider">Provider</span>
+          </h2>
+          <div class="section-content">
+            <div class="setting-row">
+              <div class="choice-group" data-choice-group="aiVideoChatProvider">
+                <button class="choice" type="button" data-value="openrouter"><span class="provider-icon provider-icon-openrouter" aria-hidden="true"></span><span>OpenRouter</span></button>
+                <button class="choice" type="button" data-value="openai"><span class="provider-icon provider-icon-openai" aria-hidden="true"></span><span>ChatGPT / OpenAI</span></button>
+                <button class="choice" type="button" data-value="anthropic"><span class="provider-icon provider-icon-anthropic" aria-hidden="true"></span><span>Claude</span></button>
+                <button class="choice" type="button" data-value="perplexity"><span class="provider-icon provider-icon-perplexity" aria-hidden="true"></span><span>Perplexity</span></button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="field">
+                <label for="ai-key" data-i18n="apiKey">API key</label>
+                <input id="ai-key" data-setting="aiVideoChatApiKey" type="password" autocomplete="off" placeholder="sk-...">
+              </div>
+              <button class="inline-help-link" type="button" data-role="provider-guide-link">How to get a key</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h2 class="section-title">
+            <svg class="section-icon" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor"><path d="M480-80 120-280v-400l360-200 360 200v400L480-80Zm0-69 300-166v-330L480-811 180-645v330l300 166Zm0-331Z"></path></svg>
+            <span data-i18n="sectionModel">Model</span>
+          </h2>
+          <div class="section-content">
+            <div class="setting-row">
+              <div class="choice-group" data-choice-group="aiVideoChatModel"></div>
+            </div>
+            <div class="setting-row" data-role="custom-model-field">
+              <div class="field">
+                <label for="ai-custom-model" data-i18n="customModelId">Custom model ID</label>
+                <div class="model-input-wrap">
+                  <img class="model-input-icon" data-role="custom-model-icon" alt="" loading="lazy" decoding="async">
+                  <input id="ai-custom-model" data-setting="aiVideoChatCustomModel" type="text" placeholder="openai/gpt-oss-120b:free">
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h2 class="section-title">
+            <svg class="section-icon" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor"><path d="m360-240-56-56 224-224H360v-80h304v304h-80v-168L360-240Z"></path></svg>
+            <span data-i18n="sectionAnswerStyle">Answer style</span>
+          </h2>
+          <div class="section-content">
+            <div class="setting-row">
+              <div class="choice-group" data-choice-group="aiVideoChatSystemPreset">
+                <button class="choice" type="button" data-value="balanced" data-i18n="styleBalanced">Balanced</button>
+                <button class="choice" type="button" data-value="concise" data-i18n="styleConcise">Concise</button>
+                <button class="choice" type="button" data-value="deep" data-i18n="styleDeep">Deep context</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="field">
+                <label data-i18n="responseLanguage">Response language</label>
+                <select id="ai-response-language" class="choice-select" data-setting="aiVideoChatResponseLanguage"></select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="field">
+                <label for="ai-prompt" data-i18n="systemPrompt">System prompt</label>
+                <textarea id="ai-prompt" data-setting="aiVideoChatCustomSystemPrompt" data-i18n-placeholder="systemPromptPlaceholder" placeholder="Assistant instructions..."></textarea>
+              </div>
+            </div>
+            <div class="setting-row slider-setting-row">
+              <div class="ytr-slider-row" data-slider-control="aiVideoChatTemperature" data-min="0" data-max="2" data-step="0.05">
+                <div class="ytr-slider-header">
+                  <label class="ytr-slider-label" for="ai-temperature-range" data-i18n="temperature">Temperature</label>
+                  <input id="ai-temperature" class="ytr-slider-value" data-setting="aiVideoChatTemperature" data-slider-input="aiVideoChatTemperature" type="text" inputmode="decimal">
+                </div>
+                <div class="ytr-slider-track">
+                  <svg class="ytr-slider-svg" viewBox="0 0 300 24" preserveAspectRatio="none" aria-hidden="true">
+                    <path data-slider-wave fill="none" stroke="var(--md-primary)" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <line data-slider-inactive x1="0" y1="12" x2="300" y2="12" stroke="var(--md-surface-container-highest)" stroke-width="4" stroke-linecap="round"></line>
+                  </svg>
+                  <span class="ytr-slider-thumb"></span>
+                  <input id="ai-temperature-range" class="ytr-slider-range" data-slider-range="aiVideoChatTemperature" type="range" min="0" max="2" step="0.05">
+                </div>
+              </div>
+            </div>
+            <div class="setting-row slider-setting-row">
+              <div class="ytr-slider-row" data-slider-control="aiVideoChatMaxTokens" data-min="300" data-max="1600" data-step="50">
+                <div class="ytr-slider-header">
+                  <label class="ytr-slider-label" for="ai-max-tokens-range" data-i18n="maxTokens">Answer length limit</label>
+                  <input id="ai-max-tokens" class="ytr-slider-value" data-setting="aiVideoChatMaxTokens" data-slider-input="aiVideoChatMaxTokens" type="text" inputmode="numeric">
+                </div>
+                <div class="ytr-slider-track">
+                  <svg class="ytr-slider-svg" viewBox="0 0 300 24" preserveAspectRatio="none" aria-hidden="true">
+                    <path data-slider-wave fill="none" stroke="var(--md-primary)" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <line data-slider-inactive x1="0" y1="12" x2="300" y2="12" stroke="var(--md-surface-container-highest)" stroke-width="4" stroke-linecap="round"></line>
+                  </svg>
+                  <span class="ytr-slider-thumb"></span>
+                  <input id="ai-max-tokens-range" class="ytr-slider-range" data-slider-range="aiVideoChatMaxTokens" type="range" min="300" max="1600" step="50">
+                </div>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="field">
+                <label for="ai-prompt-name" data-i18n="savePromptAs">Save current prompt as</label>
+                <input id="ai-prompt-name" data-role="prompt-preset-name" type="text" data-i18n-placeholder="savePromptPlaceholder" placeholder="My assistant style">
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="choice-group" data-role="prompt-presets"></div>
+            </div>
+            <div class="setting-row">
+              <div class="prompt-toolbar">
+                <button class="action" type="button" data-role="save-prompt-preset" data-i18n="saveAsStyle" hidden>Save as style</button>
+                <button class="action" type="button" data-role="rename-prompt-preset" data-i18n="renameStyle" hidden>Rename style</button>
+                <button class="action" type="button" data-role="delete-prompt-preset" data-i18n="deleteStyle" hidden>Delete style</button>
+                <button class="action" type="button" data-role="reset-system-prompt" data-i18n="resetPrompt">Reset prompt</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h2 class="section-title">
+            <svg class="section-icon" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor"><path d="M200-120v-640q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v640L480-240 200-120Zm80-122 200-86 200 86v-518H280v518Zm0-518h400-400Z"></path></svg>
+            <span data-i18n="sectionBehavior">Behavior</span>
+          </h2>
+          <div class="section-content">
+            <label class="toggle-row">
+              <span class="toggle-copy">
+                <span class="toggle-title" data-i18n="autoOpenTitle">Open assistant automatically</span>
+                <span class="toggle-description" data-i18n="autoOpenDescription">Show the chat panel on watch pages when the feature is enabled.</span>
+              </span>
+              <span class="toggle-track">
+                <span class="toggle-thumb"><svg class="toggle-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                <input class="toggle-input" data-setting="aiVideoChatAutoOpen" type="checkbox">
+              </span>
+            </label>
+            <label class="toggle-row">
+              <span class="toggle-copy">
+                <span class="toggle-title" data-i18n="useWebTitle">Use web search</span>
+                <span class="toggle-description" data-i18n="useWebDescription">Look up fresh terms, people, conflicts, memes and source pages when useful.</span>
+              </span>
+              <span class="toggle-track">
+                <span class="toggle-thumb"><svg class="toggle-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                <input class="toggle-input" data-setting="aiVideoChatUseWeb" type="checkbox">
+              </span>
+            </label>
+            <label class="toggle-row">
+              <span class="toggle-copy">
+                <span class="toggle-title" data-i18n="channelContextTitle">Use channel context</span>
+                <span class="toggle-description" data-i18n="channelContextDescription">Add channel/profile context when the question needs identity or background.</span>
+              </span>
+              <span class="toggle-track">
+                <span class="toggle-thumb"><svg class="toggle-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                <input class="toggle-input" data-setting="aiVideoChatUseChannelContext" type="checkbox">
+              </span>
+            </label>
+            <label class="toggle-row">
+              <span class="toggle-copy">
+                <span class="toggle-title" data-i18n="deepLinksTitle">Inspect source links deeply</span>
+                <span class="toggle-description" data-i18n="deepLinksDescription">Follow original/source YouTube links from the description for multi-step answers.</span>
+              </span>
+              <span class="toggle-track">
+                <span class="toggle-thumb"><svg class="toggle-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                <input class="toggle-input" data-setting="aiVideoChatDeepLinkInspection" type="checkbox">
+              </span>
+            </label>
+            <div class="setting-row">
+              <div class="field">
+                <label data-i18n="adultMode">18+ and sensitive content</label>
+                <div class="choice-group" data-choice-group="aiVideoChatAdultMode">
+                  <button class="choice" type="button" data-value="hide" data-i18n="adultModeHide">Avoid</button>
+                  <button class="choice" type="button" data-value="brief" data-i18n="adultModeBrief">Brief context</button>
+                  <button class="choice" type="button" data-value="allow" data-i18n="adultModeAllow">Allowed when asked</button>
+                </div>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="field">
+                <label data-i18n="reasoningDepth">Context depth</label>
+                <div class="choice-group" data-choice-group="aiVideoChatReasoningDepth">
+                  <button class="choice" type="button" data-value="fast" data-i18n="reasoningFast">Fast</button>
+                  <button class="choice" type="button" data-value="balanced" data-i18n="reasoningBalanced">Balanced</button>
+                  <button class="choice" type="button" data-value="deep" data-i18n="reasoningDeep">Deep</button>
+                </div>
+              </div>
+            </div>
+            <div class="setting-row slider-setting-row">
+              <div class="ytr-slider-row" data-slider-control="aiVideoChatMaxWebSnippets" data-min="2" data-max="12" data-step="1">
+                <div class="ytr-slider-header">
+                  <label class="ytr-slider-label" for="ai-web-snippets-range" data-i18n="webSnippets">Web snippets</label>
+                  <input id="ai-web-snippets" class="ytr-slider-value" data-setting="aiVideoChatMaxWebSnippets" data-slider-input="aiVideoChatMaxWebSnippets" type="text" inputmode="numeric">
+                </div>
+                <div class="ytr-slider-track">
+                  <svg class="ytr-slider-svg" viewBox="0 0 300 24" preserveAspectRatio="none" aria-hidden="true">
+                    <path data-slider-wave fill="none" stroke="var(--md-primary)" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <line data-slider-inactive x1="0" y1="12" x2="300" y2="12" stroke="var(--md-surface-container-highest)" stroke-width="4" stroke-linecap="round"></line>
+                  </svg>
+                  <span class="ytr-slider-thumb"></span>
+                  <input id="ai-web-snippets-range" class="ytr-slider-range" data-slider-range="aiVideoChatMaxWebSnippets" type="range" min="2" max="12" step="1">
+                </div>
+              </div>
+            </div>
+            <div class="setting-row slider-setting-row">
+              <div class="ytr-slider-row" data-slider-control="aiVideoChatMaxYouTubeLinks" data-min="2" data-max="12" data-step="1">
+                <div class="ytr-slider-header">
+                  <label class="ytr-slider-label" for="ai-link-depth-range" data-i18n="youtubeLinks">YouTube links to inspect</label>
+                  <input id="ai-link-depth" class="ytr-slider-value" data-setting="aiVideoChatMaxYouTubeLinks" data-slider-input="aiVideoChatMaxYouTubeLinks" type="text" inputmode="numeric">
+                </div>
+                <div class="ytr-slider-track">
+                  <svg class="ytr-slider-svg" viewBox="0 0 300 24" preserveAspectRatio="none" aria-hidden="true">
+                    <path data-slider-wave fill="none" stroke="var(--md-primary)" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <line data-slider-inactive x1="0" y1="12" x2="300" y2="12" stroke="var(--md-surface-container-highest)" stroke-width="4" stroke-linecap="round"></line>
+                  </svg>
+                  <span class="ytr-slider-thumb"></span>
+                  <input id="ai-link-depth-range" class="ytr-slider-range" data-slider-range="aiVideoChatMaxYouTubeLinks" type="range" min="2" max="12" step="1">
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="form-footer">
+        <span class="form-status" data-role="settings-status"></span>
+      </footer>
+
+      <footer class="app-footer" id="ytr-about">
+        <p class="about-description" data-i18n="aboutDescription">Hide clutter, filter content and refresh YouTube's look.</p>
+        <div class="about-links">
+          <a class="about-link" href="https://t.me/ytrewind_extension" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+            <span data-i18n="aboutTelegram">Telegram</span>
+          </a>
+          <a class="about-link" href="https://addons.mozilla.org/firefox/addon/youtube-rewind/" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8.824 7.287c.008 0 .004 0 0 0zm-2.8-1.4c.006 0 .003 0 0 0zm16.754 2.161c-.505-1.215-1.53-2.528-2.333-2.943.654 1.283 1.033 2.57 1.177 3.53l.002.02c-1.314-3.278-3.544-4.6-5.366-7.477-.091-.147-.184-.292-.273-.446a3.545 3.545 0 01-.13-.24 2.118 2.118 0 01-.172-.46.03.03 0 00-.027-.03.038.038 0 00-.021 0l-.006.001a.037.037 0 00-.01.005L15.624 0c-2.585 1.515-3.657 4.168-3.932 5.856a6.197 6.197 0 00-2.305.587.297.297 0 00-.147.37c.057.162.24.24.396.17a5.622 5.622 0 012.008-.523l.067-.005a5.847 5.847 0 011.957.222l.095.03a5.816 5.816 0 01.616.228c.08.036.16.073.238.112l.107.055a5.835 5.835 0 01.368.211 5.953 5.953 0 012.034 2.104c-.62-.437-1.733-.868-2.803-.681 4.183 2.09 3.06 9.292-2.737 9.02a5.164 5.164 0 01-1.513-.292 4.42 4.42 0 01-.538-.232c-1.42-.735-2.593-2.121-2.74-3.806 0 0 .537-2 3.845-2 .357 0 1.38-.998 1.398-1.287-.005-.095-2.029-.9-2.817-1.677-.422-.416-.622-.616-.8-.767a3.47 3.47 0 00-.301-.227 5.388 5.388 0 01-.032-2.842c-1.195.544-2.124 1.403-2.8 2.163h-.006c-.46-.584-.428-2.51-.402-2.913-.006-.025-.343.176-.389.206-.406.29-.787.616-1.136.974-.397.403-.76.839-1.085 1.303a9.816 9.816 0 00-1.562 3.52c-.003.013-.11.487-.19 1.073-.013.09-.026.181-.037.272a7.8 7.8 0 00-.069.667l-.002.034-.023.387-.001.06C.386 18.795 5.593 24 12.016 24c5.752 0 10.527-4.176 11.463-9.661.02-.149.035-.298.052-.448.232-1.994-.025-4.09-.753-5.844z"/></svg>
+            <span data-i18n="aboutFirefox">Firefox Add-ons</span>
+          </a>
+          <a class="about-link" href="https://chromewebstore.google.com/detail/youtube-rewind/mafjipbkleeooghlebgipkcbcggpojma" target="_blank" rel="noopener">
+            <svg class="about-link-google-icon" viewBox="90 78 286 282" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M371.3784 193.2406H237.0825v53.4375h77.167c-1.2405 7.5627-4.0259 15.0024-8.1049 21.7862-4.6734 7.7723-10.4511 13.6895-16.373 18.1957-17.7389 13.4983-38.42 16.2584-52.7828 16.2584-36.2824 0-67.2833-23.2865-79.2844-54.9287-.4843-1.1482-.8059-2.3344-1.1975-3.5068-2.652-8.0533-4.101-16.5825-4.101-25.4474 0-9.226 1.5691-18.0575 4.4301-26.3985 11.2851-32.8967 42.9849-57.4674 80.1789-57.4674 7.4811 0 14.6854.8843 21.5173 2.6481 15.6135 4.0309 26.6578 11.9698 33.4252 18.2494l40.834-39.7111c-24.839-22.616-57.2194-36.3201-95.8444-36.3201-30.8782-.00066-59.3863 9.55308-82.7477 25.6992-18.9454 13.0941-34.4833 30.6254-44.9695 50.9861-9.75366 18.8785-15.09441 39.7994-15.09441 62.2934 0 22.495 5.34891 43.6334 15.10261 62.3374v.126c10.3023 19.8567 25.3678 36.9537 43.6783 49.9878 15.9962 11.3866 44.6789 26.5516 84.0307 26.5516 22.6301 0 42.6867-4.0517 60.3748-11.6447 12.76-5.4775 24.0655-12.6217 34.3012-21.8036 13.5247-12.1323 24.1168-27.1388 31.3465-44.4041 7.2297-17.2654 11.097-36.7895 11.097-57.957 0-9.858-.9971-19.8694-2.6881-28.9684Z"/></svg>
+            <span data-i18n="aboutChrome">Chrome Web Store</span>
+          </a>
+          <a class="about-link" href="https://github.com/crixqq/YouTube-Rewind" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+            <span data-i18n="aboutGitHub">GitHub</span>
+          </a>
+        </div>
+        <div class="about-creator"><span data-i18n="aboutCreator">Created by</span> <a href="https://github.com/crixqq" target="_blank" rel="noopener">crixqq</a></div>
+        <a class="footer-link" href="https://github.com/crixqq/YouTube-Rewind/blob/main/LICENSE" target="_blank" rel="noopener">GPL-3.0</a>
+      </footer>
+
+      <div class="modal-backdrop" data-role="provider-guide-modal" hidden>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="provider-guide-title">
+          <div class="modal-header">
+            <h2 class="modal-title" id="provider-guide-title">How to get a key</h2>
+            <button class="icon-button" type="button" data-role="provider-guide-close" data-i18n-aria="close">
+              <svg viewBox="0 -960 960 960" width="20" height="20" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+            </button>
+          </div>
+          <div class="modal-body" data-role="provider-guide-body"></div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

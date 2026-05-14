@@ -455,9 +455,12 @@
   }
 
   .color-picker-panel {
+    --color-picker-panel-radius: 24px;
+    --color-picker-panel-padding: 14px;
+    --color-picker-inner-radius: calc(var(--color-picker-panel-radius) - var(--color-picker-panel-padding));
     margin-top: 10px;
-    padding: 14px;
-    border-radius: 24px;
+    padding: var(--color-picker-panel-padding);
+    border-radius: var(--color-picker-panel-radius);
     border: 1px solid color-mix(in srgb, var(--md-outline-variant) 82%, transparent);
     background:
       radial-gradient(circle at top right, color-mix(in srgb, var(--md-primary) 14%, transparent), transparent 38%),
@@ -477,7 +480,7 @@
     position: relative;
     aspect-ratio: 1 / 1;
     width: 100%;
-    border-radius: 20px;
+    border-radius: var(--color-picker-inner-radius);
     cursor: crosshair;
     overflow: hidden;
   }

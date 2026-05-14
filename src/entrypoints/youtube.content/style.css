@@ -2,19 +2,33 @@
    YouTube Rewind — Content Script Styles
    ============================================ */
 
-/* Material Symbols font for classic like/dislike icons (thumb_down + thumb_up, with FILL axis) */
-@font-face {
-  font-family: 'Material Symbols Outlined';
-  font-style: normal;
-  font-weight: 400;
-  src: url(https://fonts.gstatic.com/l/font?kit=kJF4BvYX7BgnkSrUwT8OhrdQw4oELdPIeeII9v6oDMzBwG-RpA6RzaxHMPdY40KH8nGzv3fzfVJU22ZZLsYEpzC_1ver5Y0R3e49__1hwl8XK7LRLdw7xna2t9M&skey=b8dc2088854b122f&v=v321) format('woff2');
+:root {
+  --ytr-ui-primary: #c8bfff;
+  --ytr-ui-on-primary: #2b1849;
+  --ytr-ui-primary-soft: #2f2740;
+  --ytr-ui-surface: #18151f;
+  --ytr-ui-surface-high: #211d29;
+  --ytr-ui-surface-highest: #312b3a;
+  --ytr-ui-outline: rgba(255, 255, 255, 0.08);
+  --ytr-ui-outline-strong: rgba(255, 255, 255, 0.18);
+  --ytr-ui-text: #f6f1ff;
+  --ytr-ui-text-muted: #c7bfd6;
+  --ytr-ui-error: #ffb4ab;
+  --ytr-ui-error-soft: rgba(255, 180, 171, 0.14);
+  --ytr-ui-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+  --ytr-radius-xl: 24px;
+  --ytr-radius-lg: 20px;
+  --ytr-radius-md: 16px;
+  --ytr-radius-sm: 12px;
+  --ytr-radius-xs: 8px;
 }
 
+/* Material Symbols Rounded font for action icons (thumb_up, thumb_down, send, etc.) */
 @font-face {
   font-family: 'Material Symbols Rounded';
   font-style: normal;
   font-weight: 400;
-  src: url(https://fonts.gstatic.com/l/font?kit=syl0-zNym6YjUruM-QrEh7-nyTnjDwKNJ_190FjpZIvDmUSVOK7BDB_Qb9vUSzq3wzLK-P0J-V_Zs-QtQth3-jOcDTCVpeRL2w5rwZu2rIelXxKRKfkBfMN441MqS-FO2Q&skey=70ddea8fe54d532e&v=v327) format('truetype');
+  src: url(https://fonts.gstatic.com/l/font?kit=syl0-zNym6YjUruM-QrEh7-nyTnjDwKNJ_190FjpZIvDmUSVOK7BDB_Qb9vUSzq3wzLK-P0J-V_Zs-QtQth3-jOcDTCVpeRL2w5rwZu2rIelXxKRKfkBfMN441MqS-FO2Q&skey=70ddea8fe54d532e&v=v327) format('woff2');
 }
 
 /* --- Top Bar --- */
@@ -101,9 +115,46 @@ html[data-ytr-thumbnail-effect="hidden"] .ytp-videowall-still .ytp-videowall-sti
 }
 
 /* Hide moving thumbnail preview (auto-play on hover in Chromium) when requested */
-html[data-ytr-disable-thumbnail-preview="true"] ytd-moving-thumbnail-renderer,
-html:not([data-ytr-thumbnail-effect="none"]) ytd-moving-thumbnail-renderer {
+html[data-ytr-disable-thumbnail-preview="true"] :is(
+  ytd-moving-thumbnail-renderer,
+  ytd-moving-thumbnail-renderer img,
+  ytd-moving-thumbnail-renderer video,
+  ytd-video-preview,
+  ytd-video-preview img,
+  ytd-video-preview video,
+  ytd-thumbnail-overlay-loading-preview-renderer,
+  ytd-thumbnail-overlay-resume-playback-renderer,
+  #mouseover-overlay,
+  #hover-overlays
+),
+html:not([data-ytr-thumbnail-effect="none"]) :is(
+  ytd-moving-thumbnail-renderer,
+  ytd-moving-thumbnail-renderer img,
+  ytd-moving-thumbnail-renderer video,
+  ytd-video-preview,
+  ytd-video-preview img,
+  ytd-video-preview video,
+  ytd-thumbnail-overlay-loading-preview-renderer,
+  ytd-thumbnail-overlay-resume-playback-renderer,
+  #mouseover-overlay,
+  #hover-overlays
+) {
   display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+html[data-ytr-disable-thumbnail-preview="true"] ytd-compact-video-renderer :is(
+  ytd-thumbnail img,
+  ytd-moving-thumbnail-renderer img,
+  ytd-video-preview img
+) {
+  transform: none !important;
+  translate: none !important;
+  margin-top: 0 !important;
+  top: 0 !important;
+  object-position: center center !important;
 }
 
 /* Hover reveal — only when enabled (no-reveal is NOT true).
@@ -303,55 +354,84 @@ html[data-ytr-disable-hover-animation="true"] yt-touch-feedback-shape {
   display: none !important;
 }
 
-/* Prevent metadata text color changes on hover */
+/* Keep feed text colors stable in Chromium when hover motion is disabled */
 html[data-ytr-disable-hover-animation="true"] :is(
   ytd-rich-item-renderer, ytd-compact-video-renderer, ytd-video-renderer,
-  ytd-grid-video-renderer, yt-lockup-view-model
-):hover :is(
+  ytd-grid-video-renderer, yt-lockup-view-model, ytd-rich-grid-media
+) :is(
+  #video-title,
+  #video-title-link,
+  a#video-title,
+  a#video-title-link,
+  h3,
+  h3 a,
+  h3 *,
+  .yt-lockup-metadata-view-model-wiz__title,
+  .yt-lockup-metadata-view-model-wiz__title *,
+  .yt-content-metadata-view-model-wiz__title,
+  .yt-content-metadata-view-model-wiz__title *,
+  yt-formatted-string#video-title,
+  yt-formatted-string#video-title *
+) {
+  color: var(--yt-spec-text-primary, #f1f1f1) !important;
+  opacity: 1 !important;
+  transition: none !important;
+}
+
+html[data-ytr-disable-hover-animation="true"] :is(
+  ytd-rich-item-renderer, ytd-compact-video-renderer, ytd-video-renderer,
+  ytd-grid-video-renderer, yt-lockup-view-model, ytd-rich-grid-media
+) :is(
   .yt-lockup-metadata-view-model-wiz__text-container,
+  .yt-lockup-metadata-view-model-wiz__text-container *,
   yt-lockup-metadata-view-model,
+  yt-lockup-metadata-view-model *,
   .yt-content-metadata-view-model-wiz__metadata-text,
+  .yt-content-metadata-view-model-wiz__metadata-text *,
   yt-content-metadata-view-model,
-  #metadata, #metadata-line, #byline-container,
-  .ytd-video-meta-block, ytd-video-meta-block,
-  #channel-name, .ytd-channel-name, #video-title
-) {
-  color: inherit !important;
-  --yt-spec-text-secondary: var(--yt-spec-text-secondary) !important;
-}
-
-html[data-ytr-disable-hover-animation="true"] :is(
-  ytd-rich-item-renderer, ytd-compact-video-renderer, ytd-video-renderer,
-  ytd-grid-video-renderer, yt-lockup-view-model
-):hover :is(
-  span.yt-content-metadata-view-model-wiz__metadata-text,
-  .yt-core-attributed-string--link-inherit-color,
-  #text.ytd-channel-name, .ytd-video-meta-block span,
-  yt-formatted-string#text
-) {
-  color: var(--yt-spec-text-secondary, #aaa) !important;
-}
-
-html[data-ytr-disable-hover-animation="true"] :is(
-  ytd-rich-item-renderer, ytd-grid-video-renderer, yt-lockup-view-model, ytd-rich-grid-media
-):hover :is(
+  yt-content-metadata-view-model *,
+  #metadata,
+  #metadata *,
+  #metadata-line,
+  #metadata-line *,
+  #byline-container,
+  #byline-container *,
+  .ytd-video-meta-block,
+  .ytd-video-meta-block *,
+  ytd-video-meta-block,
+  ytd-video-meta-block *,
+  #channel-name,
+  #channel-name *,
+  .ytd-channel-name,
+  .ytd-channel-name *,
   .ytContentMetadataViewModelMetadataRow,
-  .ytContentMetadataViewModelMetadataRow *,
-  .ytContentMetadataViewModelMetadataRow a,
-  .ytContentMetadataViewModelMetadataRow yt-formatted-string
+  .ytContentMetadataViewModelMetadataRow *
 ) {
   color: var(--yt-spec-text-secondary, #aaa) !important;
   transition: none !important;
 }
 
-/* Keep title text its normal color (primary text) */
+/* Re-assert title color after metadata overrides so compact/watch lockups keep a primary title */
 html[data-ytr-disable-hover-animation="true"] :is(
   ytd-rich-item-renderer, ytd-compact-video-renderer, ytd-video-renderer,
-  ytd-grid-video-renderer, yt-lockup-view-model
-):hover :is(
-  #video-title, h3, .yt-lockup-metadata-view-model-wiz__title
+  ytd-grid-video-renderer, yt-lockup-view-model, ytd-rich-grid-media
+) :is(
+  #video-title,
+  #video-title-link,
+  a#video-title,
+  a#video-title-link,
+  h3,
+  h3 a,
+  h3 *,
+  .yt-lockup-metadata-view-model-wiz__title,
+  .yt-lockup-metadata-view-model-wiz__title *,
+  .yt-content-metadata-view-model-wiz__title,
+  .yt-content-metadata-view-model-wiz__title *,
+  yt-formatted-string#video-title,
+  yt-formatted-string#video-title *
 ) {
   color: var(--yt-spec-text-primary, #f1f1f1) !important;
+  opacity: 1 !important;
 }
 
 /* --- Base fixes --- */
@@ -364,9 +444,41 @@ ytd-rich-grid-renderer #contents {
   padding-top: 0 !important;
 }
 
-ytd-thumbnail yt-image,
-ytd-thumbnail yt-image img {
+html[data-ytr-thumbnail-shape="none"] ytd-thumbnail yt-image,
+html[data-ytr-thumbnail-shape="none"] ytd-thumbnail yt-image img {
   background-color: var(--yt-spec-badge-chip-background);
+}
+
+html:not([data-ytr-thumbnail-shape="none"]) :is(
+  ytd-thumbnail,
+  ytd-playlist-thumbnail,
+  yt-thumbnail-view-model,
+  .yt-lockup-view-model-wiz__content-image
+) :is(
+  yt-image,
+  yt-image img,
+  #img,
+  #thumbnail,
+  img,
+  video
+) {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+html:not([data-ytr-thumbnail-shape="none"]) ytd-browse[page-subtype="channels"] :is(
+  ytd-thumbnail,
+  ytd-thumbnail a#thumbnail,
+  ytd-thumbnail #thumbnail,
+  ytd-thumbnail yt-image,
+  ytd-thumbnail yt-image-shadow,
+  ytd-rich-grid-media #thumbnail,
+  ytd-rich-grid-media a#thumbnail
+) {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
 }
 
 ytd-rich-section-renderer:empty,
@@ -418,29 +530,25 @@ html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd
   transition: none !important;
 }
 
-/* Links, timecodes, hashtags in description body — blue */
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata #description-inline-expander a,
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata #description-inline-expander a,
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata ytd-text-inline-expander a,
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-text-inline-expander a,
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata #expanded a,
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata #expanded a {
+/* Full author-written links only */
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata ytd-text-inline-expander :is(#expanded, #snippet) .ytAttributedStringHost .ytAttributedStringLinkInheritColor > a.ytAttributedStringLink,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-text-inline-expander :is(#expanded, #snippet) .ytAttributedStringHost .ytAttributedStringLinkInheritColor > a.ytAttributedStringLink {
   color: #3ea6ff !important;
 }
 
-/* Hashtags in info line — gray when collapsed, blue when expanded */
+/* Hashtags/info line and structured metadata links stay neutral */
 html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata #info a,
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata #info a {
-  color: #a8a8a8 !important;
-}
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata ytd-text-inline-expander[is-expanded] #info a,
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-text-inline-expander[is-expanded] #info a {
-  color: #3ea6ff !important;
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata #info a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata ytd-structured-description-content-renderer a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-structured-description-content-renderer a {
+  color: var(--yt-spec-text-primary) !important;
 }
 
-/* Truncated link chips — every highlight text decorator inside description */
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata :is(#description-inline-expander, ytd-text-inline-expander, #expanded) :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator),
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata :is(#description-inline-expander, ytd-text-inline-expander, #expanded) :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator) {
+/* Truncated author link chips stay white */
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata ytd-text-inline-expander #snippet :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator),
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-text-inline-expander #snippet :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator),
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata ytd-text-inline-expander #expanded .ytAttributedStringHost :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator),
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-text-inline-expander #expanded .ytAttributedStringHost :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator) {
   background: #3d3d3d !important;
   border-radius: 8px !important;
   -webkit-box-decoration-break: clone;
@@ -448,11 +556,35 @@ html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd
   color: #fff !important;
 }
 
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata :is(#description-inline-expander, ytd-text-inline-expander, #expanded) :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator):has(> a[href]) > a,
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata :is(#description-inline-expander, ytd-text-inline-expander, #expanded) :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator):has(> a[href]) > a,
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata :is(#description-inline-expander, ytd-text-inline-expander, #expanded) :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator):has(> a[href]) > a *,
-html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata :is(#description-inline-expander, ytd-text-inline-expander, #expanded) :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator):has(> a[href]) > a * {
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata ytd-text-inline-expander #snippet :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator):has(> a[href]) > a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-text-inline-expander #snippet :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator):has(> a[href]) > a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata ytd-text-inline-expander #snippet :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator):has(> a[href]) > a *,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-text-inline-expander #snippet :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator):has(> a[href]) > a *,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata ytd-text-inline-expander #expanded .ytAttributedStringHost :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator):has(> a[href]) > a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-text-inline-expander #expanded .ytAttributedStringHost :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator):has(> a[href]) > a,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata #description.ytd-watch-metadata ytd-text-inline-expander #expanded .ytAttributedStringHost :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator):has(> a[href]) > a *,
+html[data-ytr-no-adaptive-desc="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-text-inline-expander #expanded .ytAttributedStringHost :is(.ytAttributedStringHighlightTextDecorator, .yt-core-attributed-string--highlight-text-decorator):has(> a[href]) > a * {
   color: #fff !important;
+}
+
+html[data-ytr-stable-description-colors="true"] ytd-watch-metadata #description.ytd-watch-metadata,
+html[data-ytr-stable-description-colors="true"] ytd-watch-metadata #description.ytd-watch-metadata *,
+html[data-ytr-stable-description-colors="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata,
+html[data-ytr-stable-description-colors="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata * {
+  transition-property: none !important;
+}
+
+html[data-ytr-stable-description-colors="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata #info,
+html[data-ytr-stable-description-colors="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata #info *,
+html[data-ytr-stable-description-colors="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-structured-description-content-renderer,
+html[data-ytr-stable-description-colors="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata ytd-structured-description-content-renderer *,
+html[data-ytr-stable-description-colors="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata .ytAttributedStringHighlightTextDecorator,
+html[data-ytr-stable-description-colors="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata .ytAttributedStringHighlightTextDecorator * {
+  color: inherit !important;
+}
+
+html[data-ytr-stable-description-colors="true"] ytd-watch-metadata:hover #description.ytd-watch-metadata .ytAttributedStringHighlightTextDecorator {
+  background-color: #3d3d3d !important;
 }
 
 /* --- Videos Per Row --- */
@@ -739,7 +871,7 @@ html[data-ytr-avatar-shape="superellipse"] :is(
   ytd-rich-grid-media yt-img-shadow img,
   yt-avatar-stack-view-model img, #avatar-stack img
 ) {
-  border-radius: 22% !important;
+  border-radius: 18% !important;
   overflow: hidden !important;
 }
 
@@ -764,7 +896,7 @@ html[data-ytr-avatar-shape="rounded-square"] :is(
   ytd-rich-grid-media yt-img-shadow img,
   yt-avatar-stack-view-model img, #avatar-stack img
 ) {
-  border-radius: 12% !important;
+  border-radius: 9% !important;
   overflow: hidden !important;
 }
 
@@ -1260,148 +1392,180 @@ html[data-ytr-hide-save-button="true"] [data-ytr-action="save"] {
   display: none !important;
 }
 
-/* --- Classic Like/Dislike Icons (Material Symbols Outlined) --- */
+/* --- Classic Like/Dislike Icons --- */
 
-/* Position icon containers and hide original SVG icons */
-html[data-ytr-classic-like-icons="true"] like-button-view-model .yt-spec-button-shape-next__icon,
-html[data-ytr-classic-like-icons="true"] dislike-button-view-model .yt-spec-button-shape-next__icon,
-html[data-ytr-classic-like-icons="true"] #segmented-like-button .yt-spec-button-shape-next__icon,
-html[data-ytr-classic-like-icons="true"] #segmented-dislike-button .yt-spec-button-shape-next__icon {
-  position: relative !important;
+html[data-ytr-classic-like-icons="true"] {
+  --ytr-classic-like-icon-mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%20-960%20960%20960'%3E%3Cpath%20d='M720-120H280v-520l280-280%2050%2050q7%207%2011.5%2019t4.5%2023v14l-44%20174h258q32%200%2056%2024t24%2056v80q0%207-1.5%2014t-4.5%2013L789-171q-9%2021-29%2036t-40%2015Zm-360-80h360l120-280v-80H480l54-220-174%20174v406Zm0-406v406-406Zm-80-34v80H160v360h120v80H80v-520h200Z'/%3E%3C/svg%3E");
+  --ytr-classic-dislike-icon-mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%20-960%20960%20960'%3E%3Cpath%20d='M240-840h440v520L400-40l-50-50q-7-7-11.5-19t-4.5-23v-14l44-174H120q-32%200-56-24t-24-56v-80q0-7%201.5-14t4.5-13l121-282q9-21%2029-36t44-15Zm360%2080H240L120-480v80h360l-54%20220%20174-174v-406Zm0%20406v-406%20406Zm80%2034v-80h120v-360H680v-80h200v520H680Z'/%3E%3C/svg%3E");
+  --ytr-classic-like-icon-filled-mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%20-960%20960%20960'%3E%3Cpath%20d='M720-120H280v-520l280-280%2050%2050q7%207%2011.5%2019t4.5%2023v14l-44%20174h258q32%200%2056%2024t24%2056v80q0%207-1.5%2014t-4.5%2013L789-171q-9%2021-29%2036t-40%2015ZM160-640q33%200%2056.5%2023.5T240-560v360q0%2033-23.5%2056.5T160-120H80v-520h80Z'/%3E%3C/svg%3E");
+  --ytr-classic-dislike-icon-filled-mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%20-960%20960%20960'%3E%3Cpath%20d='M240-840h440v520L400-40l-50-50q-7-7-11.5-19t-4.5-23v-14l44-174H120q-32%200-56-24t-24-56v-80q0-7%201.5-14t4.5-13l121-282q9-21%2029-36t44-15Zm560%200h80v520H680q-33%200-56.5-23.5T600-400v-360q0-33%2023.5-56.5T680-840h120Z'/%3E%3C/svg%3E");
 }
 
-html[data-ytr-classic-like-icons="true"] like-button-view-model .yt-spec-button-shape-next__icon > *,
-html[data-ytr-classic-like-icons="true"] dislike-button-view-model .yt-spec-button-shape-next__icon > *,
-html[data-ytr-classic-like-icons="true"] #segmented-like-button .yt-spec-button-shape-next__icon > *,
-html[data-ytr-classic-like-icons="true"] #segmented-dislike-button .yt-spec-button-shape-next__icon > * {
+html[data-ytr-classic-like-icons="true"] :is(
+  like-button-view-model,
+  dislike-button-view-model,
+  segmented-like-button-view-model,
+  segmented-dislike-button-view-model,
+  #segmented-like-button,
+  #segmented-dislike-button
+) :is(.yt-spec-button-shape-next__icon, .ytSpecButtonShapeNextIcon) {
+  position: relative !important;
+  display: inline-flex !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+}
+
+html[data-ytr-classic-like-icons="true"] :is(
+  like-button-view-model,
+  dislike-button-view-model,
+  segmented-like-button-view-model,
+  segmented-dislike-button-view-model,
+  #segmented-like-button,
+  #segmented-dislike-button
+) :is(.yt-spec-button-shape-next__icon, .ytSpecButtonShapeNextIcon) > * {
   visibility: hidden !important;
 }
 
-/* Base pseudo-element — Material Symbols Outlined font */
-html[data-ytr-classic-like-icons="true"] like-button-view-model .yt-spec-button-shape-next__icon::before,
-html[data-ytr-classic-like-icons="true"] dislike-button-view-model .yt-spec-button-shape-next__icon::before,
-html[data-ytr-classic-like-icons="true"] #segmented-like-button .yt-spec-button-shape-next__icon::before,
-html[data-ytr-classic-like-icons="true"] #segmented-dislike-button .yt-spec-button-shape-next__icon::before {
+html[data-ytr-classic-like-icons="true"] :is(
+  like-button-view-model,
+  dislike-button-view-model,
+  segmented-like-button-view-model,
+  segmented-dislike-button-view-model,
+  #segmented-like-button,
+  #segmented-dislike-button
+) :is(.yt-spec-button-shape-next__icon, .ytSpecButtonShapeNextIcon)::before {
+  content: '' !important;
   position: absolute !important;
   inset: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
+  display: block !important;
   visibility: visible !important;
-  font-family: 'Material Symbols Outlined' !important;
-  font-weight: 400 !important;
-  font-size: 24px !important;
-  line-height: 1 !important;
-  letter-spacing: normal !important;
-  text-transform: none !important;
-  -webkit-font-feature-settings: 'liga' !important;
-  font-feature-settings: 'liga' !important;
-  -webkit-font-smoothing: antialiased !important;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
-  color: currentColor !important;
+  background: currentColor !important;
+  -webkit-mask: var(--ytr-classic-like-icon-mask) center / 24px 24px no-repeat !important;
+  mask: var(--ytr-classic-like-icon-mask) center / 24px 24px no-repeat !important;
 }
 
-/* Like icon — outlined (default) */
-html[data-ytr-classic-like-icons="true"] like-button-view-model .yt-spec-button-shape-next__icon::before,
-html[data-ytr-classic-like-icons="true"] #segmented-like-button .yt-spec-button-shape-next__icon::before {
-  content: 'thumb_up' !important;
+html[data-ytr-classic-like-icons="true"] :is(
+  like-button-view-model button[aria-pressed="true"],
+  like-button-view-model button[aria-label*="Unlike" i],
+  like-button-view-model button[title*="Unlike" i],
+  like-button-view-model button[aria-label*="Убрать отметку" i],
+  like-button-view-model button[title*="Убрать отметку" i],
+  segmented-like-button-view-model button[aria-pressed="true"],
+  segmented-like-button-view-model button[aria-label*="Unlike" i],
+  segmented-like-button-view-model button[title*="Unlike" i],
+  segmented-like-button-view-model button[aria-label*="Убрать отметку" i],
+  segmented-like-button-view-model button[title*="Убрать отметку" i],
+  segmented-like-button-view-model[is-active],
+  like-button-view-model[is-active],
+  #segmented-like-button[is-active],
+  #segmented-like-button button[aria-pressed="true"],
+  #segmented-like-button button[aria-label*="Unlike" i],
+  #segmented-like-button button[title*="Unlike" i],
+  #segmented-like-button button[aria-label*="Убрать отметку" i],
+  #segmented-like-button button[title*="Убрать отметку" i]
+) :is(.yt-spec-button-shape-next__icon, .ytSpecButtonShapeNextIcon)::before {
+  -webkit-mask: var(--ytr-classic-like-icon-filled-mask) center / 24px 24px no-repeat !important;
+  mask: var(--ytr-classic-like-icon-filled-mask) center / 24px 24px no-repeat !important;
 }
 
-/* Like icon — filled (active) */
-html[data-ytr-classic-like-icons="true"] like-button-view-model button[aria-pressed="true"] .yt-spec-button-shape-next__icon::before,
-html[data-ytr-classic-like-icons="true"] #segmented-like-button[is-active] .yt-spec-button-shape-next__icon::before,
-html[data-ytr-classic-like-icons="true"] like-button-view-model[is-active] .yt-spec-button-shape-next__icon::before {
-  content: 'thumb_up' !important;
-  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+html[data-ytr-classic-like-icons="true"] :is(
+  dislike-button-view-model,
+  segmented-dislike-button-view-model,
+  #segmented-dislike-button
+) :is(.yt-spec-button-shape-next__icon, .ytSpecButtonShapeNextIcon)::before {
+  -webkit-mask: var(--ytr-classic-dislike-icon-mask) center / 24px 24px no-repeat !important;
+  mask: var(--ytr-classic-dislike-icon-mask) center / 24px 24px no-repeat !important;
 }
 
-/* Dislike icon — outlined (default) */
-html[data-ytr-classic-like-icons="true"] dislike-button-view-model .yt-spec-button-shape-next__icon::before,
-html[data-ytr-classic-like-icons="true"] #segmented-dislike-button .yt-spec-button-shape-next__icon::before {
-  content: 'thumb_down' !important;
+html[data-ytr-classic-like-icons="true"] :is(
+  dislike-button-view-model button[aria-pressed="true"],
+  dislike-button-view-model button[aria-label*="Remove dislike" i],
+  dislike-button-view-model button[title*="Remove dislike" i],
+  dislike-button-view-model button[aria-label*="Убрать дизлайк" i],
+  dislike-button-view-model button[title*="Убрать дизлайк" i],
+  segmented-dislike-button-view-model button[aria-pressed="true"],
+  segmented-dislike-button-view-model button[aria-label*="Remove dislike" i],
+  segmented-dislike-button-view-model button[title*="Remove dislike" i],
+  segmented-dislike-button-view-model button[aria-label*="Убрать дизлайк" i],
+  segmented-dislike-button-view-model button[title*="Убрать дизлайк" i],
+  segmented-dislike-button-view-model[is-active],
+  dislike-button-view-model[is-active],
+  #segmented-dislike-button[is-active],
+  #segmented-dislike-button button[aria-pressed="true"],
+  #segmented-dislike-button button[aria-label*="Remove dislike" i],
+  #segmented-dislike-button button[title*="Remove dislike" i],
+  #segmented-dislike-button button[aria-label*="Убрать дизлайк" i],
+  #segmented-dislike-button button[title*="Убрать дизлайк" i]
+) :is(.yt-spec-button-shape-next__icon, .ytSpecButtonShapeNextIcon)::before {
+  -webkit-mask: var(--ytr-classic-dislike-icon-filled-mask) center / 24px 24px no-repeat !important;
+  mask: var(--ytr-classic-dislike-icon-filled-mask) center / 24px 24px no-repeat !important;
 }
 
-/* Dislike icon — filled (active) */
-html[data-ytr-classic-like-icons="true"] dislike-button-view-model button[aria-pressed="true"] .yt-spec-button-shape-next__icon::before,
-html[data-ytr-classic-like-icons="true"] #segmented-dislike-button[is-active] .yt-spec-button-shape-next__icon::before,
-html[data-ytr-classic-like-icons="true"] dislike-button-view-model[is-active] .yt-spec-button-shape-next__icon::before {
-  content: 'thumb_down' !important;
-  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+html[data-ytr-classic-like-icons="true"] :is(
+  segmented-like-button-view-model,
+  segmented-dislike-button-view-model,
+  #segmented-like-button,
+  #segmented-dislike-button
+) :is(.yt-spec-button-shape-next__button-text-content, .ytSpecButtonShapeNextTextContent, [class*="button-text-content"]) {
+  display: inline-flex !important;
+  visibility: visible !important;
 }
 
-/* --- Classic Like/Dislike Icons: Comments & Posts --- */
-
-/* Position icon containers and hide original SVG icons */
 html[data-ytr-classic-like-icons="true"] :is(
   ytd-comment-action-buttons-renderer,
   ytd-comment-engagement-bar
-) :is(#like-button, #dislike-button) .yt-spec-button-shape-next__icon {
+) :is(#like-button, #dislike-button) :is(.yt-spec-button-shape-next__icon, .ytSpecButtonShapeNextIcon) {
   position: relative !important;
+  display: inline-flex !important;
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
 }
 
 html[data-ytr-classic-like-icons="true"] :is(
   ytd-comment-action-buttons-renderer,
   ytd-comment-engagement-bar
-) :is(#like-button, #dislike-button) .yt-spec-button-shape-next__icon > * {
+) :is(#like-button, #dislike-button) :is(.yt-spec-button-shape-next__icon, .ytSpecButtonShapeNextIcon) > * {
   visibility: hidden !important;
 }
 
-/* Base pseudo-element for comment/post icons */
 html[data-ytr-classic-like-icons="true"] :is(
   ytd-comment-action-buttons-renderer,
   ytd-comment-engagement-bar
-) :is(#like-button, #dislike-button) .yt-spec-button-shape-next__icon::before {
+) :is(#like-button, #dislike-button) :is(.yt-spec-button-shape-next__icon, .ytSpecButtonShapeNextIcon)::before {
+  content: '' !important;
   position: absolute !important;
   inset: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
+  display: block !important;
   visibility: visible !important;
-  font-family: 'Material Symbols Outlined' !important;
-  font-weight: 400 !important;
-  font-size: 20px !important;
-  line-height: 1 !important;
-  letter-spacing: normal !important;
-  text-transform: none !important;
-  -webkit-font-feature-settings: 'liga' !important;
-  font-feature-settings: 'liga' !important;
-  -webkit-font-smoothing: antialiased !important;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20 !important;
-  color: currentColor !important;
+  background: currentColor !important;
+  -webkit-mask: var(--ytr-classic-like-icon-mask) center / 20px 20px no-repeat !important;
+  mask: var(--ytr-classic-like-icon-mask) center / 20px 20px no-repeat !important;
 }
 
-/* Comment/post like icon */
 html[data-ytr-classic-like-icons="true"] :is(
   ytd-comment-action-buttons-renderer,
   ytd-comment-engagement-bar
-) #like-button .yt-spec-button-shape-next__icon::before {
-  content: 'thumb_up' !important;
+) #like-button button[aria-pressed="true"] :is(.yt-spec-button-shape-next__icon, .ytSpecButtonShapeNextIcon)::before {
+  -webkit-mask: var(--ytr-classic-like-icon-filled-mask) center / 20px 20px no-repeat !important;
+  mask: var(--ytr-classic-like-icon-filled-mask) center / 20px 20px no-repeat !important;
 }
 
-/* Comment/post like — filled (active) */
 html[data-ytr-classic-like-icons="true"] :is(
   ytd-comment-action-buttons-renderer,
   ytd-comment-engagement-bar
-) #like-button button[aria-pressed="true"] .yt-spec-button-shape-next__icon::before {
-  content: 'thumb_up' !important;
-  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20 !important;
+) #dislike-button :is(.yt-spec-button-shape-next__icon, .ytSpecButtonShapeNextIcon)::before {
+  -webkit-mask: var(--ytr-classic-dislike-icon-mask) center / 20px 20px no-repeat !important;
+  mask: var(--ytr-classic-dislike-icon-mask) center / 20px 20px no-repeat !important;
 }
 
-/* Comment/post dislike icon */
 html[data-ytr-classic-like-icons="true"] :is(
   ytd-comment-action-buttons-renderer,
   ytd-comment-engagement-bar
-) #dislike-button .yt-spec-button-shape-next__icon::before {
-  content: 'thumb_down' !important;
-}
-
-/* Comment/post dislike — filled (active) */
-html[data-ytr-classic-like-icons="true"] :is(
-  ytd-comment-action-buttons-renderer,
-  ytd-comment-engagement-bar
-) #dislike-button button[aria-pressed="true"] .yt-spec-button-shape-next__icon::before {
-  content: 'thumb_down' !important;
-  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20 !important;
+) #dislike-button button[aria-pressed="true"] :is(.yt-spec-button-shape-next__icon, .ytSpecButtonShapeNextIcon)::before {
+  -webkit-mask: var(--ytr-classic-dislike-icon-filled-mask) center / 20px 20px no-repeat !important;
+  mask: var(--ytr-classic-dislike-icon-filled-mask) center / 20px 20px no-repeat !important;
 }
 
 /* --- Hide "New" Badge --- */
@@ -1511,7 +1675,7 @@ html[data-ytr-hide-playables="true"] ytd-rich-section-renderer[data-ytr-playable
 }
 
 /* ============================================
-   v0.5.0 — Media, Overlays, and Watch Tools
+   Media, Overlays, and Watch Tools
    ============================================ */
 
 /* --- Watch Timer --- */
@@ -1555,6 +1719,10 @@ html[data-ytr-fullscreen="true"] #ytr-watch-timer {
   to { background-position: 50% 180%; }
 }
 
+:root {
+  --ytr-scroll-lock-offset: 0px;
+}
+
 /* --- Block Overlay (Time Limit) --- */
 
 html.ytr-overlay-lock-scroll {
@@ -1563,8 +1731,18 @@ html.ytr-overlay-lock-scroll {
 
 html.ytr-download-menu-lock-scroll,
 html.ytr-download-menu-lock-scroll body {
-  overflow: hidden !important;
   overscroll-behavior: none !important;
+}
+
+html.ytr-overlay-lock-scroll,
+html.ytr-download-menu-lock-scroll {
+  overflow: hidden !important;
+}
+
+html.ytr-overlay-lock-scroll body,
+html.ytr-download-menu-lock-scroll body {
+  overflow: hidden !important;
+  padding-inline-end: var(--ytr-scroll-lock-offset) !important;
 }
 
 html[data-ytr-clean-video-capture="true"] #movie_player .ytp-chrome-top,
@@ -1782,6 +1960,7 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
 }
 
 .ytr-screenshot-btn-wrap,
+.ytr-video-stats-btn-wrap,
 .ytr-download-btn {
   margin-left: 6px;
 }
@@ -1842,9 +2021,57 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   margin: 0;
 }
 
-.ytr-action-btn-screenshot svg {
+.ytr-action-btn-screenshot svg,
+.ytr-action-btn-video-stats svg {
   width: 22px;
   height: 22px;
+}
+
+.ytr-action-btn-video-stats {
+  background: var(--yt-spec-badge-chip-background, rgba(255, 255, 255, 0.1));
+  color: var(--yt-spec-text-primary, #f1f1f1);
+}
+
+[data-ytr-theme-mode="dark"] .ytr-action-btn-video-stats,
+html[dark] .ytr-action-btn-video-stats,
+ytd-app[dark] .ytr-action-btn-video-stats {
+  color: #f1f1f1;
+}
+
+[data-ytr-theme-mode="light"] .ytr-action-btn-video-stats,
+html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
+  color: #0f0f0f;
+}
+
+.ytr-action-btn-video-stats:hover {
+  background: var(--yt-spec-button-chip-background-hover, rgba(255, 255, 255, 0.16));
+}
+
+.ytr-action-btn .yt-spec-button-shape-next__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.ytr-action-btn .yt-spec-button-shape-next__icon > svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.ytr-action-btn-screenshot .yt-spec-button-shape-next__icon > svg,
+.ytr-action-btn-video-stats .yt-spec-button-shape-next__icon > svg {
+  width: 22px;
+  height: 22px;
+}
+
+.ytr-action-btn-video-stats svg,
+.ytr-action-btn-video-stats svg * {
+  color: currentColor !important;
+  fill: currentColor !important;
 }
 
 .ytr-material-symbols-rounded {
@@ -1862,6 +2089,9 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   text-transform: none;
   white-space: nowrap;
   direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
   font-variation-settings:
     'FILL' 0,
     'wght' 400,
@@ -1871,14 +2101,18 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
 }
 
 .ytr-download-menu {
+  --ytr-download-menu-radius: 16px;
+  --ytr-download-menu-padding: 8px;
+  --ytr-download-menu-inner-radius: calc(var(--ytr-download-menu-radius) - var(--ytr-download-menu-padding));
+  --ytr-download-preview-height: 156px;
   position: fixed;
   top: 0;
   left: 0;
-  background: var(--yt-spec-menu-background, #282828);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
-  padding: 8px;
+  background: var(--ytr-ui-surface-high);
+  border: 1px solid var(--ytr-ui-outline);
+  border-radius: var(--ytr-download-menu-radius);
+  box-shadow: var(--ytr-ui-shadow);
+  padding: var(--ytr-download-menu-padding);
   z-index: 2050;
   width: 296px;
   max-width: calc(100vw - 24px);
@@ -1886,12 +2120,18 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   box-sizing: border-box;
   display: none;
   overflow-y: auto;
+  overscroll-behavior: contain;
   animation: ytr-menu-in 0.15s ease;
 }
 
 @keyframes ytr-menu-in {
   from { opacity: 0; transform: translateY(-4px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ytr-preview-pixel-load {
+  0% { background-position: 0 0, 0 0, 0 0; }
+  100% { background-position: 18px 18px, -18px -18px, 0 0; }
 }
 
 .ytr-download-menu.ytr-download-menu-open {
@@ -1928,10 +2168,30 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
 
 .ytr-download-preview-img {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: var(--ytr-download-preview-height);
   display: block;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: var(--ytr-download-menu-inner-radius);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--ytr-ui-primary) 24%, transparent) 25%, transparent 25%) 0 0 / 18px 18px,
+    linear-gradient(135deg, transparent 75%, color-mix(in srgb, var(--ytr-ui-primary) 18%, transparent) 75%) 0 0 / 18px 18px,
+    var(--ytr-ui-surface-highest);
+  image-rendering: auto;
+  transition: filter 0.28s cubic-bezier(0.2, 0, 0, 1), opacity 0.22s ease, transform 0.22s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ytr-download-preview-img[data-loading="true"] {
+  opacity: 0.76;
+  filter: blur(3px) contrast(1.12) saturate(0.8);
+  image-rendering: pixelated;
+  transform: scale(0.985);
+  animation: ytr-preview-pixel-load 0.9s steps(5, end) infinite;
+}
+
+.ytr-download-preview-img[data-loading="false"] {
+  opacity: 1;
+  filter: none;
+  transform: scale(1);
 }
 
 .ytr-download-preview-label {
@@ -1940,12 +2200,148 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   justify-content: center;
   min-height: 0;
   padding: 0;
-  color: var(--yt-spec-text-secondary, #aaa);
+  color: var(--ytr-ui-text-muted);
   font-size: 12px;
   font-weight: 500;
   font-family: 'Roboto', 'Arial', sans-serif;
   letter-spacing: 0.01em;
   background: transparent;
+}
+
+.ytr-channel-assets-carousel {
+  position: relative;
+  display: block;
+  margin: 0 0 8px;
+  overflow: visible;
+}
+
+.ytr-channel-assets-arrow {
+  appearance: none;
+  position: absolute;
+  top: calc(var(--ytr-download-preview-height) / 2);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.56);
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: background 0.14s ease, color 0.14s ease, transform 0.14s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ytr-channel-assets-arrow-prev {
+  left: 6px;
+}
+
+.ytr-channel-assets-arrow-next {
+  right: 6px;
+}
+
+.ytr-channel-assets-arrow:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+}
+
+.ytr-channel-assets-arrow:active:not(:disabled) {
+  transform: translateY(-50%) scale(0.94);
+}
+
+.ytr-channel-assets-arrow:disabled {
+  opacity: 0.34;
+  cursor: default;
+}
+
+.ytr-channel-assets-arrow svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.ytr-channel-assets-preview-grid {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 2px 6px;
+  padding-inline: var(--ytr-channel-assets-edge-padding, 2px);
+  margin: 0;
+  width: 100%;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.ytr-channel-assets-preview-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.ytr-channel-asset-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  flex: 0 0 min(calc(var(--ytr-download-preview-height) * 16 / 9), calc(100vw - 140px));
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  scroll-snap-align: center;
+  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), opacity 0.16s ease;
+}
+
+.ytr-channel-asset-preview-avatar {
+  flex-basis: var(--ytr-download-preview-height);
+}
+
+.ytr-channel-asset-preview-banner {
+  flex-basis: min(calc(var(--ytr-download-preview-height) * 16 / 9), calc(100vw - 140px));
+}
+
+.ytr-channel-asset-preview:hover {
+  transform: scale(1.01);
+}
+
+.ytr-channel-asset-preview-img {
+  width: 100%;
+  height: var(--ytr-download-preview-height);
+  max-height: var(--ytr-download-preview-height);
+  display: block;
+  object-fit: cover;
+  border-radius: var(--ytr-download-menu-inner-radius);
+  background: var(--ytr-ui-surface-highest);
+}
+
+.ytr-channel-asset-preview-img-avatar {
+  aspect-ratio: 1 / 1;
+}
+
+.ytr-channel-asset-preview-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  color: var(--ytr-ui-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: 'Roboto', 'Arial', sans-serif;
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+
+.ytr-channel-assets-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 /* --- Menu Items --- */
@@ -1957,10 +2353,12 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   width: 100%;
   min-height: 40px;
   padding: 0 12px;
+  box-sizing: border-box;
   border-radius: 10px;
   border: none;
   background: transparent;
-  color: var(--yt-spec-text-primary, #f1f1f1);
+  color: var(--ytr-ui-text);
+  text-decoration: none;
   font-size: 14px;
   font-family: 'Roboto', 'Arial', sans-serif;
   cursor: pointer;
@@ -1969,13 +2367,71 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
 }
 
 .ytr-download-menu-item:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--ytr-ui-surface-highest);
   transform: scale(1.01);
+  text-decoration: none;
+}
+
+.ytr-download-menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.ytr-download-menu-item-favicon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.ytr-download-menu-item-label {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: none;
 }
 
 .ytr-download-menu-item svg {
+  display: block;
   flex-shrink: 0;
   opacity: 0.9;
+  fill: currentColor;
+}
+
+.ytr-download-menu-item-icon .ytr-material-symbols-rounded {
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+}
+
+.ytr-channel-stats-menu {
+  width: min(280px, calc(100vw - 24px));
+  overflow-x: hidden;
+}
+
+.ytr-channel-assets-menu {
+  overflow-x: hidden;
+}
+
+.ytr-video-stats-menu {
+  width: min(280px, calc(100vw - 24px));
+  overflow-x: hidden;
+}
+
+.ytr-channel-stats-menu a,
+.ytr-video-stats-menu a,
+.ytr-channel-stats-menu a:hover,
+.ytr-video-stats-menu a:hover,
+.ytr-channel-stats-menu a:focus,
+.ytr-video-stats-menu a:focus {
+  text-decoration: none;
 }
 
 /* --- Thumbnail fullscreen overlay --- */
@@ -1990,6 +2446,7 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   padding: clamp(16px, 3vw, 32px);
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: rgba(8, 7, 11, 0.24);
   backdrop-filter: blur(22px) saturate(0.82);
   -webkit-backdrop-filter: blur(22px) saturate(0.82);
@@ -2041,7 +2498,7 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   background: transparent;
   width: fit-content;
   max-width: 100%;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .ytr-thumb-overlay-panel {
@@ -2093,12 +2550,16 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
 }
 
 .ytr-thumb-overlay-img-wrap {
+  --ytr-thumb-overlay-stage-radius: 32px;
+  --ytr-thumb-overlay-stage-padding: 12px;
+  --ytr-thumb-overlay-inner-radius: calc(var(--ytr-thumb-overlay-stage-radius) - var(--ytr-thumb-overlay-stage-padding));
+  --ytr-thumb-overlay-placeholder-ratio: 16 / 9;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 12px;
-  border-radius: 32px;
+  padding: var(--ytr-thumb-overlay-stage-padding);
+  border-radius: var(--ytr-thumb-overlay-stage-radius);
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   max-width: min(calc(100vw - 64px), 1320px);
@@ -2106,6 +2567,53 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   min-height: min(38vh, 320px);
   cursor: grab;
   position: relative;
+  transition:
+    width 0.2s cubic-bezier(0.2, 0, 0, 1),
+    aspect-ratio 0.2s cubic-bezier(0.2, 0, 0, 1),
+    background-color 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ytr-thumb-overlay-img-wrap[data-loading="true"] {
+  width: min(calc(100vw - 64px), 960px);
+  aspect-ratio: var(--ytr-thumb-overlay-placeholder-ratio);
+  min-height: 0;
+  cursor: wait;
+}
+
+.ytr-thumb-overlay-img-wrap[data-loading="true"][data-kind="channel-avatar"] {
+  width: min(calc(100vw - 96px), 560px);
+}
+
+.ytr-thumb-overlay-img-wrap[data-loading="true"][data-kind="channel-banner"] {
+  width: min(calc(100vw - 64px), 920px);
+}
+
+.ytr-thumb-overlay-img-wrap::before {
+  content: "";
+  position: absolute;
+  inset: var(--ytr-thumb-overlay-stage-padding);
+  z-index: 0;
+  border-radius: var(--ytr-thumb-overlay-inner-radius);
+  opacity: 0;
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.045) 0 8px,
+      rgba(255, 255, 255, 0.02) 8px 16px
+    );
+  background-size: 180% 100%, 16px 16px;
+  background-position: -120% 0, 0 0;
+  pointer-events: none;
+}
+
+.ytr-thumb-overlay-img-wrap[data-loading="true"]::before {
+  opacity: 1;
+  animation: ytr-preview-shimmer 1s steps(8, end) infinite;
+}
+
+@keyframes ytr-preview-shimmer {
+  to { background-position: 120% 0, 16px 0; }
 }
 
 .ytr-thumb-overlay-media-layer {
@@ -2118,6 +2626,8 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   max-height: 100%;
   transform-origin: center center;
   will-change: transform;
+  z-index: 1;
+  transition: opacity 0.16s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .ytr-thumb-overlay-status {
@@ -2149,7 +2659,13 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
-  border-radius: 24px;
+  border-radius: var(--ytr-thumb-overlay-inner-radius);
+  opacity: 1;
+  transition: opacity 0.16s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ytr-thumb-overlay-img-wrap[data-loading="true"] .ytr-thumb-overlay-img {
+  opacity: 0;
 }
 
 .ytr-thumb-overlay-drawing {
@@ -2234,7 +2750,7 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
 .ytr-thumb-overlay-gallery {
   display: block;
   width: max-content;
-  min-width: 100%;
+  min-width: 0;
   max-width: none;
   margin: 0;
   padding: 0;
@@ -2243,8 +2759,8 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
 .ytr-thumb-overlay-gallery-viewport {
   flex: 0 1 auto;
   min-width: 0;
-  width: min(520px, calc(100vw - 176px));
-  max-width: 100%;
+  width: auto;
+  max-width: min(520px, calc(100vw - 176px));
   display: block;
   overflow-x: auto;
   overflow-y: hidden;
@@ -2265,13 +2781,13 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   justify-content: flex-start;
   padding: 4px 6px;
   width: max-content;
-  min-width: 100%;
+  min-width: 0;
   margin: 0;
   box-sizing: border-box;
 }
 
 .ytr-thumb-overlay-thumb {
-  flex: 0 0 clamp(76px, 9vw, 112px);
+  flex: 0 0 auto;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
@@ -2285,9 +2801,10 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
 
 .ytr-thumb-overlay-thumb img {
   display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
+  height: clamp(48px, 5.1vw, 64px);
+  width: auto;
+  max-width: clamp(76px, 15vw, 154px);
+  object-fit: contain;
   border-radius: inherit;
 }
 
@@ -2533,6 +3050,9 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
 }
 
 .ytr-thumb-overlay-color-panel {
+  --ytr-thumb-overlay-color-panel-radius: 24px;
+  --ytr-thumb-overlay-color-panel-padding: 16px;
+  --ytr-thumb-overlay-color-inner-radius: calc(var(--ytr-thumb-overlay-color-panel-radius) - var(--ytr-thumb-overlay-color-panel-padding));
   position: absolute;
   right: 0;
   bottom: calc(100% + 12px);
@@ -2540,8 +3060,8 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   display: grid;
   gap: 12px;
   width: min(304px, calc(100vw - 32px));
-  padding: 16px;
-  border-radius: 24px;
+  padding: var(--ytr-thumb-overlay-color-panel-padding);
+  border-radius: var(--ytr-thumb-overlay-color-panel-radius);
   border: 1px solid rgba(255, 255, 255, 0.09);
   background: rgba(31, 29, 36, 0.98);
   box-shadow: 0 26px 72px rgba(0, 0, 0, 0.42);
@@ -2577,7 +3097,7 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   width: 100%;
   aspect-ratio: 1 / 1;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: var(--ytr-thumb-overlay-color-inner-radius);
   cursor: crosshair;
   background:
     linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 100%),
@@ -2661,7 +3181,7 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   width: 40px;
   height: 40px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
+  border-radius: var(--ytr-thumb-overlay-color-inner-radius);
   background: rgba(255, 255, 255, 0.055);
   color: rgba(255, 255, 255, 0.92);
   cursor: pointer;
@@ -2687,7 +3207,7 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   min-height: 48px;
   padding: 0 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
+  border-radius: var(--ytr-thumb-overlay-color-inner-radius);
   background: rgba(255, 255, 255, 0.045);
   color: rgba(255, 255, 255, 0.94);
   font: 600 14px/1 'Google Sans', 'Roboto', 'Arial', sans-serif;
@@ -2787,6 +3307,14 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1);
 }
 
+.ytr-thumb-overlay-icon-btn svg,
+.ytr-thumb-overlay-btn-icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
 .ytr-thumb-overlay-btn-label {
   display: inline-flex;
   align-items: center;
@@ -2833,6 +3361,989 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
 
 .ytr-thumb-overlay-secondary[data-state="success"] .ytr-thumb-overlay-btn-icon {
   transform: scale(1.12);
+}
+
+.ytr-channel-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: 0;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.ytr-channel-tools-host-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ytr-channel-tools-host-overlay {
+  position: relative;
+  padding-inline-end: clamp(156px, 24vw, 280px);
+}
+
+.ytr-channel-tools-host-inline > .ytr-channel-tools-anchor {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  max-width: none;
+  flex: 0 0 auto;
+  order: 99;
+}
+
+.ytr-channel-tools-host-overlay > .ytr-channel-tools-anchor {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  min-width: max-content;
+  max-width: clamp(156px, 24vw, 280px);
+  z-index: 1;
+}
+
+.ytr-channel-tool-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.ytr-channel-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--yt-spec-text-primary, #f1f1f1);
+  font: 500 13px/1 'Roboto', 'Arial', sans-serif;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s cubic-bezier(0.2, 0, 0, 1), border-color 0.15s ease;
+}
+
+.ytr-channel-tool-btn:hover {
+  color: var(--yt-spec-text-primary, #f1f1f1);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: scale(1.03);
+}
+
+.ytr-channel-tool-btn:active {
+  transform: scale(0.96);
+}
+
+.ytr-channel-tool-btn-icon,
+.ytr-channel-tool-btn-icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.ytr-channel-tool-btn-icon svg,
+.ytr-channel-tool-btn-icon-slot svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.ytr-channel-tool-btn-icon .ytr-material-symbols-rounded,
+.ytr-channel-tool-btn-icon-slot .ytr-material-symbols-rounded {
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+}
+
+.ytr-channel-tool-btn-label {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.ytr-ai-sidebar-host {
+  display: block;
+  width: 100%;
+  margin: 0 0 14px;
+  position: relative;
+  z-index: 1;
+}
+
+.ytr-ai-sidebar-card {
+  --ytr-ai-card-radius: var(--ytr-radius-lg);
+  --ytr-ai-card-padding: 12px;
+  --ytr-ai-inner-radius: calc(var(--ytr-ai-card-radius) - var(--ytr-ai-card-padding));
+  --ytr-ai-bubble-radius: var(--ytr-ai-inner-radius);
+  --ytr-ai-bubble-tail-radius: 6px;
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: var(--ytr-ai-card-padding);
+  border: 1px solid var(--ytr-ui-outline);
+  border-radius: var(--ytr-ai-card-radius);
+  background: var(--ytr-ui-surface-high);
+  box-shadow: var(--ytr-ui-shadow);
+  box-sizing: border-box;
+}
+
+@keyframes ytr-ai-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ytr-cursor-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes ytr-status-pulse {
+  0%, 100% {
+    opacity: 0.92;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
+}
+
+.ytr-ai-sidebar-card[data-collapsed="true"] .ytr-ai-sidebar-body {
+  display: none;
+}
+
+.ytr-ai-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.ytr-ai-sidebar-header-actions {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.ytr-ai-sidebar-model {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ytr-ai-sidebar-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--ytr-ui-primary-soft);
+  color: var(--ytr-ui-primary);
+}
+
+.ytr-ai-sidebar-avatar-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ytr-ai-sidebar-avatar-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.ytr-ai-sidebar-avatar-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.ytr-ai-sidebar-model-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ytr-ai-sidebar-title {
+  color: var(--ytr-ui-text);
+  font: 700 16px/1.25 'Google Sans', 'Roboto', 'Arial', sans-serif;
+}
+
+.ytr-ai-sidebar-subtitle {
+  color: var(--ytr-ui-text-muted);
+  font: 500 12px/1.35 'Google Sans', 'Roboto', 'Arial', sans-serif;
+  word-break: break-word;
+}
+
+.ytr-ai-sidebar-header-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--ytr-ui-surface-highest);
+  color: var(--ytr-ui-text-muted);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ytr-ai-sidebar-header-link:hover {
+  background: var(--ytr-ui-primary-soft);
+  color: var(--ytr-ui-text);
+  transform: scale(1.02);
+}
+
+.ytr-ai-sidebar-header-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+}
+
+.ytr-ai-sidebar-header-link-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.ytr-ai-sidebar-header-link::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 6px);
+  z-index: 5;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--ytr-ui-text) 14%, transparent);
+  border-radius: 8px;
+  background: var(--ytr-ui-surface-highest);
+  color: var(--ytr-ui-text);
+  box-shadow: var(--ytr-ui-shadow);
+  font: 600 11px/1.2 'Google Sans', 'Roboto', 'Arial', sans-serif;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -3px);
+  transition: opacity 0.16s ease 0.55s, transform 0.16s ease 0.55s;
+}
+
+.ytr-ai-sidebar-header-link:hover::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.ytr-ai-sidebar-collapse-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ytr-ui-text-muted);
+  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), color 0.18s ease;
+}
+
+.ytr-ai-sidebar-collapse-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.ytr-ai-sidebar-card[data-collapsed="true"] .ytr-ai-sidebar-collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.ytr-ai-sidebar-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ytr-ai-sidebar-status {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 24px;
+  padding: 0 2px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ytr-ui-text-muted);
+  font: 500 12px/1.4 'Google Sans', 'Roboto', 'Arial', sans-serif;
+}
+
+.ytr-ai-sidebar-status:empty {
+  display: none;
+}
+
+.ytr-ai-sidebar-status[data-tone="default"] {
+  animation: ytr-status-pulse 1.45s ease-in-out infinite;
+}
+
+.ytr-ai-sidebar-status[data-tone="ok"] {
+  background: transparent;
+  color: var(--ytr-ui-text);
+  animation: none;
+}
+
+.ytr-ai-sidebar-status[data-tone="error"] {
+  background: transparent;
+  color: var(--ytr-ui-error);
+  animation: none;
+}
+
+.ytr-ai-sidebar-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 220px;
+  max-height: min(40vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.ytr-ai-sidebar-message {
+  max-width: 100%;
+  padding: 2px 0;
+  border-radius: var(--ytr-ai-bubble-radius);
+  color: var(--ytr-ui-text);
+  font: 400 13px/1.48 'Roboto', 'Arial', sans-serif;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  animation: ytr-ai-message-in 0.22s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ytr-ai-sidebar-message :is(p, ul, ol) {
+  margin: 0;
+}
+
+.ytr-ai-sidebar-message :is(p, ul, ol) + :is(p, ul, ol) {
+  margin-top: 8px;
+}
+
+.ytr-ai-sidebar-message :is(ul, ol) {
+  padding-left: 18px;
+}
+
+.ytr-ai-sidebar-message li + li {
+  margin-top: 4px;
+}
+
+.ytr-ai-markdown-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.ytr-ai-markdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: inherit;
+}
+
+.ytr-ai-markdown-table :is(th, td) {
+  padding: 6px 7px;
+  border: 1px solid color-mix(in srgb, var(--ytr-ui-text) 13%, transparent);
+  text-align: left;
+  vertical-align: top;
+}
+
+.ytr-ai-markdown-table th {
+  color: var(--ytr-ui-text);
+  font-weight: 700;
+}
+
+.ytr-ai-sidebar-message :is(strong, b) {
+  font-weight: 700;
+}
+
+.ytr-ai-sidebar-message a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  color: var(--ytr-ui-primary);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  vertical-align: -0.16em;
+}
+
+.ytr-ai-sidebar-message a:hover {
+  text-decoration: underline;
+}
+
+.ytr-ai-link-favicon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border-radius: 3px;
+  object-fit: contain;
+}
+
+.ytr-ai-sidebar-message a span {
+  min-width: 0;
+}
+
+.ytr-ai-sidebar-message code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ytr-ui-surface) 72%, transparent);
+  font: 600 12px/1.4 "SFMono-Regular", Consolas, monospace;
+}
+
+.ytr-ai-sidebar-message-user {
+  align-self: flex-end;
+  border-end-end-radius: var(--ytr-ai-bubble-tail-radius);
+  background: var(--ytr-ui-primary-soft);
+  padding: 10px 12px;
+}
+
+.ytr-ai-sidebar-message-assistant {
+  align-self: flex-start;
+  border-end-start-radius: var(--ytr-ai-bubble-tail-radius);
+  background: transparent;
+}
+
+.ytr-ai-sidebar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: -22px;
+  padding-top: 24px;
+  overflow: visible;
+}
+
+.ytr-ai-sidebar-variants {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 2px;
+  color: var(--ytr-ui-text-muted);
+}
+
+.ytr-ai-sidebar-variant-counter {
+  min-width: 32px;
+  text-align: center;
+  color: var(--ytr-ui-text);
+  font: 700 12px/1 'Google Sans', 'Roboto', 'Arial', sans-serif;
+}
+
+.ytr-ai-sidebar-action {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ytr-ui-text-muted);
+  font: 600 12px/1 'Google Sans', 'Roboto', 'Arial', sans-serif;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.14s ease, background 0.14s ease, transform 0.14s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ytr-ai-sidebar-action::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 5px);
+  z-index: 2;
+  max-width: 160px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--ytr-ui-text) 14%, transparent);
+  border-radius: 8px;
+  background: var(--ytr-ui-surface-highest);
+  color: var(--ytr-ui-text);
+  box-shadow: var(--ytr-ui-shadow);
+  font: 600 11px/1.2 'Google Sans', 'Roboto', 'Arial', sans-serif;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.16s ease 0.65s, transform 0.16s ease 0.65s;
+}
+
+.ytr-ai-sidebar-action::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 1px);
+  z-index: 3;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid color-mix(in srgb, var(--ytr-ui-text) 14%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--ytr-ui-text) 14%, transparent);
+  background: var(--ytr-ui-surface-highest);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px) rotate(45deg);
+  transition: opacity 0.16s ease 0.65s, transform 0.16s ease 0.65s;
+}
+
+.ytr-ai-sidebar-action:hover {
+  background: color-mix(in srgb, var(--ytr-ui-text) 10%, transparent);
+  color: var(--ytr-ui-text);
+}
+
+.ytr-ai-sidebar-action:hover::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.ytr-ai-sidebar-action:hover::before {
+  opacity: 1;
+  transform: translate(-50%, 0) rotate(45deg);
+}
+
+.ytr-ai-sidebar-action:active {
+  transform: scale(0.96);
+}
+
+.ytr-ai-sidebar-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.ytr-ai-sidebar-action-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.ytr-ai-sidebar-command-suggestions {
+  display: none;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0 12px 8px;
+}
+
+.ytr-ai-sidebar-command-suggestions[data-visible="true"] {
+  display: flex;
+}
+
+.ytr-ai-sidebar-command-suggestion {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  max-width: 100%;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ytr-ui-text) 7%, transparent);
+  color: var(--ytr-ui-text-muted);
+  font: 600 11px/1 'Google Sans', 'Roboto', 'Arial', sans-serif;
+  cursor: pointer;
+}
+
+.ytr-ai-sidebar-command-suggestion:hover {
+  background: color-mix(in srgb, var(--ytr-ui-text) 12%, transparent);
+  color: var(--ytr-ui-text);
+}
+
+.ytr-ai-sidebar-command-name {
+  color: var(--ytr-ui-primary);
+  font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
+.ytr-ai-sidebar-command-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ytr-ai-sidebar-message-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  vertical-align: -0.14em;
+  animation: ytr-cursor-blink 1.05s steps(1, end) infinite;
+}
+
+.ytr-ai-sidebar-scroll-bottom {
+  position: absolute;
+  left: 50%;
+  bottom: 76px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--ytr-ui-outline);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ytr-ui-surface-high) 92%, transparent);
+  color: var(--ytr-ui-text);
+  box-shadow: var(--ytr-ui-shadow);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 8px) scale(0.94);
+  transition: opacity 0.16s ease, transform 0.16s cubic-bezier(0.2, 0, 0, 1), background 0.16s ease;
+}
+
+.ytr-ai-sidebar-scroll-bottom[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.ytr-ai-sidebar-scroll-bottom:hover {
+  background: var(--ytr-ui-primary-soft);
+}
+
+.ytr-ai-sidebar-scroll-bottom-icon,
+.ytr-ai-sidebar-scroll-bottom-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.ytr-ai-sidebar-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.ytr-ai-sidebar-input {
+  width: 100%;
+  min-height: 48px;
+  max-height: 148px;
+  padding: 12px 14px;
+  border: 1px solid var(--ytr-ui-outline);
+  border-radius: var(--ytr-ai-inner-radius);
+  background: var(--ytr-ui-surface);
+  color: var(--ytr-ui-text);
+  font: 400 13px/1.48 'Roboto', 'Arial', sans-serif;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.ytr-ai-sidebar-input::placeholder {
+  color: var(--ytr-ui-text-muted);
+}
+
+.ytr-ai-sidebar-input:focus {
+  outline: none;
+  border-color: var(--ytr-ui-primary);
+  box-shadow: 0 0 0 1px var(--ytr-ui-primary-soft);
+}
+
+.ytr-ai-sidebar-input:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.ytr-ai-sidebar-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: var(--ytr-ui-primary);
+  color: var(--ytr-ui-on-primary);
+  cursor: pointer;
+  transition: transform 0.16s cubic-bezier(0.2, 0, 0, 1), filter 0.16s ease, opacity 0.16s ease;
+}
+
+.ytr-ai-sidebar-send:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: scale(1.04);
+}
+
+.ytr-ai-sidebar-send:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.ytr-ai-sidebar-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none !important;
+}
+
+.ytr-ai-sidebar-send-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.ytr-ai-sidebar-send-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.ytr-playback-rate-bubble {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px) scale(0.96);
+  min-width: 86px;
+  padding: 12px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(18, 17, 22, 0.72);
+  color: #f7f2ff;
+  font: 700 16px/1 'Google Sans', 'Roboto', 'Arial', sans-serif;
+  text-align: center;
+  letter-spacing: 0.01em;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s cubic-bezier(0.2, 0, 0, 1);
+  z-index: 2147483000;
+}
+
+.ytr-playback-rate-bubble[data-visible="true"] {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+
+.ytr-ai-chat-panel {
+  --ytr-ai-panel-radius: var(--ytr-radius-lg);
+  --ytr-ai-panel-padding: 12px;
+  --ytr-ai-panel-inner-radius: calc(var(--ytr-ai-panel-radius) - var(--ytr-ai-panel-padding));
+  --ytr-ai-panel-bubble-radius: var(--ytr-ai-panel-inner-radius);
+  --ytr-ai-panel-bubble-tail-radius: 6px;
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(380px, calc(100vw - 32px));
+  padding: var(--ytr-ai-panel-padding);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--ytr-ai-panel-radius);
+  background: rgba(32, 32, 32, 0.98);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(18px);
+  z-index: 2147483600;
+  animation: ytr-menu-in 0.18s cubic-bezier(0.2, 0, 0, 1);
+  box-sizing: border-box;
+}
+
+.ytr-ai-chat-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ytr-ai-chat-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ytr-ai-chat-title {
+  color: var(--yt-spec-text-primary, #f1f1f1);
+  font: 700 16px/1.2 'Google Sans', 'Roboto', 'Arial', sans-serif;
+}
+
+.ytr-ai-chat-subtitle {
+  color: var(--yt-spec-text-secondary, #aaa);
+  font: 500 12px/1.35 'Google Sans', 'Roboto', 'Arial', sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ytr-ai-chat-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--yt-spec-text-secondary, #aaa);
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ytr-ai-chat-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--yt-spec-text-primary, #f1f1f1);
+  transform: scale(1.03);
+}
+
+.ytr-ai-chat-close:active {
+  transform: scale(0.96);
+}
+
+.ytr-ai-chat-status {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--ytr-ai-panel-inner-radius);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--yt-spec-text-secondary, #aaa);
+  font: 500 12px/1.4 'Google Sans', 'Roboto', 'Arial', sans-serif;
+}
+
+.ytr-ai-chat-status[data-tone="ok"] {
+  background: rgba(208, 188, 255, 0.12);
+  color: #e8dbff;
+}
+
+.ytr-ai-chat-status[data-tone="error"] {
+  background: rgba(255, 133, 133, 0.12);
+  color: #ffd4d4;
+}
+
+.ytr-ai-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 180px;
+  max-height: min(46vh, 420px);
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
+.ytr-ai-chat-message {
+  max-width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--ytr-ai-panel-bubble-radius);
+  color: var(--yt-spec-text-primary, #f1f1f1);
+  font: 400 13px/1.48 'Roboto', 'Arial', sans-serif;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ytr-ai-chat-message-user {
+  align-self: flex-end;
+  border-end-end-radius: var(--ytr-ai-panel-bubble-tail-radius);
+  background: rgba(208, 188, 255, 0.18);
+}
+
+.ytr-ai-chat-message-assistant {
+  align-self: flex-start;
+  border-end-start-radius: var(--ytr-ai-panel-bubble-tail-radius);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.ytr-ai-chat-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ytr-ai-chat-input {
+  width: 100%;
+  min-height: 84px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--ytr-ai-panel-inner-radius);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--yt-spec-text-primary, #f1f1f1);
+  font: 400 13px/1.48 'Roboto', 'Arial', sans-serif;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.ytr-ai-chat-input::placeholder {
+  color: rgba(255, 255, 255, 0.46);
+}
+
+.ytr-ai-chat-input:focus {
+  outline: none;
+  border-color: rgba(208, 188, 255, 0.44);
+  box-shadow: 0 0 0 1px rgba(208, 188, 255, 0.2);
+}
+
+.ytr-ai-chat-send {
+  align-self: flex-end;
+  min-height: 38px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: #d0bcff;
+  color: #241444;
+  font: 600 13px/1 'Google Sans', 'Roboto', 'Arial', sans-serif;
+  cursor: pointer;
+  transition: background 0.16s ease, transform 0.16s cubic-bezier(0.2, 0, 0, 1), opacity 0.16s ease;
+}
+
+.ytr-ai-chat-send:hover:not(:disabled) {
+  background: #dfd1ff;
+  transform: scale(1.03);
+}
+
+.ytr-ai-chat-send:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.ytr-ai-chat-send:disabled {
+  opacity: 0.46;
+  cursor: default;
 }
 
 @keyframes ytrOverlayActionsIn {
@@ -2966,5 +4477,77 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   .ytr-thumb-overlay-download {
     flex: 1 1 160px;
     justify-content: center;
+  }
+
+  .ytr-channel-tools,
+  .ytr-channel-tools-anchor {
+    width: 100%;
+  }
+
+  .ytr-channel-tools-host-overlay {
+    padding-inline-end: 0 !important;
+  }
+
+  .ytr-channel-tools-host-inline,
+  .ytr-channel-tools-anchor {
+    position: static;
+    max-width: none;
+  }
+
+  .ytr-channel-tools-host-inline,
+  .ytr-channel-tools-host-inline > .yt-flexible-actions-view-model-wiz__action-row {
+    width: 100%;
+  }
+
+  .ytr-channel-tools-host-inline > .ytr-channel-tools-anchor {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+
+  .ytr-channel-tools {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-inline-start: 0;
+    margin-top: 8px;
+  }
+
+  .ytr-channel-tool-wrap {
+    width: 100%;
+  }
+
+  .ytr-channel-tool-btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 40px;
+    padding-inline: 12px;
+  }
+
+  .ytr-channel-assets-preview-grid {
+    gap: 8px;
+  }
+
+  .ytr-channel-asset-preview {
+    flex-basis: calc(100% - 28px);
+  }
+
+  .ytr-ai-chat-panel {
+    width: calc(100vw - 24px) !important;
+    min-width: 0;
+    max-height: calc(100vh - 24px) !important;
+  }
+
+  .ytr-ai-chat-messages {
+    max-height: min(42vh, 320px);
+  }
+
+  .ytr-ai-sidebar-card {
+    position: static;
+    top: auto;
+    max-height: none;
+  }
+
+  .ytr-ai-sidebar-messages {
+    min-height: 180px;
+    max-height: min(34vh, 280px);
   }
 }

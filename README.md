@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="../../releases"><img src="https://img.shields.io/github/v/release/crixqq/YouTube-Rewind?style=flat-square&color=c8bfff&labelColor=1c1b20&label=version" alt="Version"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-v0.6.0-c8bfff?style=flat-square&labelColor=1c1b20" alt="Version"></a>
   <a href="../../releases"><img src="https://img.shields.io/github/downloads/crixqq/YouTube-Rewind/total?style=flat-square&color=c8bfff&labelColor=1c1b20&label=downloads" alt="Downloads"></a>
   <a href="https://addons.mozilla.org/firefox/addon/youtube-rewind/"><img src="https://img.shields.io/amo/users/youtube-rewind?style=flat-square&color=c8bfff&labelColor=1c1b20&label=firefox%20users" alt="Firefox Users"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/crixqq/YouTube-Rewind?style=flat-square&color=c8bfff&labelColor=1c1b20" alt="License"></a>
@@ -21,6 +21,10 @@
 <p align="center">
   <a href="https://addons.mozilla.org/firefox/addon/youtube-rewind/">
     <img src="https://img.shields.io/badge/Firefox_Add--ons-Install-c8bfff?style=for-the-badge&logo=firefoxbrowser&logoColor=white&labelColor=1c1b20" alt="Firefox Add-ons">
+  </a>
+  &nbsp;
+  <a href="https://chromewebstore.google.com/detail/youtube-rewind/mafjipbkleeooghlebgipkcbcggpojma">
+    <img src="https://img.shields.io/badge/Chrome_Web_Store-Install-c8bfff?style=for-the-badge&logo=googlechrome&logoColor=white&labelColor=1c1b20" alt="Chrome Web Store">
   </a>
   &nbsp;
   <a href="../../releases">
@@ -40,7 +44,7 @@
 
 ## <img src="docs/icons/overview.svg" width="18" height="18" alt=""> Overview
 
-This README has been rechecked against the current `0.5.0` release line, including auto theme mode, linked light/dark palette behavior, fullscreen preview tools, frame screenshots, custom logo media support, hover-preview controls, and beta toggles that can be saved into profiles.
+This README has been rechecked against the current `0.6.0` version, including auto theme mode, linked light/dark palette behavior, fullscreen preview tools, frame screenshots, channel asset tools, hover-preview controls, auto-skip ads, AI video chat, and beta toggles that can be saved into profiles.
 
 All current features, supported UI languages, installation formats, and release-facing usage notes are listed in this `README.md`.
 
@@ -76,7 +80,8 @@ YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and 
 
 | | |
 |---|---|
-| **Playback Speed** | Set a default playback speed (0.25x–5.0x) applied to every video |
+| **Playback Speed** | Set a default playback speed (0.25x–5.0x), keep it through ads, and keep manual changes for the current page |
+| **Auto-skip Ads** | Detects YouTube's own Skip button and presses it automatically without acting like a full ad blocker |
 | **Classic Player** | Brings back the classic gradient under player controls, removes pill-shaped backgrounds, hides quick action buttons above the progress bar |
 | **Wide Player** | Removes width limits — player, metadata, and recommendations fill the full page |
 | **Disable Description Color** | Removes the adaptive color tint and hover effects from the description area |
@@ -93,6 +98,7 @@ YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and 
 | **Download Control** | Adds a native-style action near the YouTube buttons to open a thumbnail menu, preview the image fullscreen, copy it, copy its link, and download it |
 | **Frame Screenshot** | Capture the current video frame without player chrome, then preview, annotate, copy, or download it |
 | **Banner Style** | Change channel banner appearance: default or sharp (no rounding) |
+| **Channel Assets** | Add tools next to Subscribe / Join on channel pages to preview or download the channel avatar and the full banner version, and open one compact stats menu for external analytics sites |
 
 </details>
 
@@ -191,6 +197,7 @@ YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and 
 | **Default Quality** | Experimental preferred video quality override (144p–8K). It is still being tuned because YouTube can ignore or reset quality decisions unexpectedly |
 | **Homepage Reveal Animation** | Replays a lightweight entrance animation for homepage cards on load, SPA navigation, and when cards re-enter the viewport |
 | **Disable Avatar Live Redirect** | Prevent channel avatar clicks on the homepage from sending you into a live stream |
+| **AI Video Chat** | Optional OpenRouter-powered side panel that uses the current video's transcript as context for questions and summaries |
 
 </details>
 

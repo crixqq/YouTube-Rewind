@@ -3,6 +3,13 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   srcDir: 'src',
   modules: ['@wxt-dev/module-svelte'],
+  svelte: {
+    vite: {
+      compilerOptions: {
+        fragments: 'tree',
+      },
+    },
+  },
   manifest: {
     name: '__MSG_extensionName__',
     description: '__MSG_extensionDescription__',
@@ -16,16 +23,22 @@ export default defineConfig({
         '128': 'icon/128.png',
       },
     },
-    permissions: ['storage', 'unlimitedStorage', 'clipboardRead', 'clipboardWrite'],
+    permissions: ['storage', 'unlimitedStorage', 'clipboardRead', 'clipboardWrite', 'downloads'],
     host_permissions: [
       '*://*.youtube.com/*',
       'https://i.ytimg.com/*',
+      'https://yt3.ggpht.com/*',
+      'https://yt3.googleusercontent.com/*',
+      'https://openrouter.ai/*',
       'https://api.github.com/*',
       'https://addons.mozilla.org/*',
+      'https://api.duckduckgo.com/*',
+      'https://*.wikipedia.org/*',
+      'https://www.google.com/*',
     ],
     web_accessible_resources: [
       {
-        resources: ['default-quality-bridge.js', 'logo-header.png'],
+        resources: ['default-quality-bridge.js', 'logo-header.png', 'ytr-page-bridge.js', 'openrouter-guide.html', 'openrouter-help.html', 'openrouter-guide.js'],
         matches: ['*://*.youtube.com/*'],
       },
     ],
@@ -33,6 +46,9 @@ export default defineConfig({
       gecko: {
         id: '{e0f1a5b2-7c3d-4e8f-9a6b-1d2c3e4f5a6b}',
         strict_min_version: '140.0',
+        data_collection_permissions: {
+          required: ['none'],
+        },
       },
     },
   },

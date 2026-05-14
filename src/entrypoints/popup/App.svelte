@@ -15,6 +15,8 @@
   const MAX_LOGO_VIDEO_FILE_SIZE = 16 * 1024 * 1024;
   const LOGO_ACCEPT = 'image/png,image/jpeg,image/gif,image/svg+xml,image/webp,video/mp4,video/webm,video/ogg';
   const BUILTIN_REWIND_LOGO_URL = browser.runtime.getURL('logo-header.png');
+  const OPENROUTER_GUIDE_URL = browser.runtime.getURL('openrouter-guide.html');
+  const EXTENSION_LOGS_KEY = 'ytr_extension_logs';
   const LOGO_VARIANTS: Settings['logoVariant'][] = ['youtube', 'rewind', 'custom'];
   const THEME_PRESETS = [
     { id: 'default', label: 'themePresetDefault', dark: '#c8bfff', light: '#443795' },
@@ -24,6 +26,51 @@
     { id: 'ocean', label: 'themePresetOcean', dark: '#7ed8ff', light: '#155993' },
     { id: 'amber', label: 'themePresetAmber', dark: '#f3c98c', light: '#8d5b17' },
   ] as const;
+  const AI_CHAT_MODEL_PRESETS = [
+    { id: 'openrouter/free', label: 'OpenRouter Free Router' },
+    { id: 'openai/gpt-oss-120b:free', label: 'OpenAI GPT-OSS 120B' },
+    { id: 'qwen/qwen3-next-80b-a3b-instruct:free', label: 'Qwen3 Next 80B' },
+    { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B' },
+    { id: 'google/gemma-4-26b-a4b-it:free', label: 'Gemma 4 26B A4B' },
+    { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron Super 120B' },
+    { id: 'arcee-ai/trinity-large-preview:free', label: 'Trinity Large Preview' },
+    { id: 'openai/gpt-oss-20b:free', label: 'OpenAI GPT-OSS 20B' },
+    { id: 'custom', label: 'custom' },
+  ] as const;
+  const AI_CHAT_MODEL_PRESETS_BY_PROVIDER = {
+    openrouter: AI_CHAT_MODEL_PRESETS,
+    openai: [
+      { id: 'gpt-4.1-mini', label: 'GPT-4.1 mini' },
+      { id: 'gpt-4o-mini', label: 'GPT-4o mini' },
+      { id: 'gpt-4.1', label: 'GPT-4.1' },
+      { id: 'custom', label: 'custom' },
+    ],
+    anthropic: [
+      { id: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
+      { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+      { id: 'claude-3-7-sonnet-20250219', label: 'Claude 3.7 Sonnet' },
+      { id: 'custom', label: 'custom' },
+    ],
+    perplexity: [
+      { id: 'sonar', label: 'Sonar' },
+      { id: 'sonar-pro', label: 'Sonar Pro' },
+      { id: 'sonar-reasoning-pro', label: 'Sonar Reasoning Pro' },
+      { id: 'custom', label: 'custom' },
+    ],
+  } as const satisfies Record<Settings['aiVideoChatProvider'], readonly { id: string; label: string }[]>;
+  const AI_CHAT_PROVIDER_PRESETS = [
+    { id: 'openrouter', label: 'OpenRouter' },
+    { id: 'openai', label: 'ChatGPT / OpenAI' },
+    { id: 'anthropic', label: 'Claude' },
+    { id: 'perplexity', label: 'Perplexity' },
+  ] as const;
+  const AI_CHAT_PROVIDER_ICON_SRC = {
+    openrouter: 'https://www.google.com/s2/favicons?domain=openrouter.ai&sz=64',
+    openai: 'https://www.google.com/s2/favicons?domain=openai.com&sz=64',
+    anthropic: 'https://www.google.com/s2/favicons?domain=claude.ai&sz=64',
+    perplexity: 'https://www.google.com/s2/favicons?domain=perplexity.ai&sz=64',
+  } as const satisfies Record<Settings['aiVideoChatProvider'], string>;
+  const AI_CHAT_SYSTEM_PRESET_IDS = ['balanced', 'concise', 'deep', 'custom'] as const;
   type ResolvedThemeMode = Exclude<Settings['interfaceThemeMode'], 'auto'>;
 
   let settings = $state<Settings>({ ...DEFAULT_SETTINGS });
@@ -62,6 +109,9 @@
   let developerConfirmOpen = $state(false);
   let developerFeedback = $state<SheetFeedback>(null);
   let developerFeedbackTimeout: ReturnType<typeof setTimeout>;
+  let developerLogsOpen = $state(false);
+  let developerLogsText = $state('');
+  let developerLogsLoading = $state(false);
 
   function formatPercent(value: number): string {
     return `${Math.round(value)}%`;
@@ -461,15 +511,22 @@
   }
 
   // Update checker
+  type UpdateSource = 'amo' | 'chrome-store' | 'github';
   type UpdateState = 'idle' | 'checking' | 'available' | 'up-to-date' | 'error';
   let updateState = $state<UpdateState>('idle');
   let latestVersion = $state('');
   let releaseUrl = $state('');
+  let updateSource = $state<UpdateSource>('github');
+  let updateActionLabel = $state('');
+  let updateInstruction = $state('');
   let updateMenuOpen = $state(false);
 
   const CACHE_KEY = 'ytr_update_cache';
   const CACHE_TTL = 60 * 60 * 1000; // 1 hour
   const AMO_API_URL = 'https://addons.mozilla.org/api/v5/addons/addon/youtube-rewind/';
+  const AMO_URL = 'https://addons.mozilla.org/firefox/addon/youtube-rewind/';
+  const CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/youtube-rewind/mafjipbkleeooghlebgipkcbcggpojma';
+  const GITHUB_RELEASES_URL = 'https://github.com/crixqq/YouTube-Rewind/releases';
 
   function isNewer(remote: string, local: string): boolean {
     const r = remote.replace(/^v/, '').split('.').map(Number);
@@ -491,6 +548,35 @@
     return value === 'youtube' || value === 'rewind' || value === 'custom'
       ? value
       : DEFAULT_SETTINGS.logoVariant;
+  }
+
+  function getAiChatModelLabel(modelId: string): string {
+    if (modelId === 'custom') return t('aiVideoChatModelCustom');
+    const presets = AI_CHAT_MODEL_PRESETS_BY_PROVIDER[settings.aiVideoChatProvider] || AI_CHAT_MODEL_PRESETS;
+    return presets.find((preset) => preset.id === modelId)?.label || modelId;
+  }
+
+  function getEffectiveAiChatModel(source: Pick<Settings, 'aiVideoChatModel' | 'aiVideoChatCustomModel'> = settings): string {
+    if (source.aiVideoChatModel === 'custom') {
+      return source.aiVideoChatCustomModel.trim();
+    }
+    return source.aiVideoChatModel.trim();
+  }
+
+  function getAiSystemPresetLabel(presetId: Settings['aiVideoChatSystemPreset']): string {
+    if (presetId === 'balanced') return t('aiVideoChatSystemBalanced');
+    if (presetId === 'concise') return t('aiVideoChatSystemConcise');
+    if (presetId === 'deep') return t('aiVideoChatSystemDeep');
+    return t('aiVideoChatSystemCustom');
+  }
+
+  function updateAiProvider(provider: Settings['aiVideoChatProvider']): void {
+    const presets = AI_CHAT_MODEL_PRESETS_BY_PROVIDER[provider] || AI_CHAT_MODEL_PRESETS;
+    const modelExists = presets.some((preset) => preset.id === settings.aiVideoChatModel);
+    void applySettingsPatch({
+      aiVideoChatProvider: provider,
+      aiVideoChatModel: modelExists ? settings.aiVideoChatModel : presets[0]?.id || DEFAULT_SETTINGS.aiVideoChatModel,
+    });
   }
 
   function clampLogoScale(value: number, fallback: number): number {
@@ -534,23 +620,80 @@
     return t('logoPresetRewind');
   }
 
-  const AMO_URL = 'https://addons.mozilla.org/firefox/addon/youtube-rewind/';
   const isFirefox = browser.runtime.getURL('').startsWith('moz-extension://');
 
-  async function fetchLatestVersionInfo(): Promise<{ version: string; url: string; source: 'amo' | 'github' }> {
-    if (isFirefox) {
-      const res = await fetch(AMO_API_URL);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      const version = (data?.current_version?.version || '').replace(/^v/, '');
-      if (!version) throw new Error('Missing AMO version');
-      return {
-        version,
-        url: AMO_URL,
-        source: 'amo',
-      };
+  function getUpdateActionLabel(source: UpdateSource): string {
+    if (source === 'amo') {
+      return settings.language === 'ru' ? 'Открыть Mozilla Add-ons' : 'Open Mozilla Add-ons';
+    }
+    if (source === 'chrome-store') {
+      return settings.language === 'ru' ? 'Открыть Chrome Web Store' : 'Open Chrome Web Store';
+    }
+    return settings.language === 'ru' ? 'Открыть последний релиз' : 'Open latest release';
+  }
+
+  function getUpdateInstruction(source: UpdateSource): string {
+    if (source === 'amo') {
+      return settings.language === 'ru'
+        ? 'Доступно новое обновление. Для Firefox открой about:addons → YouTube Rewind → шестерёнка → Проверить наличие обновлений, либо открой страницу расширения на Mozilla Add-ons.'
+        : 'An update is available. In Firefox, open about:addons → YouTube Rewind → gear menu → Check for Updates, or open the extension page on Mozilla Add-ons.';
     }
 
+    if (source === 'chrome-store') {
+      return settings.language === 'ru'
+        ? 'Доступно новое обновление. Для Chrome открой chrome://extensions → включи «Режим разработчика» → нажми «Обновить», либо открой страницу расширения в Chrome Web Store.'
+        : 'An update is available. In Chrome, open chrome://extensions → enable Developer mode → click Update, or open the extension page in the Chrome Web Store.';
+    }
+
+    return settings.language === 'ru'
+      ? 'Это локальная или GitHub-установка. Если доступна новая версия, открой страницу последнего релиза на GitHub и скачай свежий архив.'
+      : 'This is a local or GitHub install. If a newer version is available, open the latest GitHub release page and download the fresh archive.';
+  }
+
+  async function getSelfInstallContext(): Promise<{ installType: string; updateUrl: string }> {
+    try {
+      if (browser.management?.getSelf) {
+        const info = await browser.management.getSelf();
+        return {
+          installType: info.installType || '',
+          updateUrl: info.updateUrl || '',
+        };
+      }
+    } catch {}
+
+    return {
+      installType: '',
+      updateUrl: '',
+    };
+  }
+
+  async function detectUpdateSource(): Promise<UpdateSource> {
+    const installContext = await getSelfInstallContext();
+    const installType = installContext.installType.toLowerCase();
+    const updateUrl = installContext.updateUrl.toLowerCase();
+
+    if (updateUrl.includes('clients2.google.com/service/update2/crx')) {
+      return 'chrome-store';
+    }
+
+    if (isFirefox) {
+      if (updateUrl.includes('addons.mozilla.org') || updateUrl.includes('mozilla.org')) {
+        return 'amo';
+      }
+      if (installType === 'development' || installType === 'other' || installType === 'sideload') {
+        return 'github';
+      }
+      return updateUrl ? 'amo' : 'github';
+    }
+
+    if (installType === 'development' || !updateUrl) {
+      return 'github';
+    }
+
+    return 'chrome-store';
+  }
+
+  async function fetchGithubLatestVersion(): Promise<{ version: string; url: string; source: UpdateSource }> {
     const res = await fetch('https://api.github.com/repos/crixqq/YouTube-Rewind/releases/latest');
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
@@ -558,14 +701,66 @@
     if (!version) throw new Error('Missing GitHub version');
     return {
       version,
-      url: data.html_url || 'https://github.com/crixqq/YouTube-Rewind/releases',
+      url: data.html_url || GITHUB_RELEASES_URL,
       source: 'github',
     };
   }
 
+  async function fetchAmoLatestVersion(): Promise<{ version: string; url: string; source: UpdateSource }> {
+    const res = await fetch(AMO_API_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const version = (data?.current_version?.version || '').replace(/^v/, '');
+    if (!version) throw new Error('Missing AMO version');
+    return {
+      version,
+      url: AMO_URL,
+      source: 'amo',
+    };
+  }
+
+  async function requestChromeStoreUpdateCheck(): Promise<{ status: 'available' | 'up-to-date' | 'error'; version: string }> {
+    const runtimeApi = typeof chrome !== 'undefined' ? chrome.runtime : null;
+    if (!runtimeApi?.requestUpdateCheck) {
+      return { status: 'error', version: '' };
+    }
+
+    return await new Promise((resolve) => {
+      try {
+        runtimeApi.requestUpdateCheck((status, details) => {
+          const lastError = chrome.runtime?.lastError?.message || '';
+          if (lastError) {
+            resolve({ status: 'error', version: '' });
+            return;
+          }
+
+          if (status === 'update_available') {
+            resolve({
+              status: 'available',
+              version: details?.version || '',
+            });
+            return;
+          }
+
+          if (status === 'no_update') {
+            resolve({ status: 'up-to-date', version: '' });
+            return;
+          }
+
+          resolve({ status: 'error', version: '' });
+        });
+      } catch {
+        resolve({ status: 'error', version: '' });
+      }
+    });
+  }
+
   async function checkForUpdates() {
     const currentVersion = browser.runtime.getManifest().version;
-    const source = isFirefox ? 'amo' : 'github';
+    const source = await detectUpdateSource();
+    updateSource = source;
+    updateActionLabel = getUpdateActionLabel(source);
+    updateInstruction = getUpdateInstruction(source);
 
     // Check cache first
     try {
@@ -574,6 +769,9 @@
       if (cache && cache.source === source && Date.now() - cache.timestamp < CACHE_TTL) {
         latestVersion = cache.version;
         releaseUrl = cache.url;
+        updateSource = cache.source;
+        updateActionLabel = getUpdateActionLabel(cache.source);
+        updateInstruction = getUpdateInstruction(cache.source);
         updateState = isNewer(cache.version, currentVersion) ? 'available' : 'up-to-date';
         return;
       }
@@ -582,15 +780,36 @@
     updateState = 'checking';
 
     try {
-      const { version, url, source: cacheSource } = await fetchLatestVersionInfo();
+      if (source === 'chrome-store') {
+        const storeResult = await requestChromeStoreUpdateCheck();
+        latestVersion = storeResult.version;
+        releaseUrl = CHROME_STORE_URL;
 
-      latestVersion = version;
-      releaseUrl = url;
-      updateState = isNewer(version, currentVersion) ? 'available' : 'up-to-date';
+        if (storeResult.status === 'available') {
+          updateState = 'available';
+        } else if (storeResult.status === 'up-to-date') {
+          updateState = 'up-to-date';
+        } else {
+          updateState = 'error';
+          return;
+        }
 
-      // Cache result
+        await browser.storage.local.set({
+          [CACHE_KEY]: { version: storeResult.version, url: CHROME_STORE_URL, source, timestamp: Date.now() },
+        });
+        return;
+      }
+
+      const versionInfo = source === 'amo'
+        ? await fetchAmoLatestVersion()
+        : await fetchGithubLatestVersion();
+
+      latestVersion = versionInfo.version;
+      releaseUrl = versionInfo.url;
+      updateState = isNewer(versionInfo.version, currentVersion) ? 'available' : 'up-to-date';
+
       await browser.storage.local.set({
-        [CACHE_KEY]: { version, url, source: cacheSource, timestamp: Date.now() },
+        [CACHE_KEY]: { version: versionInfo.version, url: versionInfo.url, source, timestamp: Date.now() },
       });
     } catch {
       updateState = 'error';
@@ -599,7 +818,7 @@
 
   function toggleUpdateMenu() {
     updateMenuOpen = !updateMenuOpen;
-    if (updateMenuOpen && updateState === 'idle') {
+    if (updateMenuOpen && (updateState === 'idle' || updateState === 'error')) {
       checkForUpdates();
     }
   }
@@ -624,8 +843,10 @@
 
   const SEARCH_ALIASES: Record<string, string[]> = {
     sectionProfiles: ['profile', 'profiles', 'preset', 'presets', 'профиль', 'профили', 'пресет', 'пресеты'],
-    sectionPlayer: ['player', 'playback', 'speed', 'quality', 'download', 'плеер', 'скорость', 'качество', 'скачивание'],
+    sectionPlayer: ['player', 'playback', 'speed', 'quality', 'download', 'ad skip', 'auto skip ads', 'плеер', 'скорость', 'качество', 'скачивание', 'пропуск рекламы'],
     sectionWatchPage: ['watch page', 'video page', 'action buttons', 'buttons under video', 'страница видео', 'кнопки под видео'],
+    sectionChannelPage: ['channel page', 'channel tools', 'channel assets', 'channel stats', 'страница канала', 'инструменты канала', 'аватар канала', 'шапка канала', 'статистика канала'],
+    sectionAssistant: ['ai assistant', 'video sense', 'openrouter', 'assistant chat', 'video chat', 'чат', 'ии', 'нейросеть', 'ассистент'],
     sectionWatchTimer: ['watch timer', 'daily limit', 'screen time', 'timeout', 'таймер', 'лимит времени', 'ограничение времени'],
     sectionHomepageFilter: ['home', 'homepage', 'feed', 'recommendations', 'главная', 'лента', 'рекомендации'],
     sectionSearchFilter: ['search', 'search page', 'search results', 'поиск', 'результаты поиска'],
@@ -633,10 +854,11 @@
     sectionSidebarFilter: ['sidebar', 'guide', 'left menu', 'боковая панель', 'левое меню'],
     sectionThumbnailEffect: ['thumbnail', 'preview image', 'cover', 'миниатюра', 'превью', 'обложка'],
     sectionAvatarShape: ['avatar', 'channel icon', 'profile picture', 'аватар', 'иконка канала', 'форма'],
-    sectionDeveloper: ['developer', 'debug', 'diagnostics', 'import', 'export', 'copy', 'paste', 'reset', 'reload', 'cache', 'developer tools', 'разработчик', 'отладка', 'диагностика', 'импорт', 'экспорт', 'копировать', 'вставить', 'сброс', 'перезагрузка', 'кэш'],
+    sectionDeveloper: ['developer', 'debug', 'diagnostics', 'logs', 'log', 'import', 'export', 'copy', 'paste', 'reset', 'reload', 'cache', 'developer tools', 'разработчик', 'отладка', 'диагностика', 'логи', 'журнал', 'импорт', 'экспорт', 'копировать', 'вставить', 'сброс', 'перезагрузка', 'кэш'],
     sectionInterface: ['interface', 'theme', 'appearance', 'ui color', 'accent color', 'интерфейс', 'тема', 'цвет темы', 'цвет интерфейса'],
     sectionBeta: ['beta', 'experimental', 'labs', 'preview features', 'бета', 'экспериментальные функции'],
     settingDeveloperEnabled: ['developer tools', 'developer mode', 'debug tools', 'режим разработчика', 'инструменты разработчика'],
+    settingExtensionLogEnabled: ['logs', 'record logs', 'debug log', 'логи', 'запись логов', 'журнал'],
     settingCustomLogo: ['logo', 'branding', 'channel mark', 'логотип'],
     settingLogoVariant: ['logo preset', 'logo variant', 'default logo', 'rewind logo', 'вариант логотипа', 'пресет логотипа', 'дефолтный логотип'],
     settingCustomLogoSize: ['logo size', 'logo scale', 'размер логотипа', 'масштаб логотипа'],
@@ -646,14 +868,21 @@
     settingInterfaceThemeCustomColor: ['custom color', 'hex color', 'свой цвет', 'hex'],
     settingInterfaceThemeReset: ['reset palette', 'default palette', 'сброс палитры'],
     settingDefaultQuality: ['default quality', 'preferred quality', 'video quality', 'качество по умолчанию', 'предпочитаемое качество', 'качество видео'],
+    settingAutoSkipAds: ['auto skip ads', 'skip ads', 'ad skip', 'skip ad button', 'автопропуск рекламы', 'пропуск рекламы', 'кнопка пропустить'],
     settingHideLogoAnimation: ['logo motion', 'logo animation', 'event logo', 'event logo variants', 'анимация логотипа', 'ивентовые версии'],
     settingDisableThumbnailPreview: ['hover preview', 'preview on hover', 'moving thumbnail', 'thumbnail preview', 'предпросмотр при наведении', 'двигающееся превью'],
     settingVideosPerRow: ['grid', 'columns', 'videos per line', 'сетка', 'колонки', 'видео в ряд'],
     settingWatchTimeLimit: ['limit', 'daily limit', 'screen time', 'лимит', 'ограничение'],
     settingWatchTimerEnabled: ['watch timer', 'time counter', 'таймер', 'счетчик времени'],
     settingBetaHomepageRevealAnimation: ['feed animation', 'home animation', 'card reveal', 'анимация ленты', 'анимация карточек'],
+    settingBetaStableDescriptionColors: ['description hover color', 'stable description', 'цвет описания', 'стабильные цвета', 'ссылки описания'],
     settingBetaVideoFrameScreenshot: ['screenshot', 'frame capture', 'video frame', 'скриншот', 'кадр видео'],
     settingBetaScreenshotInstantDownload: ['instant screenshot download', 'download screenshot immediately', 'скачивать скриншот сразу', 'моментальное скачивание скриншота'],
+    settingBetaChannelTvBannerLookup: ['tv banner', 'channel banner lookup', 'full banner', 'tv client', 'баннер тв', 'поиск шапки', 'полная шапка'],
+    settingAiVideoChatEnabled: ['ai chat', 'video ai', 'openrouter', 'transcript chat', 'ии чат', 'чат по видео', 'транскрипция'],
+    settingAiVideoChatApiKey: ['api key', 'openrouter key', 'ключ api', 'ключ openrouter'],
+    settingAiVideoChatModel: ['model', 'ai model', 'llm', 'модель', 'нейросеть'],
+    settingAiVideoChatCustomModel: ['custom model', 'model id', 'свой id модели', 'кастомная модель'],
     hideJoinButton: ['join', 'membership', 'sponsor', 'спонсировать'],
     hideSubscribeButton: ['subscribe', 'подписаться', 'подписка'],
     hideLikeDislike: ['like', 'dislike', 'лайк', 'дизлайк'],
@@ -739,6 +968,7 @@
     'betaEnabled',
     'disableAvatarLiveRedirect',
     'betaHomepageRevealAnimation',
+    'betaStableDescriptionColors',
     'defaultQuality',
   ];
 
@@ -753,9 +983,14 @@
     normalized.interfaceThemeHue = clampHue(normalized.interfaceThemeHue ?? DEFAULT_SETTINGS.interfaceThemeHue);
     normalized.interfaceThemeColor = getSeedThemeColor(normalized.interfaceThemeColor);
     normalized.developerEnabled = Boolean(normalized.developerEnabled);
+    normalized.extensionLogEnabled = Boolean(normalized.extensionLogEnabled);
+    if (!normalized.developerEnabled) {
+      normalized.extensionLogEnabled = false;
+    }
     if (!normalized.betaEnabled) {
       normalized.disableAvatarLiveRedirect = false;
       normalized.betaHomepageRevealAnimation = false;
+      normalized.betaStableDescriptionColors = false;
       normalized.defaultQuality = 'auto';
     }
     if (!normalized.betaVideoFrameScreenshot) {
@@ -770,6 +1005,7 @@
     delete (profileSettings as any).customProfiles;
     delete (profileSettings as any).activeProfile;
     delete (profileSettings as any).developerEnabled;
+    delete (profileSettings as any).extensionLogEnabled;
     delete (profileSettings as any).betaStandalonePage;
     return profileSettings;
   }
@@ -788,6 +1024,7 @@
       betaEnabled: settings.betaEnabled,
       disableAvatarLiveRedirect: settings.disableAvatarLiveRedirect,
       betaHomepageRevealAnimation: settings.betaHomepageRevealAnimation,
+      betaStableDescriptionColors: settings.betaStableDescriptionColors,
     };
   }
 
@@ -828,6 +1065,18 @@
   function computeProfileModifiedState(nextSettings: Settings): boolean {
     const activeId = nextSettings.activeProfile;
     if (!activeId || activeId === 'none') return false;
+
+    if (activeId === 'default') {
+      const baseline = normalizeLocalSettings({
+        ...DEFAULT_SETTINGS,
+        language: nextSettings.language,
+        customProfiles: cloneCustomProfiles(nextSettings.customProfiles || []),
+        developerEnabled: nextSettings.developerEnabled,
+        extensionLogEnabled: nextSettings.extensionLogEnabled,
+        activeProfile: 'default',
+      });
+      return JSON.stringify(extractProfileSettings(nextSettings)) !== JSON.stringify(extractProfileSettings(baseline));
+    }
 
     if (activeId.startsWith('custom:')) {
       const profileName = activeId.slice(7);
@@ -879,7 +1128,7 @@
 
   function shouldDetachBuiltinProfile(partial: Partial<Settings>): boolean {
     const activeId = settings.activeProfile;
-    if (!activeId || activeId === 'none' || activeId.startsWith('custom:')) return false;
+    if (!activeId || activeId === 'none' || activeId === 'default' || activeId.startsWith('custom:')) return false;
     if ('activeProfile' in partial || 'customProfiles' in partial) return false;
     return Object.keys(partial).length > 0;
   }
@@ -951,6 +1200,30 @@
     if (!activeId || !activeId.startsWith('custom:')) return null;
     const profileName = activeId.slice(7);
     return (settings.customProfiles || []).find((profile) => profile.name === profileName) || null;
+  }
+
+  function buildAppliedCustomProfilePatch(profile: CustomProfile, profiles = cloneCustomProfiles(settings.customProfiles || [])): Partial<Settings> {
+    const resetData = { ...DEFAULT_SETTINGS };
+    delete (resetData as any).language;
+    delete (resetData as any).customProfiles;
+    delete (resetData as any).activeProfile;
+    delete (resetData as any).betaStandalonePage;
+    delete (resetData as any).developerEnabled;
+    delete (resetData as any).extensionLogEnabled;
+    const profileSettings = resolveAppliedProfileSettings(profile.settings);
+    stripLogoDefaults(resetData, profileSettings);
+    return {
+      ...resetData,
+      ...profileSettings,
+      customProfiles: profiles,
+      activeProfile: 'custom:' + profile.name,
+    };
+  }
+
+  async function activateCustomProfile(profile: CustomProfile, profiles = cloneCustomProfiles(settings.customProfiles || [])): Promise<void> {
+    const merged = buildAppliedCustomProfilePatch(profile, profiles);
+    patchLocalSettings(merged);
+    await saveSettings(merged);
   }
 
   function patchLocalSettings(partial: Partial<Settings>): void {
@@ -1091,6 +1364,8 @@
       if (!next.developerEnabled) {
         developerConfirmOpen = false;
         developerFeedback = null;
+        developerLogsOpen = false;
+        developerLogsText = '';
         showResetConfirm = false;
       }
     };
@@ -1290,6 +1565,7 @@
       betaEnabled: false,
       disableAvatarLiveRedirect: false,
       betaHomepageRevealAnimation: false,
+      betaStableDescriptionColors: false,
     });
   }
 
@@ -1536,16 +1812,17 @@
     delete (parsed.settings as any).language;
     delete (parsed.settings as any).activeProfile;
     delete (parsed.settings as any).developerEnabled;
+    delete (parsed.settings as any).extensionLogEnabled;
     delete (parsed.settings as any).betaStandalonePage;
 
     const newProfile: CustomProfile = { name, settings: parsed.settings };
     const profiles = cloneCustomProfiles([...(settings.customProfiles || []), newProfile]);
-    patchLocalSettings({ customProfiles: profiles });
-    await saveSettings({ customProfiles: profiles });
+    await activateCustomProfile(newProfile, profiles);
     pendingProfileText = '';
     pendingProfileFileName = '';
     sheetProfileNameInput = '';
-    showSheetFeedback(t('profileSaved'));
+    showSheetFeedback(t('profileApplied'));
+    showFeedback('profile');
   }
 
   function cancelSheetProfileImport() {
@@ -1588,8 +1865,10 @@
     }
     developerConfirmOpen = false;
     developerFeedback = null;
+    developerLogsOpen = false;
+    developerLogsText = '';
     showResetConfirm = false;
-    void applySettingsPatch({ developerEnabled: false });
+    void applySettingsPatch({ developerEnabled: false, extensionLogEnabled: false });
   }
 
   async function copyDeveloperSnapshot(): Promise<void> {
@@ -1633,6 +1912,103 @@
     } catch {
       showDeveloperFeedback(t('developerActionFailed'), 'error');
     }
+  }
+
+  function formatDeveloperLogs(logs: unknown[]): string {
+    return logs
+      .map((entry) => {
+        const item = entry as {
+          time?: string;
+          level?: string;
+          area?: string;
+          message?: string;
+          data?: unknown;
+        };
+        const details = item.data === undefined || item.data === null
+          ? ''
+          : `\n${typeof item.data === 'string' ? item.data : JSON.stringify(item.data, null, 2)}`;
+        return `[${item.time || ''}] ${String(item.level || 'info').toUpperCase()} ${item.area || 'extension'}: ${item.message || ''}${details}`;
+      })
+      .join('\n\n');
+  }
+
+  async function refreshDeveloperLogs(open = true): Promise<void> {
+    try {
+      developerLogsLoading = true;
+      let logs: unknown[] = [];
+      try {
+        const response = await browser.runtime.sendMessage({ type: 'ytr_extension_logs_get' }) as { logs?: unknown[]; error?: string };
+        logs = Array.isArray(response?.logs) ? response.logs : [];
+      } catch {}
+      if (!logs.length) {
+        const stored = await browser.storage.local.get(EXTENSION_LOGS_KEY).catch(() => ({}));
+        logs = Array.isArray(stored?.[EXTENSION_LOGS_KEY]) ? stored[EXTENSION_LOGS_KEY] : [];
+      }
+      developerLogsText = formatDeveloperLogs(logs);
+      developerLogsOpen = open;
+      showDeveloperFeedback(t('developerLogsOpened'));
+    } catch {
+      showDeveloperFeedback(t('developerActionFailed'), 'error');
+    } finally {
+      developerLogsLoading = false;
+    }
+  }
+
+  async function copyDeveloperLogs(): Promise<void> {
+    try {
+      if (!developerLogsText) {
+        await refreshDeveloperLogs(false);
+      }
+      await navigator.clipboard.writeText(developerLogsText || '');
+      showDeveloperFeedback(t('developerLogsCopied'));
+    } catch {
+      showDeveloperFeedback(t('developerActionFailed'), 'error');
+    }
+  }
+
+  async function saveDeveloperLogs(): Promise<void> {
+    try {
+      if (!developerLogsText) {
+        await refreshDeveloperLogs(false);
+      }
+      const blob = new Blob([developerLogsText || ''], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `youtube-rewind-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showDeveloperFeedback(t('developerLogsSaved'));
+    } catch {
+      showDeveloperFeedback(t('developerActionFailed'), 'error');
+    }
+  }
+
+  async function clearDeveloperLogs(): Promise<void> {
+    try {
+      let cleared = false;
+      try {
+        const response = await browser.runtime.sendMessage({ type: 'ytr_extension_logs_clear' }) as { ok?: boolean };
+        cleared = response?.ok !== false;
+      } catch {}
+      await browser.storage.local.remove(EXTENSION_LOGS_KEY);
+      cleared = true;
+      developerLogsText = '';
+      showDeveloperFeedback(cleared ? t('developerLogsCleared') : t('developerActionFailed'), cleared ? 'ok' : 'error');
+    } catch {
+      showDeveloperFeedback(t('developerActionFailed'), 'error');
+    }
+  }
+
+  function logDeveloperEvent(message: string, data?: unknown): void {
+    if (!settings.developerEnabled || !settings.extensionLogEnabled) return;
+    void browser.runtime.sendMessage({
+      type: 'ytr_extension_log',
+      level: 'info',
+      area: 'popup.developer',
+      message,
+      data,
+    }).catch(() => {});
   }
 
   function reloadExtension(): void {
@@ -1791,6 +2167,20 @@
       update('activeProfile', 'none');
       return;
     }
+    if (profileId === 'default') {
+      const resetData: Partial<Settings> = {
+        ...DEFAULT_SETTINGS,
+        language: settings.language,
+        customProfiles: cloneCustomProfiles(settings.customProfiles || []),
+        developerEnabled: settings.developerEnabled,
+        extensionLogEnabled: settings.developerEnabled ? settings.extensionLogEnabled : false,
+        activeProfile: 'default',
+      };
+      patchLocalSettings(resetData);
+      void saveSettings(resetData);
+      showFeedback('profile');
+      return;
+    }
     const profile = PROFILES[profileId];
     if (!profile) return;
 
@@ -1805,9 +2195,11 @@
     delete (resetData as any).betaEnabled;
     delete (resetData as any).betaStandalonePage;
     delete (resetData as any).betaHomepageRevealAnimation;
+    delete (resetData as any).betaStableDescriptionColors;
     delete (resetData as any).betaVideoFrameScreenshot;
     delete (resetData as any).betaScreenshotInstantDownload;
     delete (resetData as any).developerEnabled;
+    delete (resetData as any).extensionLogEnabled;
     const merged = { ...resetData, ...profile, activeProfile: profileId };
     patchLocalSettings(merged);
     void saveSettings(merged);
@@ -1839,14 +2231,13 @@
   let renamingProfileIndex = $state(-1);
   let renameInput = $state('');
 
-  function saveCurrentAsProfile() {
+  async function saveCurrentAsProfile() {
     const name = profileNameInput.trim();
     if (!name) return;
     const profileSettings = extractProfileSettings(settings);
     const newProfile: CustomProfile = { name, settings: profileSettings };
     const profiles = cloneCustomProfiles([...(settings.customProfiles || []), newProfile]);
-    patchLocalSettings({ customProfiles: profiles });
-    void saveSettings({ customProfiles: profiles });
+    await activateCustomProfile(newProfile, profiles);
     profileNameInput = '';
     showProfileAdd = false;
     showFeedback('profile');
@@ -1899,19 +2290,9 @@
   }
 
   function applyCustomProfile(profile: CustomProfile) {
-    const resetData = { ...DEFAULT_SETTINGS };
-    delete (resetData as any).language;
-    delete (resetData as any).customProfiles;
-    delete (resetData as any).activeProfile;
-    delete (resetData as any).betaStandalonePage;
-    delete (resetData as any).developerEnabled;
-    const profileSettings = resolveAppliedProfileSettings(profile.settings);
-    stripLogoDefaults(resetData, profileSettings);
-
-    const merged = { ...resetData, ...profileSettings, activeProfile: 'custom:' + profile.name };
-    patchLocalSettings(merged);
-    void saveSettings(merged);
-    showFeedback('profile');
+    void activateCustomProfile(profile).then(() => {
+      showFeedback('profile');
+    });
   }
 
   async function resetAllSettings() {
@@ -1977,8 +2358,8 @@
 
   const AVATAR_SHAPE_ITEMS = [
     { id: 'none', labelKey: 'shapeDefault', svgContent: '<circle cx="16" cy="16" r="13" fill="currentColor"/>' },
-    { id: 'superellipse', labelKey: 'shapeSuperellipse', svgContent: '<rect x="3" y="3" width="26" height="26" rx="6" fill="currentColor"/>' },
-    { id: 'rounded-square', labelKey: 'shapeRoundedSquare', svgContent: '<rect x="3" y="3" width="26" height="26" rx="3" fill="currentColor"/>' },
+    { id: 'superellipse', labelKey: 'shapeSuperellipse', svgContent: '<rect x="3" y="3" width="26" height="26" rx="5" fill="currentColor"/>' },
+    { id: 'rounded-square', labelKey: 'shapeRoundedSquare', svgContent: '<rect x="3" y="3" width="26" height="26" rx="2" fill="currentColor"/>' },
     { id: 'notched', labelKey: 'thumbShapeNotched', svgContent: '<path d="M10,2 H22 L30,10 V22 L22,30 H10 L2,22 V10 Z" fill="currentColor"/>' },
     { id: 'slanted', labelKey: 'thumbShapeSlanted', svgContent: '<path d="M8,3 H30 L24,29 H2 Z" fill="currentColor"/>' },
     { id: 'arch', labelKey: 'thumbShapeArch', svgContent: '<path d="M7,29 H25 Q29,29 29,25 V14 Q29,3 16,3 Q3,3 3,14 V25 Q3,29 7,29Z" fill="currentColor"/>' },
@@ -2036,6 +2417,7 @@
     return QUALITY_LABELS[q] || q;
   }
   const PROFILE_OPTIONS = [
+    { id: 'default', label: 'profileDefault' },
     { id: 'none', label: 'profileNone' },
     { id: 'focus', label: 'profileFocus' },
     { id: 'minimal', label: 'profileMinimal' },
@@ -2075,9 +2457,9 @@
   <div class="app-shell" data-locale={langVersion} class:app-shell-page={isStandaloneView} onclick={closeMenus} role="presentation">
       <header class="app-header">
         <div class="header-content">
-          <div class="header-brand">
+          <a class="header-brand" href="./popup.html?view=page" aria-label="YouTube Rewind settings">
             <span class="app-logo" role="img" aria-label="YouTube Rewind"></span>
-          </div>
+          </a>
           <div class="header-actions">
             {#if !isStandaloneView}
               <button class="info-button" onclick={openStandalonePage} title={t('betaOpenStandalone')} aria-label={t('betaOpenStandalone')}>
@@ -2153,15 +2535,21 @@
                         <line x1="12" y1="8" x2="12" y2="12"/>
                         <line x1="12" y1="16" x2="12.01" y2="16"/>
                       </svg>
-                      <span>{t('updateAvailable')}: <b>v{latestVersion}</b></span>
+                      <span>
+                        {t('updateAvailable')}
+                        {#if latestVersion}
+                          : <b>v{latestVersion}</b>
+                        {/if}
+                      </span>
                     </div>
+                    <div class="update-note">{updateInstruction}</div>
                     <a class="update-download" href={releaseUrl} target="_blank" rel="noopener" role="menuitem">
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                         <polyline points="7 10 12 15 17 10"/>
                         <line x1="12" y1="15" x2="12" y2="3"/>
                       </svg>
-                      <span>{t('updateDownload')}</span>
+                      <span>{updateActionLabel || t('updateDownload')}</span>
                     </a>
                   {:else if updateState === 'up-to-date'}
                     <div class="update-status update-status-ok">
@@ -2210,7 +2598,7 @@
         </div>
 
         <main class="app-body">
-        <SettingsSection title={t('sectionProfiles')} icon={ICON.tune} hidden={!sectionVisible(['sectionProfiles', 'profileNone', 'profileFocus', 'profileMinimal', 'profileClean', 'profileSaveCurrent', 'profileFromFile'], ['custom', 'preset'])}>
+        <SettingsSection title={t('sectionProfiles')} icon={ICON.tune} hidden={!sectionVisible(['sectionProfiles', 'profileDefault', 'profileNone', 'profileFocus', 'profileMinimal', 'profileClean', 'profileSaveCurrent', 'profileFromFile'], ['custom', 'preset'])}>
           <div class="effect-picker">
             {#each PROFILE_OPTIONS as profile (profile.id)}
                 <button
@@ -2300,7 +2688,7 @@
           {/if}
         </SettingsSection>
 
-        <SettingsSection title={t('sectionPlayer')} icon={ICON.play_circle} hidden={!sectionVisible(['sectionPlayer', 'settingPlaybackSpeed', 'settingClassicPlayer', 'settingWidePlayer', 'settingClassicLikeIcons', 'settingAdaptiveDescription'])}>
+        <SettingsSection title={t('sectionPlayer')} icon={ICON.play_circle} hidden={!sectionVisible(['sectionPlayer', 'settingPlaybackSpeed', 'settingAutoSkipAds', 'settingClassicPlayer', 'settingWidePlayer', 'settingClassicLikeIcons', 'settingAdaptiveDescription'])}>
           <Slider
             label={t('settingPlaybackSpeed')}
             value={speedToSlider(settings.playbackSpeed)}
@@ -2311,6 +2699,7 @@
             parseInput={parseSpeed}
             onchange={(v) => update('playbackSpeed', sliderToSpeed(v))}
           />
+          <Toggle label={t('settingAutoSkipAds')} checked={settings.autoSkipAds} onchange={(v) => update('autoSkipAds', v)} />
           <Toggle label={t('settingClassicPlayer')} checked={settings.classicPlayer} onchange={(v) => update('classicPlayer', v)} />
           <Toggle label={t('settingWidePlayer')} checked={settings.widePlayer} onchange={(v) => update('widePlayer', v)} />
           <Toggle label={t('settingAdaptiveDescription')} checked={settings.adaptiveColorsDescription} onchange={(v) => update('adaptiveColorsDescription', v)} />
@@ -2336,6 +2725,11 @@
               </button>
             {/each}
           </div>
+        </SettingsSection>
+
+        <SettingsSection title={t('sectionChannelPage')} icon={ICON.person} hidden={!sectionVisible(['sectionChannelPage', 'settingDownloadChannelAssets', 'settingShowChannelStatsLinks'], ['channel', 'avatar', 'banner', 'stats'])}>
+          <Toggle label={t('settingDownloadChannelAssets')} checked={settings.downloadChannelAssets} onchange={(v) => void applySettingsPatch({ downloadChannelAssets: v })} />
+          <Toggle label={t('settingShowChannelStatsLinks')} checked={settings.showChannelStatsLinks} onchange={(v) => void applySettingsPatch({ showChannelStatsLinks: v })} />
         </SettingsSection>
 
         <SettingsSection title={t('sectionWatchTimer')} icon={ICON.timer} hidden={!sectionVisible(['sectionWatchTimer', 'settingWatchTimerEnabled', 'settingWatchTimeLimit', 'settingWatchTimeLimitBlockRepeat'])}>
@@ -2527,7 +2921,7 @@
           </div>
         </SettingsSection>
 
-        <SettingsSection title={t('sectionDeveloper')} icon={ICON.database} hidden={!sectionVisible(['sectionDeveloper', 'settingDeveloperEnabled', 'developerCopyDebug', 'developerClearUpdateCache', 'developerResetWatchTime', 'developerReloadExtension', 'exportLabel', 'importLabel', 'resetSettings'])}>
+        <SettingsSection title={t('sectionDeveloper')} icon={ICON.database} hidden={!sectionVisible(['sectionDeveloper', 'settingDeveloperEnabled', 'settingExtensionLogEnabled', 'developerOpenLogs', 'developerCopyLogs', 'developerSaveLogs', 'developerClearLogs', 'developerCopyDebug', 'developerClearUpdateCache', 'developerResetWatchTime', 'developerReloadExtension', 'exportLabel', 'importLabel', 'resetSettings'])}>
           <div class="data-section">
             <div class="data-toggle-wrap">
               <Toggle label={t('settingDeveloperEnabled')} checked={settings.developerEnabled} onchange={toggleDeveloperTools} />
@@ -2552,11 +2946,41 @@
               <div class="data-divider"></div>
               <div class="data-group">
                 <div class="data-group-label">{t('developerDiagnostics')}</div>
+                <div class="data-toggle-wrap">
+                  <Toggle
+                    label={t('settingExtensionLogEnabled')}
+                    checked={settings.extensionLogEnabled}
+                    onchange={(v) => {
+                      void applySettingsPatch({ extensionLogEnabled: v });
+                      if (v) {
+                        setTimeout(() => {
+                          void browser.runtime.sendMessage({
+                            type: 'ytr_extension_log',
+                            level: 'info',
+                            area: 'popup.developer',
+                            message: 'extension log recording enabled',
+                            data: {
+                            version: browser.runtime.getManifest().version,
+                            userAgent: navigator.userAgent,
+                            },
+                          }).catch(() => {});
+                        }, 300);
+                      }
+                    }}
+                  />
+                </div>
                 <div class="data-actions">
                   <button class="action-btn" onclick={() => void copyDeveloperSnapshot()}>{t('developerCopyDebug')}</button>
+                  <button class="action-btn" onclick={() => void refreshDeveloperLogs(true)}>{developerLogsLoading ? t('developerLogsLoading') : t('developerOpenLogs')}</button>
+                  <button class="action-btn" onclick={() => void copyDeveloperLogs()}>{t('developerCopyLogs')}</button>
+                  <button class="action-btn" onclick={() => void saveDeveloperLogs()}>{t('developerSaveLogs')}</button>
+                  <button class="action-btn" onclick={() => void clearDeveloperLogs()}>{t('developerClearLogs')}</button>
                   <button class="action-btn" onclick={() => void clearDeveloperUpdateCache()}>{t('developerClearUpdateCache')}</button>
                   <button class="action-btn" onclick={() => void resetDeveloperWatchTime()}>{t('developerResetWatchTime')}</button>
                 </div>
+                {#if developerLogsOpen}
+                  <textarea class="developer-log-viewer" readonly value={developerLogsText || t('developerLogsEmpty')}></textarea>
+                {/if}
               </div>
               <div class="data-divider"></div>
               <div class="data-group">
@@ -2606,7 +3030,42 @@
           </div>
         </SettingsSection>
 
-        <SettingsSection title={t('sectionBeta')} icon={ICON.info} hidden={!sectionVisible(['sectionBeta', 'settingBetaEnabled', 'settingDefaultQuality', 'settingDisableAvatarLive', 'settingBetaHomepageRevealAnimation'])}>
+        <SettingsSection title={t('sectionAssistant')} icon={ICON.web_asset} hidden={!sectionVisible(['sectionAssistant', 'settingAiVideoChatEnabled', 'settingAiVideoChatProvider', 'settingAiVideoChatApiKey', 'aiVideoChatGuide'])}>
+          <Toggle label={t('settingAiVideoChatEnabled')} checked={settings.aiVideoChatEnabled} onchange={(v) => void applySettingsPatch({ aiVideoChatEnabled: v })} />
+          {#if settings.aiVideoChatEnabled}
+            <div class="sub-label">{t('settingAiVideoChatProvider')}</div>
+            <div class="effect-picker">
+              {#each AI_CHAT_PROVIDER_PRESETS as preset (preset.id)}
+                <button
+                  class="effect-option provider-effect-option"
+                  class:active={settings.aiVideoChatProvider === preset.id}
+                  onclick={() => updateAiProvider(preset.id as Settings['aiVideoChatProvider'])}
+                  title={preset.label}
+                >
+                  <img class="provider-icon-img" src={AI_CHAT_PROVIDER_ICON_SRC[preset.id]} alt="" loading="lazy" decoding="async" />
+                  <span class="effect-option-label">{preset.label}</span>
+                </button>
+              {/each}
+            </div>
+
+            <div class="sub-label">{t('settingAiVideoChatApiKey')}</div>
+            <input
+              class="profile-name-input ai-api-key-input"
+              type="password"
+              placeholder={t('settingAiVideoChatApiKey')}
+              value={settings.aiVideoChatApiKey}
+              onchange={(event) => update('aiVideoChatApiKey', (event.currentTarget as HTMLInputElement).value as Settings['aiVideoChatApiKey'])}
+            />
+            <div class="profile-helper">{t('aiVideoChatApiKeyHint')}</div>
+            <div class="profile-actions-row ai-settings-actions">
+              <a class="action-btn ai-settings-link" href={OPENROUTER_GUIDE_URL} target="_blank" rel="noopener">
+                <span>{t('aiVideoChatGuide')}</span>
+              </a>
+            </div>
+          {/if}
+        </SettingsSection>
+
+        <SettingsSection title={t('sectionBeta')} icon={ICON.info} hidden={!sectionVisible(['sectionBeta', 'settingBetaEnabled', 'settingDefaultQuality', 'settingDisableAvatarLive', 'settingBetaStableDescriptionColors'])}>
           <Toggle label={t('settingBetaEnabled')} checked={settings.betaEnabled} onchange={toggleBetaFeatures} />
           {#if settings.betaEnabled}
             <Slider
@@ -2619,7 +3078,7 @@
               onchange={(v) => update('defaultQuality', sliderToQuality(v))}
             />
             <Toggle label={t('settingDisableAvatarLive')} checked={settings.disableAvatarLiveRedirect} onchange={(v) => void applySettingsPatch({ disableAvatarLiveRedirect: v })} />
-            <Toggle label={t('settingBetaHomepageRevealAnimation')} checked={settings.betaHomepageRevealAnimation} onchange={(v) => void applySettingsPatch({ betaHomepageRevealAnimation: v })} />
+            <Toggle label={t('settingBetaStableDescriptionColors')} checked={settings.betaStableDescriptionColors} onchange={(v) => void applySettingsPatch({ betaStableDescriptionColors: v })} />
           {/if}
 
           {#if betaConfirmOpen}
@@ -2645,6 +3104,12 @@
           <a class="about-link" href="https://addons.mozilla.org/firefox/addon/youtube-rewind/" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8.824 7.287c.008 0 .004 0 0 0zm-2.8-1.4c.006 0 .003 0 0 0zm16.754 2.161c-.505-1.215-1.53-2.528-2.333-2.943.654 1.283 1.033 2.57 1.177 3.53l.002.02c-1.314-3.278-3.544-4.6-5.366-7.477-.091-.147-.184-.292-.273-.446a3.545 3.545 0 01-.13-.24 2.118 2.118 0 01-.172-.46.03.03 0 00-.027-.03.038.038 0 00-.021 0l-.006.001a.037.037 0 00-.01.005L15.624 0c-2.585 1.515-3.657 4.168-3.932 5.856a6.197 6.197 0 00-2.305.587.297.297 0 00-.147.37c.057.162.24.24.396.17a5.622 5.622 0 012.008-.523l.067-.005a5.847 5.847 0 011.957.222l.095.03a5.816 5.816 0 01.616.228c.08.036.16.073.238.112l.107.055a5.835 5.835 0 01.368.211 5.953 5.953 0 012.034 2.104c-.62-.437-1.733-.868-2.803-.681 4.183 2.09 3.06 9.292-2.737 9.02a5.164 5.164 0 01-1.513-.292 4.42 4.42 0 01-.538-.232c-1.42-.735-2.593-2.121-2.74-3.806 0 0 .537-2 3.845-2 .357 0 1.38-.998 1.398-1.287-.005-.095-2.029-.9-2.817-1.677-.422-.416-.622-.616-.8-.767a3.47 3.47 0 00-.301-.227 5.388 5.388 0 01-.032-2.842c-1.195.544-2.124 1.403-2.8 2.163h-.006c-.46-.584-.428-2.51-.402-2.913-.006-.025-.343.176-.389.206-.406.29-.787.616-1.136.974-.397.403-.76.839-1.085 1.303a9.816 9.816 0 00-1.562 3.52c-.003.013-.11.487-.19 1.073-.013.09-.026.181-.037.272a7.8 7.8 0 00-.069.667l-.002.034-.023.387-.001.06C.386 18.795 5.593 24 12.016 24c5.752 0 10.527-4.176 11.463-9.661.02-.149.035-.298.052-.448.232-1.994-.025-4.09-.753-5.844z"/></svg>
             <span>{t('aboutFirefox')}</span>
+          </a>
+          <a class="about-link" href="https://chromewebstore.google.com/detail/youtube-rewind/mafjipbkleeooghlebgipkcbcggpojma" target="_blank" rel="noopener">
+            <svg class="about-link-google-icon" viewBox="90 78 286 282" width="18" height="18" aria-hidden="true">
+              <path fill="currentColor" d="M371.3784 193.2406H237.0825v53.4375h77.167c-1.2405 7.5627-4.0259 15.0024-8.1049 21.7862-4.6734 7.7723-10.4511 13.6895-16.373 18.1957-17.7389 13.4983-38.42 16.2584-52.7828 16.2584-36.2824 0-67.2833-23.2865-79.2844-54.9287-.4843-1.1482-.8059-2.3344-1.1975-3.5068-2.652-8.0533-4.101-16.5825-4.101-25.4474 0-9.226 1.5691-18.0575 4.4301-26.3985 11.2851-32.8967 42.9849-57.4674 80.1789-57.4674 7.4811 0 14.6854.8843 21.5173 2.6481 15.6135 4.0309 26.6578 11.9698 33.4252 18.2494l40.834-39.7111c-24.839-22.616-57.2194-36.3201-95.8444-36.3201-30.8782-.00066-59.3863 9.55308-82.7477 25.6992-18.9454 13.0941-34.4833 30.6254-44.9695 50.9861-9.75366 18.8785-15.09441 39.7994-15.09441 62.2934 0 22.495 5.34891 43.6334 15.10261 62.3374v.126c10.3023 19.8567 25.3678 36.9537 43.6783 49.9878 15.9962 11.3866 44.6789 26.5516 84.0307 26.5516 22.6301 0 42.6867-4.0517 60.3748-11.6447 12.76-5.4775 24.0655-12.6217 34.3012-21.8036 13.5247-12.1323 24.1168-27.1388 31.3465-44.4041 7.2297-17.2654 11.097-36.7895 11.097-57.957 0-9.858-.9971-19.8694-2.6881-28.9684Z"/>
+            </svg>
+            <span>{t('aboutChrome')}</span>
           </a>
           <a class="about-link" href="https://github.com/crixqq/YouTube-Rewind" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
@@ -3060,6 +3525,8 @@
     align-items: center;
     gap: 12px;
     min-width: 0;
+    color: inherit;
+    text-decoration: none;
   }
 
   .app-logo {
@@ -3335,6 +3802,13 @@
     color: var(--md-error);
   }
 
+  .update-note {
+    padding: 0 12px 8px;
+    color: var(--md-on-surface-variant);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
   .update-spinner {
     animation: spin 1s linear infinite;
   }
@@ -3501,8 +3975,46 @@
     transition: transform 0.24s cubic-bezier(0.2, 0, 0, 1);
   }
 
+  .provider-effect-option {
+    gap: 8px;
+  }
+
+  .provider-icon-img {
+    position: relative;
+    z-index: 1;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    object-fit: contain;
+    flex: 0 0 auto;
+    background: color-mix(in srgb, var(--md-surface-container-highest) 86%, transparent);
+  }
+
+  .ai-api-key-input {
+    display: block;
+    box-sizing: border-box;
+    width: calc(100% - 20px);
+    max-width: calc(100% - 20px);
+    min-width: 0;
+    margin: 8px 10px 4px;
+  }
+
+  .ai-settings-actions {
+    align-items: center;
+    padding-top: 8px;
+  }
+
+  .ai-settings-link {
+    min-height: 40px;
+    padding: 0 18px;
+    border-radius: var(--md-shape-full);
+    font-size: 13px;
+    font-weight: 800;
+    text-decoration: none;
+  }
+
   .effect-option:hover .effect-option-label {
-    transform: translateY(-1px);
+    transform: none;
   }
 
   .effect-option:active {
@@ -3639,8 +4151,7 @@
   }
 
   .app-shell-page .app-header {
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--md-surface) 96%, transparent), color-mix(in srgb, var(--md-surface-container-low) 92%, transparent));
+    background: var(--md-surface);
     backdrop-filter: blur(18px);
   }
 
@@ -3852,9 +4363,32 @@
     transition: color 0.15s ease;
   }
 
+  .about-creator a:visited {
+    color: var(--md-primary);
+  }
+
   .about-creator a:hover {
     text-decoration: underline;
     color: var(--md-on-surface);
+  }
+
+  .footer-link {
+    color: var(--md-primary);
+    text-decoration: none;
+    font-weight: 500;
+    transition:
+      color 0.15s ease,
+      transform 0.15s ease,
+      opacity 0.15s ease;
+  }
+
+  .footer-link:visited {
+    color: var(--md-primary);
+  }
+
+  .footer-link:hover {
+    color: color-mix(in oklab, var(--md-primary), white 18%);
+    text-decoration: underline;
   }
 
   .app-footer .footer-link {
@@ -3948,6 +4482,21 @@
     flex-wrap: wrap;
   }
 
+  .developer-log-viewer {
+    width: 100%;
+    min-height: 180px;
+    max-height: 320px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--md-shape-md);
+    background: var(--md-surface-container-lowest);
+    color: var(--md-on-surface);
+    font: 500 11px/1.45 "SFMono-Regular", Consolas, monospace;
+    resize: vertical;
+    white-space: pre;
+  }
+
   .data-divider {
     height: 1px;
     background: var(--md-outline-variant);
@@ -4006,7 +4555,7 @@
   }
 
   .action-btn:hover > * {
-    transform: translateY(-1px);
+    transform: none;
   }
 
   .action-btn:active {
@@ -4190,11 +4739,11 @@
     padding: 7px 11px;
   }
 
-  .profile-name-input::placeholder {
-    color: var(--md-outline);
-  }
+	  .profile-name-input::placeholder {
+	    color: var(--md-outline);
+	  }
 
-  /* --- Inline Confirmations --- */
+		  /* --- Inline Confirmations --- */
 
   .inline-confirm {
     margin: 8px 10px 10px;
@@ -4249,10 +4798,13 @@
   }
 
   .sheet-card {
+    --sheet-card-radius: 32px;
+    --sheet-content-inset: 22px;
+    --sheet-inner-radius: calc(var(--sheet-card-radius) - var(--sheet-content-inset));
     width: min(720px, 100%);
     max-height: calc(100vh - 48px);
     overflow: auto;
-    border-radius: 32px;
+    border-radius: var(--sheet-card-radius);
     background: var(--md-surface);
     color: var(--md-on-surface);
     border: 1px solid color-mix(in srgb, var(--md-outline-variant) 72%, transparent);
@@ -4318,7 +4870,7 @@
     gap: 12px;
     min-height: 220px;
     padding: 24px;
-    border-radius: 28px;
+    border-radius: var(--sheet-inner-radius);
     background: var(--md-surface-container-low);
     border: 1px dashed color-mix(in srgb, var(--md-outline-variant) 80%, transparent);
     text-align: center;
@@ -4352,7 +4904,7 @@
     max-width: min(100%, 340px);
     max-height: 84px;
     object-fit: contain;
-    border-radius: 14px;
+    border-radius: calc(var(--sheet-inner-radius) - 2px);
   }
 
   .sheet-file-input {
@@ -4461,9 +5013,11 @@
     }
 
     .sheet-card {
+      --sheet-card-radius: 28px;
+      --sheet-content-inset: 16px;
       width: 100%;
       max-height: min(88vh, 760px);
-      border-radius: 28px 28px 0 0;
+      border-radius: var(--sheet-card-radius) var(--sheet-card-radius) 0 0;
     }
 
     .sheet-header,

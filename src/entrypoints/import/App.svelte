@@ -115,8 +115,19 @@
     const current = await loadSettings();
     const newProfile: CustomProfile = { name, settings: parsed.settings };
     const profiles = [...(current.customProfiles || []), newProfile];
-    await saveSettings({ customProfiles: profiles });
-    showToast(t('profileSaved'));
+    const resetData = { ...DEFAULT_SETTINGS };
+    delete (resetData as any).language;
+    delete (resetData as any).customProfiles;
+    delete (resetData as any).activeProfile;
+    delete (resetData as any).betaStandalonePage;
+    delete (resetData as any).developerEnabled;
+    await saveSettings({
+      ...resetData,
+      ...parsed.settings,
+      customProfiles: profiles,
+      activeProfile: 'custom:' + name,
+    });
+    showToast(t('profileApplied'));
     pendingProfileText = '';
     pendingProfileFileName = '';
     profileNameInput = '';

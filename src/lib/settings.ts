@@ -56,21 +56,47 @@ export interface Settings {
   hideFilterBar: boolean;
   disableAvatarLiveRedirect: boolean;
   language: string;
-  // v0.5.0
+  // Playback and watch tools
   playbackSpeed: number;
+  autoSkipAds: boolean;
   defaultQuality: string;
   watchTimerEnabled: boolean;
   watchTimeLimitMinutes: number;
   activeProfile: string;
   downloadThumbnailButton: boolean;
+  downloadChannelAssets: boolean;
+  showChannelStatsLinks: boolean;
+  betaChannelTvBannerLookup: boolean;
+  aiVideoChatEnabled: boolean;
+  aiVideoChatApiKey: string;
+  aiVideoChatProvider: 'openrouter' | 'openai' | 'anthropic' | 'perplexity';
+  aiVideoChatCustomEndpoint: string;
+  aiVideoChatModel: string;
+  aiVideoChatCustomModel: string;
+  aiVideoChatSystemPreset: 'balanced' | 'concise' | 'deep' | 'custom';
+  aiVideoChatCustomSystemPrompt: string;
+  aiVideoChatTemperature: number;
+  aiVideoChatSavedPrompts: Array<{ name: string; prompt: string }>;
+  aiVideoChatAutoOpen: boolean;
+  aiVideoChatUseWeb: boolean;
+  aiVideoChatUseChannelContext: boolean;
+  aiVideoChatDeepLinkInspection: boolean;
+  aiVideoChatMaxWebSnippets: number;
+  aiVideoChatMaxYouTubeLinks: number;
+  aiVideoChatResponseLanguage: 'auto' | 'en' | 'ru' | 'es' | 'pt' | 'fr' | 'de' | 'tr' | 'ja' | 'uk' | 'zh' | 'ko' | 'it' | 'pl' | 'nl';
+  aiVideoChatAdultMode: 'hide' | 'brief' | 'allow';
+  aiVideoChatMaxTokens: number;
+  aiVideoChatReasoningDepth: 'fast' | 'balanced' | 'deep';
   watchTimeLimitBlockRepeat: boolean;
   customProfiles: CustomProfile[];
   betaEnabled: boolean;
   betaStandalonePage: boolean;
   betaHomepageRevealAnimation: boolean;
+  betaStableDescriptionColors: boolean;
   betaVideoFrameScreenshot: boolean;
   betaScreenshotInstantDownload: boolean;
   developerEnabled: boolean;
+  extensionLogEnabled: boolean;
   interfaceThemeMode: 'auto' | 'dark' | 'light';
   interfaceThemeHue: number;
   interfaceThemeColor: string;
@@ -131,21 +157,47 @@ export const DEFAULT_SETTINGS: Settings = {
   hideFilterBar: false,
   disableAvatarLiveRedirect: false,
   language: 'auto',
-  // v0.5.0
+  // Playback and watch tools
   playbackSpeed: 0,
+  autoSkipAds: false,
   defaultQuality: 'auto',
   watchTimerEnabled: false,
   watchTimeLimitMinutes: 0,
   activeProfile: 'none',
   downloadThumbnailButton: false,
+  downloadChannelAssets: false,
+  showChannelStatsLinks: false,
+  betaChannelTvBannerLookup: true,
+  aiVideoChatEnabled: false,
+  aiVideoChatApiKey: '',
+  aiVideoChatProvider: 'openrouter',
+  aiVideoChatCustomEndpoint: '',
+  aiVideoChatModel: 'openrouter/free',
+  aiVideoChatCustomModel: '',
+  aiVideoChatSystemPreset: 'balanced',
+  aiVideoChatCustomSystemPrompt: '',
+  aiVideoChatTemperature: 0.2,
+  aiVideoChatSavedPrompts: [],
+  aiVideoChatAutoOpen: true,
+  aiVideoChatUseWeb: true,
+  aiVideoChatUseChannelContext: true,
+  aiVideoChatDeepLinkInspection: true,
+  aiVideoChatMaxWebSnippets: 8,
+  aiVideoChatMaxYouTubeLinks: 8,
+  aiVideoChatResponseLanguage: 'auto',
+  aiVideoChatAdultMode: 'brief',
+  aiVideoChatMaxTokens: 700,
+  aiVideoChatReasoningDepth: 'balanced',
   watchTimeLimitBlockRepeat: true,
   customProfiles: [],
   betaEnabled: false,
   betaStandalonePage: true,
   betaHomepageRevealAnimation: false,
+  betaStableDescriptionColors: false,
   betaVideoFrameScreenshot: false,
   betaScreenshotInstantDownload: false,
   developerEnabled: false,
+  extensionLogEnabled: false,
   interfaceThemeMode: 'auto',
   interfaceThemeHue: 248,
   interfaceThemeColor: '#c8bfff',
@@ -158,6 +210,7 @@ const VALID_BANNER_STYLES = ['none', 'sharp'];
 const VALID_QUALITIES = ['auto', '144p', '240p', '360p', '480p', '720p', '1080p', '1440p', '2160p', '4320p'];
 const VALID_INTERFACE_THEME_MODES = ['auto', 'dark', 'light'];
 const VALID_LOGO_VARIANTS = ['youtube', 'rewind', 'custom'];
+const VALID_AI_RESPONSE_LANGUAGES = ['auto', 'en', 'ru', 'es', 'pt', 'fr', 'de', 'tr', 'ja', 'uk', 'zh', 'ko', 'it', 'pl', 'nl'];
 const HEX_COLOR_RE = /^#([0-9a-f]{6})$/i;
 
 export const QUALITY_MAP: Record<string, number> = {
@@ -362,6 +415,9 @@ function normalizeSettings(input: Partial<Settings> = {}): Settings {
   if (!VALID_QUALITIES.includes(normalized.defaultQuality)) {
     normalized.defaultQuality = 'auto';
   }
+  if (typeof normalized.autoSkipAds !== 'boolean') {
+    normalized.autoSkipAds = DEFAULT_SETTINGS.autoSkipAds;
+  }
   if (!VALID_INTERFACE_THEME_MODES.includes(normalized.interfaceThemeMode)) {
     normalized.interfaceThemeMode = 'auto';
   }
@@ -375,10 +431,90 @@ function normalizeSettings(input: Partial<Settings> = {}): Settings {
   if (!Array.isArray(normalized.customProfiles)) {
     normalized.customProfiles = [];
   }
+  if (typeof normalized.betaChannelTvBannerLookup !== 'boolean') {
+    normalized.betaChannelTvBannerLookup = DEFAULT_SETTINGS.betaChannelTvBannerLookup;
+  }
+  if (typeof normalized.betaStableDescriptionColors !== 'boolean') {
+    normalized.betaStableDescriptionColors = DEFAULT_SETTINGS.betaStableDescriptionColors;
+  }
+  if (typeof normalized.aiVideoChatEnabled !== 'boolean') {
+    normalized.aiVideoChatEnabled = DEFAULT_SETTINGS.aiVideoChatEnabled;
+  }
+  if (typeof normalized.aiVideoChatApiKey !== 'string') {
+    normalized.aiVideoChatApiKey = DEFAULT_SETTINGS.aiVideoChatApiKey;
+  }
+  if (!['openrouter', 'openai', 'anthropic', 'perplexity'].includes(normalized.aiVideoChatProvider)) {
+    normalized.aiVideoChatProvider = DEFAULT_SETTINGS.aiVideoChatProvider;
+  }
+  if (typeof normalized.aiVideoChatCustomEndpoint !== 'string') {
+    normalized.aiVideoChatCustomEndpoint = DEFAULT_SETTINGS.aiVideoChatCustomEndpoint;
+  }
+  if (typeof normalized.aiVideoChatModel !== 'string' || !normalized.aiVideoChatModel.trim()) {
+    normalized.aiVideoChatModel = DEFAULT_SETTINGS.aiVideoChatModel;
+  }
+  if (typeof normalized.aiVideoChatCustomModel !== 'string') {
+    normalized.aiVideoChatCustomModel = DEFAULT_SETTINGS.aiVideoChatCustomModel;
+  }
+  if (!['balanced', 'concise', 'deep', 'custom'].includes(normalized.aiVideoChatSystemPreset)) {
+    normalized.aiVideoChatSystemPreset = DEFAULT_SETTINGS.aiVideoChatSystemPreset;
+  }
+  if (typeof normalized.aiVideoChatCustomSystemPrompt !== 'string') {
+    normalized.aiVideoChatCustomSystemPrompt = DEFAULT_SETTINGS.aiVideoChatCustomSystemPrompt;
+  }
+  if (!Number.isFinite(normalized.aiVideoChatTemperature)) {
+    normalized.aiVideoChatTemperature = DEFAULT_SETTINGS.aiVideoChatTemperature;
+  }
+  normalized.aiVideoChatTemperature = Math.min(2, Math.max(0, Math.round(normalized.aiVideoChatTemperature * 100) / 100));
+  if (!Array.isArray(normalized.aiVideoChatSavedPrompts)) {
+    normalized.aiVideoChatSavedPrompts = DEFAULT_SETTINGS.aiVideoChatSavedPrompts;
+  } else {
+    normalized.aiVideoChatSavedPrompts = normalized.aiVideoChatSavedPrompts
+      .filter((entry) => entry && typeof entry.name === 'string' && typeof entry.prompt === 'string')
+      .map((entry) => ({
+        name: entry.name.trim().slice(0, 80),
+        prompt: entry.prompt.trim().slice(0, 6000),
+      }))
+      .filter((entry) => entry.name && entry.prompt)
+      .slice(0, 12);
+  }
+  if (typeof normalized.aiVideoChatAutoOpen !== 'boolean') {
+    normalized.aiVideoChatAutoOpen = DEFAULT_SETTINGS.aiVideoChatAutoOpen;
+  }
+  if (typeof normalized.aiVideoChatUseWeb !== 'boolean') {
+    normalized.aiVideoChatUseWeb = DEFAULT_SETTINGS.aiVideoChatUseWeb;
+  }
+  if (typeof normalized.aiVideoChatUseChannelContext !== 'boolean') {
+    normalized.aiVideoChatUseChannelContext = DEFAULT_SETTINGS.aiVideoChatUseChannelContext;
+  }
+  if (typeof normalized.aiVideoChatDeepLinkInspection !== 'boolean') {
+    normalized.aiVideoChatDeepLinkInspection = DEFAULT_SETTINGS.aiVideoChatDeepLinkInspection;
+  }
+  if (!Number.isFinite(normalized.aiVideoChatMaxWebSnippets)) {
+    normalized.aiVideoChatMaxWebSnippets = DEFAULT_SETTINGS.aiVideoChatMaxWebSnippets;
+  }
+  normalized.aiVideoChatMaxWebSnippets = Math.min(12, Math.max(2, Math.round(normalized.aiVideoChatMaxWebSnippets)));
+  if (!Number.isFinite(normalized.aiVideoChatMaxYouTubeLinks)) {
+    normalized.aiVideoChatMaxYouTubeLinks = DEFAULT_SETTINGS.aiVideoChatMaxYouTubeLinks;
+  }
+  normalized.aiVideoChatMaxYouTubeLinks = Math.min(12, Math.max(2, Math.round(normalized.aiVideoChatMaxYouTubeLinks)));
+  if (!VALID_AI_RESPONSE_LANGUAGES.includes(normalized.aiVideoChatResponseLanguage)) {
+    normalized.aiVideoChatResponseLanguage = DEFAULT_SETTINGS.aiVideoChatResponseLanguage;
+  }
+  if (!['hide', 'brief', 'allow'].includes(normalized.aiVideoChatAdultMode)) {
+    normalized.aiVideoChatAdultMode = DEFAULT_SETTINGS.aiVideoChatAdultMode;
+  }
+  if (!Number.isFinite(normalized.aiVideoChatMaxTokens)) {
+    normalized.aiVideoChatMaxTokens = DEFAULT_SETTINGS.aiVideoChatMaxTokens;
+  }
+  normalized.aiVideoChatMaxTokens = Math.min(1600, Math.max(300, Math.round(normalized.aiVideoChatMaxTokens)));
+  if (!['fast', 'balanced', 'deep'].includes(normalized.aiVideoChatReasoningDepth)) {
+    normalized.aiVideoChatReasoningDepth = DEFAULT_SETTINGS.aiVideoChatReasoningDepth;
+  }
   normalized.thumbnailShape = normalizeThumbnailShape(normalized.thumbnailShape);
   normalized.customProfiles = normalized.customProfiles.map((profile) => {
     const profileSettings = { ...(profile?.settings || {}) } as Partial<Settings> & Record<string, unknown>;
     delete profileSettings.developerEnabled;
+    delete profileSettings.extensionLogEnabled;
     delete profileSettings.betaStandalonePage;
     profileSettings.thumbnailShape = normalizeThumbnailShape(profileSettings.thumbnailShape);
     if (typeof profileSettings.betaScreenshotInstantDownload !== 'boolean' && typeof profileSettings.betaScreenshotOpenPreview === 'boolean') {
@@ -402,6 +538,67 @@ function normalizeSettings(input: Partial<Settings> = {}): Settings {
     }
     if (typeof profileSettings.interfaceThemeColor === 'string') {
       profileSettings.interfaceThemeHue = hueFromHex(profileSettings.interfaceThemeColor, profileSettings.interfaceThemeHue);
+    }
+    if (typeof profileSettings.betaChannelTvBannerLookup !== 'boolean') {
+      delete profileSettings.betaChannelTvBannerLookup;
+    }
+    if (typeof profileSettings.betaStableDescriptionColors !== 'boolean') {
+      delete profileSettings.betaStableDescriptionColors;
+    }
+    if (typeof profileSettings.autoSkipAds !== 'boolean') {
+      delete profileSettings.autoSkipAds;
+    }
+    if (typeof profileSettings.aiVideoChatEnabled !== 'boolean') {
+      delete profileSettings.aiVideoChatEnabled;
+    }
+    if (typeof profileSettings.aiVideoChatApiKey !== 'string') {
+      delete profileSettings.aiVideoChatApiKey;
+    }
+    if (!['openrouter', 'openai', 'anthropic', 'perplexity'].includes(profileSettings.aiVideoChatProvider)) {
+      delete profileSettings.aiVideoChatProvider;
+    }
+    if (typeof profileSettings.aiVideoChatModel !== 'string' || !profileSettings.aiVideoChatModel.trim()) {
+      delete profileSettings.aiVideoChatModel;
+    }
+    if (typeof profileSettings.aiVideoChatCustomModel !== 'string') {
+      delete profileSettings.aiVideoChatCustomModel;
+    }
+    if (!['balanced', 'concise', 'deep', 'custom'].includes(profileSettings.aiVideoChatSystemPreset)) {
+      delete profileSettings.aiVideoChatSystemPreset;
+    }
+    if (typeof profileSettings.aiVideoChatCustomSystemPrompt !== 'string') {
+      delete profileSettings.aiVideoChatCustomSystemPrompt;
+    }
+    if (!Number.isFinite(profileSettings.aiVideoChatTemperature)) {
+      delete profileSettings.aiVideoChatTemperature;
+    } else {
+      profileSettings.aiVideoChatTemperature = Math.min(2, Math.max(0, Math.round(profileSettings.aiVideoChatTemperature * 100) / 100));
+    }
+    if (!Array.isArray(profileSettings.aiVideoChatSavedPrompts)) {
+      delete profileSettings.aiVideoChatSavedPrompts;
+    } else {
+      profileSettings.aiVideoChatSavedPrompts = profileSettings.aiVideoChatSavedPrompts
+        .filter((entry) => entry && typeof entry.name === 'string' && typeof entry.prompt === 'string')
+        .map((entry) => ({
+          name: entry.name.trim().slice(0, 80),
+          prompt: entry.prompt.trim().slice(0, 6000),
+        }))
+        .filter((entry) => entry.name && entry.prompt)
+        .slice(0, 12);
+    }
+    if (!VALID_AI_RESPONSE_LANGUAGES.includes(profileSettings.aiVideoChatResponseLanguage as string)) {
+      delete profileSettings.aiVideoChatResponseLanguage;
+    }
+    if (!['hide', 'brief', 'allow'].includes(profileSettings.aiVideoChatAdultMode as string)) {
+      delete profileSettings.aiVideoChatAdultMode;
+    }
+    if (!Number.isFinite(profileSettings.aiVideoChatMaxTokens)) {
+      delete profileSettings.aiVideoChatMaxTokens;
+    } else {
+      profileSettings.aiVideoChatMaxTokens = Math.min(1600, Math.max(300, Math.round(profileSettings.aiVideoChatMaxTokens)));
+    }
+    if (!['fast', 'balanced', 'deep'].includes(profileSettings.aiVideoChatReasoningDepth as string)) {
+      delete profileSettings.aiVideoChatReasoningDepth;
     }
     for (const key of legacyKeysToDelete) {
       delete profileSettings[key];
@@ -432,6 +629,7 @@ function normalizeSettings(input: Partial<Settings> = {}): Settings {
   if (!normalized.betaEnabled) {
     normalized.disableAvatarLiveRedirect = false;
     normalized.betaHomepageRevealAnimation = false;
+    normalized.betaStableDescriptionColors = false;
     normalized.defaultQuality = 'auto';
   }
   if (!normalized.betaVideoFrameScreenshot) {
@@ -439,6 +637,12 @@ function normalizeSettings(input: Partial<Settings> = {}): Settings {
   }
   if (typeof normalized.developerEnabled !== 'boolean') {
     normalized.developerEnabled = DEFAULT_SETTINGS.developerEnabled;
+  }
+  if (typeof normalized.extensionLogEnabled !== 'boolean') {
+    normalized.extensionLogEnabled = DEFAULT_SETTINGS.extensionLogEnabled;
+  }
+  if (!normalized.developerEnabled) {
+    normalized.extensionLogEnabled = false;
   }
   for (const key of legacyKeysToDelete) {
     delete normalized[key];

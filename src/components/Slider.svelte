@@ -275,11 +275,13 @@
     font-family: inherit;
     color: var(--md-primary);
     background: var(--md-surface-container);
-    border: 1px solid var(--md-primary);
+    border: 0;
+    border-bottom: 1px dashed var(--md-primary);
     border-radius: var(--md-shape-xs);
     padding: 2px 6px;
     text-align: right;
     outline: none;
+    box-shadow: none;
     animation: inputPop 0.15s cubic-bezier(0.18, 0.89, 0.32, 1.28) both;
   }
 
