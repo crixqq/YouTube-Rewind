@@ -5,6 +5,10 @@ const DEFAULT_SETTINGS = {
   interfaceThemeColor: '#c8bfff',
   aiVideoChatProvider: 'openrouter',
   aiVideoChatApiKey: '',
+  aiVideoChatOpenRouterApiKey: '',
+  aiVideoChatOpenAiApiKey: '',
+  aiVideoChatAnthropicApiKey: '',
+  aiVideoChatPerplexityApiKey: '',
   aiVideoChatModel: 'openrouter/free',
   aiVideoChatCustomModel: '',
   aiVideoChatSystemPreset: 'balanced',
@@ -21,6 +25,10 @@ const DEFAULT_SETTINGS = {
   aiVideoChatAdultMode: 'brief',
   aiVideoChatMaxTokens: 700,
   aiVideoChatReasoningDepth: 'balanced',
+  activeProfile: 'none',
+  customProfiles: [],
+  developerEnabled: false,
+  extensionLogEnabled: false,
 };
 
 const MODEL_PRESETS_BY_PROVIDER = {
@@ -132,6 +140,16 @@ const I18N = {
     deleteStyle: 'Delete style',
     resetPrompt: 'Reset prompt',
     sectionBehavior: 'Behavior',
+    sectionProfiles: 'Profiles',
+    profileDefault: 'Default',
+    profileCustom: 'Custom',
+    profileFocus: 'Focus',
+    profileMinimal: 'Minimal',
+    profileClean: 'Clean',
+    sectionDeveloper: 'Developer',
+    developerEnabled: 'Enable developer tools',
+    extensionLogs: 'Record extension logs',
+    openFullSettings: 'Open full settings',
     autoOpenTitle: 'Open assistant automatically',
     autoOpenDescription: 'Show the chat panel on watch pages when the feature is enabled.',
     useWebTitle: 'Use web search',
@@ -150,7 +168,7 @@ const I18N = {
     promptDeleted: 'Style deleted',
     promptRequired: 'Name and prompt are required',
     newStyleName: 'New style name',
-    aboutDescription: "Hide clutter, filter content and refresh YouTube's look.",
+    aboutDescription: "Customize YouTube and add practical tools for viewers and creators.",
     aboutTelegram: 'Telegram',
     aboutFirefox: 'Firefox Add-ons',
     aboutChrome: 'Chrome Web Store',
@@ -196,6 +214,16 @@ const I18N = {
     deleteStyle: 'Удалить стиль',
     resetPrompt: 'Сбросить промпт',
     sectionBehavior: 'Поведение',
+    sectionProfiles: 'Профили',
+    profileDefault: 'Default',
+    profileCustom: 'Свой',
+    profileFocus: 'Фокус',
+    profileMinimal: 'Минимальный',
+    profileClean: 'Чистый',
+    sectionDeveloper: 'Разработчик',
+    developerEnabled: 'Включить инструменты разработчика',
+    extensionLogs: 'Записывать логи расширения',
+    openFullSettings: 'Открыть полные настройки',
     autoOpenTitle: 'Открывать ассистента автоматически',
     autoOpenDescription: 'Показывать чат на страницах видео, когда функция включена.',
     useWebTitle: 'Использовать веб-поиск',
@@ -214,7 +242,7 @@ const I18N = {
     promptDeleted: 'Стиль удалён',
     promptRequired: 'Нужны название и промпт',
     newStyleName: 'Новое название стиля',
-    aboutDescription: 'Убирай лишнее, фильтруй контент и освежай внешний вид YouTube.',
+    aboutDescription: 'Кастомизирует YouTube и добавляет полезные инструменты для зрителей и авторов.',
     aboutTelegram: 'Telegram',
     aboutFirefox: 'Firefox Add-ons',
     aboutChrome: 'Chrome Web Store',
@@ -237,6 +265,18 @@ function t(key, params = {}) {
     value = value.replaceAll(`{${name}}`, String(replacement));
   });
   return value;
+}
+
+function getProviderApiKeySetting(provider = DEFAULT_SETTINGS.aiVideoChatProvider) {
+  if (provider === 'openai') return 'aiVideoChatOpenAiApiKey';
+  if (provider === 'anthropic') return 'aiVideoChatAnthropicApiKey';
+  if (provider === 'perplexity') return 'aiVideoChatPerplexityApiKey';
+  return 'aiVideoChatOpenRouterApiKey';
+}
+
+function getProviderApiKey(settings = {}, provider = settings.aiVideoChatProvider || DEFAULT_SETTINGS.aiVideoChatProvider) {
+  const key = getProviderApiKeySetting(provider);
+  return String(settings[key] || (provider === 'openrouter' ? settings.aiVideoChatApiKey || '' : ''));
 }
 
 const BASE_SYSTEM_PROMPT = 'You are an assistant for a specific YouTube video. Write naturally and keep conversation context. Think like a careful web researcher: when the user asks for people, socials, sources, originals, conflicts, slang, memes, music formats, or claims, do multi-step context work before answering. Use the current video title, channel, description, links, comments, linked YouTube videos, YouTube/Gemini summary when present, channel information, web snippets, and recent messages before making assumptions. For web research, do not send the user question verbatim: extract entities, roles, video/channel names, and create short precise search queries. First resolve who the user means: current uploader, clipper/reuploader, streamer/reactor, person from the original video, brand, advertiser, or another named participant. Never substitute the requested person with uploader/channel socials. If the user asks for socials of a streamer/person from the original/reaction source, do not include clipper/uploader socials in the answer except in a separate clearly labeled "uploader/clipper" note when useful. If the description separates sections such as creator/uploader, streamer, original, author, ad, merch, announcements, or donations, preserve those groups and do not merge them. If the current video is a reaction/clip/reupload and the user asks about someone from the reacted-to/original video, inspect original/source links from the description first; keep the original video link as a labeled Markdown link such as [video title](https://youtube.com/watch?v=...) when useful. If no original link is present, search for the original using the title, description, and source phrases. Use Markdown links as [channel/video/page name](https://example.com), never bare URLs when a label exists, and never add spaces inside URLs. For YouTube links from the description, use the visible chip/text/title as the link label instead of printing a separate URL. Use tables only when the user asks for a table/comparison; otherwise use short grouped bullets or paragraphs. Do not write file-style Markdown headings like ### Title. If the user asks for socials, contacts, or description links, copy service names, labels, handles, and URLs exactly from the description: do not translate Telegram, Twitch, Boosty, TikTok, Discord, VK, Rutube, or @handles. Separate personal/creator socials from advertising, marketplaces, stream platforms, donations, stores, merch, announcements, and generic services. A link is a creator social only when the label/domain/content clearly belongs to that person/channel. Generic links like w.tv, stores, donations, or ad services are not personal socials unless ownership is explicit. Verify slang, memes, music formats, covers, originals, people, organizations, and news against fresh context. Type beat usually means an instrumental in the style of named artists, not necessarily produced by them. VTuber/Витубер is usually a streamer type with a virtual avatar, not a proper name unless context proves otherwise. Viewer comments are questions/opinions, not facts about the video: do not turn one comment into an event or personal story unless sources confirm it. Do not invent facts; say when something is inferred from title/description rather than proven by sources. Ignore sponsorships unless the user asks about ads. If timestamps are present, use them as an outline but do not list every timestamp unless asked for chapters. If this is a reaction, clip, cover, or reupload, briefly name the format and source, but make the main answer about the video content and user request rather than originality.';
@@ -621,19 +661,49 @@ function renderLanguageMenu() {
 }
 
 function populateResponseLanguageSelect(selectedLanguage = DEFAULT_SETTINGS.aiVideoChatResponseLanguage) {
-  const select = document.querySelector('[data-setting="aiVideoChatResponseLanguage"]');
-  if (!(select instanceof HTMLSelectElement)) return;
+  const input = document.querySelector('[data-setting="aiVideoChatResponseLanguage"]');
+  const button = document.querySelector('[data-role="response-language-button"]');
+  const menu = document.querySelector('[data-role="response-language-menu"]');
+  if (!(input instanceof HTMLInputElement) || !(button instanceof HTMLButtonElement) || !(menu instanceof HTMLElement)) return;
   const normalized = RESPONSE_LANGUAGES.some(([id]) => id === selectedLanguage)
     ? selectedLanguage
     : DEFAULT_SETTINGS.aiVideoChatResponseLanguage;
-  select.replaceChildren();
+  input.value = normalized;
+  button.textContent = normalized === 'auto' ? t('responseLanguageAuto') : getLanguageDisplayName(normalized);
+  button.setAttribute('aria-expanded', String(!menu.hidden));
+  menu.replaceChildren();
   RESPONSE_LANGUAGES.forEach(([id]) => {
-    const option = document.createElement('option');
-    option.value = id;
-    option.textContent = id === 'auto' ? t('responseLanguageAuto') : getLanguageDisplayName(id);
-    select.appendChild(option);
+    const item = document.createElement('button');
+    item.className = 'lang-menu-item';
+    if (normalized === id) item.classList.add('active');
+    item.type = 'button';
+    item.setAttribute('role', 'menuitem');
+    item.innerHTML = `
+      <span class="lang-menu-item-copy">
+        <span class="lang-menu-item-label"></span>
+        <span class="lang-menu-item-note"></span>
+      </span>
+      ${normalized === id ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
+    `;
+    const label = item.querySelector('.lang-menu-item-label');
+    if (label instanceof HTMLElement) {
+      label.textContent = id === 'auto' ? t('responseLanguageAuto') : getLanguageDisplayName(id, false);
+    }
+    const note = item.querySelector('.lang-menu-item-note');
+    if (note instanceof HTMLElement) {
+      const localized = id === 'auto' ? '' : getLanguageLocalizedLabel(id);
+      note.textContent = localized;
+      note.hidden = !localized;
+    }
+    item.addEventListener('click', () => {
+      input.value = id;
+      menu.hidden = true;
+      button.setAttribute('aria-expanded', 'false');
+      populateResponseLanguageSelect(id);
+      scheduleAutoSave();
+    });
+    menu.appendChild(item);
   });
-  select.value = normalized;
 }
 
 async function selectLanguage(language) {
@@ -915,11 +985,20 @@ function syncAiSettingsForm(settings = {}, options = {}) {
   populateResponseLanguageSelect(merged.aiVideoChatResponseLanguage || DEFAULT_SETTINGS.aiVideoChatResponseLanguage);
   setChoiceValue('aiVideoChatAdultMode', merged.aiVideoChatAdultMode || DEFAULT_SETTINGS.aiVideoChatAdultMode);
   setChoiceValue('aiVideoChatReasoningDepth', merged.aiVideoChatReasoningDepth || DEFAULT_SETTINGS.aiVideoChatReasoningDepth);
+  setChoiceValue('activeProfile', merged.activeProfile || DEFAULT_SETTINGS.activeProfile);
 
   document.querySelectorAll('[data-setting]').forEach((field) => {
     const key = field.dataset.setting;
     if (!key) return;
     if (key === 'aiVideoChatCustomSystemPrompt') return;
+    if (key === 'aiVideoChatApiKey') {
+      field.value = getProviderApiKey(merged, provider);
+      return;
+    }
+    if (field instanceof HTMLInputElement && field.type === 'hidden') {
+      field.value = String(merged[key] ?? DEFAULT_SETTINGS[key] ?? '');
+      return;
+    }
     if (field instanceof HTMLInputElement && field.type === 'checkbox') {
       field.checked = Boolean(merged[key]);
       field.closest('.toggle-track')?.classList.toggle('active', field.checked);
@@ -969,10 +1048,15 @@ function collectAiSettingsFormPatch() {
     }
   });
   patch.aiVideoChatProvider = getChoiceValue('aiVideoChatProvider', DEFAULT_SETTINGS.aiVideoChatProvider);
+  const activeKeyField = document.querySelector('[data-setting="aiVideoChatApiKey"]');
+  const activeKey = activeKeyField instanceof HTMLInputElement ? activeKeyField.value : '';
+  patch.aiVideoChatApiKey = activeKey;
+  patch[getProviderApiKeySetting(patch.aiVideoChatProvider)] = activeKey;
   patch.aiVideoChatModel = getChoiceValue('aiVideoChatModel', DEFAULT_SETTINGS.aiVideoChatModel);
   patch.aiVideoChatSystemPreset = getChoiceValue('aiVideoChatSystemPreset', activeSavedPromptName ? 'custom' : DEFAULT_SETTINGS.aiVideoChatSystemPreset) || 'custom';
   patch.aiVideoChatAdultMode = getChoiceValue('aiVideoChatAdultMode', DEFAULT_SETTINGS.aiVideoChatAdultMode);
   patch.aiVideoChatReasoningDepth = getChoiceValue('aiVideoChatReasoningDepth', DEFAULT_SETTINGS.aiVideoChatReasoningDepth);
+  patch.activeProfile = getChoiceValue('activeProfile', DEFAULT_SETTINGS.activeProfile);
   return patch;
 }
 
@@ -1013,7 +1097,7 @@ function scheduleAutoSave(delay = 250) {
 
 function getProviderGuide(provider) {
   const guideJumps = PROVIDERS
-    .map(([id, label, iconClass]) => `<button class="provider-guide-jump" type="button" data-provider-guide-jump="${id}"><span class="provider-icon ${iconClass}" aria-hidden="true"></span><span>${label}</span></button>`)
+    .map(([id, label, iconClass]) => `<button class="provider-guide-jump${id === provider ? ' is-selected' : ''}" type="button" data-provider-guide-jump="${id}" aria-pressed="${id === provider ? 'true' : 'false'}"><span class="provider-icon ${iconClass}" aria-hidden="true"></span><span>${label}</span></button>`)
     .join('');
   const otherGuides = `<div class="provider-guide-jumps">${guideJumps}</div>`;
   const guides = {
@@ -1055,6 +1139,28 @@ function updateProviderGuideLink(provider) {
     perplexity: isRuLocale ? 'Как получить ключ Perplexity' : 'How to get a Perplexity key',
   };
   link.textContent = labels[provider] || labels.openrouter;
+}
+
+function getModelIconDomain(modelId = '') {
+  const normalized = String(modelId || '').toLowerCase();
+  if (normalized.includes('openai') || normalized.startsWith('gpt-')) return MODEL_ICON_DOMAINS.openai;
+  if (normalized.includes('claude') || normalized.includes('anthropic')) return MODEL_ICON_DOMAINS.anthropic;
+  if (normalized.includes('perplexity') || normalized.includes('sonar')) return MODEL_ICON_DOMAINS.perplexity;
+  if (normalized.includes('qwen')) return MODEL_ICON_DOMAINS.qwen;
+  if (normalized.includes('google') || normalized.includes('gemma')) return MODEL_ICON_DOMAINS.google;
+  return MODEL_ICON_DOMAINS.openrouter;
+}
+
+function updateCustomModelIcon() {
+  const icon = document.querySelector('[data-role="custom-model-icon"]');
+  if (!(icon instanceof HTMLImageElement)) return;
+  const provider = getChoiceValue('aiVideoChatProvider', DEFAULT_SETTINGS.aiVideoChatProvider);
+  const modelChoice = getChoiceValue('aiVideoChatModel', DEFAULT_SETTINGS.aiVideoChatModel);
+  const customModelInput = document.querySelector('[data-setting="aiVideoChatCustomModel"]');
+  const customModel = customModelInput instanceof HTMLInputElement ? customModelInput.value : '';
+  const domain = getModelIconDomain(modelChoice === 'custom' ? customModel : modelChoice || provider);
+  icon.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
+  icon.hidden = false;
 }
 
 function openProviderGuide(provider) {
@@ -1129,9 +1235,10 @@ function bindAiSettingsForm() {
   document.querySelectorAll('[data-choice-group="aiVideoChatProvider"] [data-value]').forEach((button) => {
     button.addEventListener('click', (event) => {
       const provider = event.currentTarget.dataset.value || DEFAULT_SETTINGS.aiVideoChatProvider;
+      const currentPatch = collectAiSettingsFormPatch();
       setChoiceValue('aiVideoChatProvider', provider);
       fillModelChoices(provider, '');
-      syncAiSettingsForm({ ...(window.__ytrAiSettings || {}), ...collectAiSettingsFormPatch(), aiVideoChatProvider: provider });
+      syncAiSettingsForm({ ...(window.__ytrAiSettings || {}), ...currentPatch, aiVideoChatProvider: provider, aiVideoChatApiKey: getProviderApiKey({ ...(window.__ytrAiSettings || {}), ...currentPatch }, provider) });
       scheduleAutoSave();
     });
   });
@@ -1154,6 +1261,13 @@ function bindAiSettingsForm() {
       scheduleAutoSave();
     });
   });
+  document.querySelectorAll('[data-choice-group="activeProfile"] [data-value]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      const target = event.currentTarget;
+      setChoiceValue('activeProfile', target.dataset.value || DEFAULT_SETTINGS.activeProfile);
+      scheduleAutoSave();
+    });
+  });
   document.querySelector('[data-setting="aiVideoChatCustomSystemPrompt"]')?.addEventListener('input', (event) => {
     syncAutoTextarea(event.currentTarget);
     syncPromptActions();
@@ -1161,6 +1275,7 @@ function bindAiSettingsForm() {
   });
   document.querySelectorAll('[data-setting]').forEach((field) => {
     if (field.getAttribute('data-setting') === 'aiVideoChatCustomSystemPrompt') return;
+    if (field instanceof HTMLInputElement && field.type === 'hidden') return;
     const eventName = (field instanceof HTMLInputElement && field.type === 'checkbox') || field instanceof HTMLSelectElement ? 'change' : 'input';
     field.addEventListener(eventName, () => {
       if (field instanceof HTMLInputElement && field.type === 'checkbox') {
@@ -1228,6 +1343,15 @@ function bindAiSettingsForm() {
       if (button instanceof HTMLButtonElement) button.setAttribute('aria-expanded', String(!menu.hidden));
     }
   });
+  document.querySelector('[data-role="response-language-button"]')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const menu = document.querySelector('[data-role="response-language-menu"]');
+    const button = document.querySelector('[data-role="response-language-button"]');
+    if (menu instanceof HTMLElement) {
+      menu.hidden = !menu.hidden;
+      if (button instanceof HTMLButtonElement) button.setAttribute('aria-expanded', String(!menu.hidden));
+    }
+  });
   document.addEventListener('click', (event) => {
     if (event.target instanceof Element && event.target.closest('.version-wrapper')) return;
     const menu = document.querySelector('[data-role="update-menu"]');
@@ -1239,6 +1363,11 @@ function bindAiSettingsForm() {
     const langButton = document.querySelector('[data-role="lang-button"]');
     if (langMenu instanceof HTMLElement) langMenu.hidden = true;
     if (langButton instanceof HTMLButtonElement) langButton.setAttribute('aria-expanded', 'false');
+    if (event.target instanceof Element && event.target.closest('.response-language-wrapper')) return;
+    const responseMenu = document.querySelector('[data-role="response-language-menu"]');
+    const responseButton = document.querySelector('[data-role="response-language-button"]');
+    if (responseMenu instanceof HTMLElement) responseMenu.hidden = true;
+    if (responseButton instanceof HTMLButtonElement) responseButton.setAttribute('aria-expanded', 'false');
   });
   document.querySelector('[data-role="reset-system-prompt"]')?.addEventListener('click', () => {
     const preset = getChoiceValue('aiVideoChatSystemPreset', DEFAULT_SETTINGS.aiVideoChatSystemPreset);

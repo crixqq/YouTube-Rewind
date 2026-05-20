@@ -112,6 +112,8 @@
   let developerLogsOpen = $state(false);
   let developerLogsText = $state('');
   let developerLogsLoading = $state(false);
+  let aiProviderGuideOpen = $state(false);
+  let aiProviderGuideProvider = $state<Settings['aiVideoChatProvider']>('openrouter');
 
   function formatPercent(value: number): string {
     return `${Math.round(value)}%`;
@@ -575,8 +577,59 @@
     const modelExists = presets.some((preset) => preset.id === settings.aiVideoChatModel);
     void applySettingsPatch({
       aiVideoChatProvider: provider,
+      aiVideoChatApiKey: getAiProviderApiKey(provider),
       aiVideoChatModel: modelExists ? settings.aiVideoChatModel : presets[0]?.id || DEFAULT_SETTINGS.aiVideoChatModel,
     });
+  }
+
+  function getAiProviderApiKey(provider: Settings['aiVideoChatProvider'] = settings.aiVideoChatProvider): string {
+    if (provider === 'openai') return settings.aiVideoChatOpenAiApiKey || '';
+    if (provider === 'anthropic') return settings.aiVideoChatAnthropicApiKey || '';
+    if (provider === 'perplexity') return settings.aiVideoChatPerplexityApiKey || '';
+    return settings.aiVideoChatOpenRouterApiKey || settings.aiVideoChatApiKey || '';
+  }
+
+  function getAiProviderApiKeySetting(provider: Settings['aiVideoChatProvider'] = settings.aiVideoChatProvider): keyof Settings {
+    if (provider === 'openai') return 'aiVideoChatOpenAiApiKey';
+    if (provider === 'anthropic') return 'aiVideoChatAnthropicApiKey';
+    if (provider === 'perplexity') return 'aiVideoChatPerplexityApiKey';
+    return 'aiVideoChatOpenRouterApiKey';
+  }
+
+  function updateAiProviderApiKey(value: string): void {
+    void applySettingsPatch({
+      aiVideoChatApiKey: value,
+      [getAiProviderApiKeySetting()]: value,
+    } as Partial<Settings>);
+  }
+
+  function getAiProviderGuideTitle(provider: Settings['aiVideoChatProvider'] = settings.aiVideoChatProvider): string {
+    if (provider === 'openai') return lang === 'ru' ? 'Как получить ключ OpenAI' : 'How to get an OpenAI key';
+    if (provider === 'anthropic') return lang === 'ru' ? 'Как получить ключ Claude' : 'How to get a Claude key';
+    if (provider === 'perplexity') return lang === 'ru' ? 'Как получить ключ Perplexity' : 'How to get a Perplexity key';
+    return lang === 'ru' ? 'Как получить ключ OpenRouter' : 'How to get an OpenRouter key';
+  }
+
+  function getAiProviderGuideHtml(provider: Settings['aiVideoChatProvider'] = aiProviderGuideProvider): string {
+    const guides: Record<Settings['aiVideoChatProvider'], string> = lang === 'ru'
+      ? {
+          openrouter: '<p><b>1.</b> Открой <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener">openrouter.ai/settings/keys</a> и войди в аккаунт.</p><p><b>2.</b> Нажми <b>Create key</b>, задай любое название и скопируй ключ целиком. Обычно он начинается с <code>sk-or-v1-</code>.</p><p><b>3.</b> Вставь ключ в поле API-ключ, затем выбери модель. Для бесплатного старта лучше оставить OpenRouter Free Router или free-пресет.</p><p><b>4.</b> Если модель пишет ошибку, создай свежий ключ в том же аккаунте или выбери другой доступный free-пресет.</p>',
+          openai: '<p><b>1.</b> Открой <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a> в аккаунте OpenAI Platform.</p><p><b>2.</b> Нажми <b>Create new secret key</b>, скопируй ключ один раз и вставь его в поле API-ключ.</p><p><b>3.</b> Выбери OpenAI-модель или Custom и укажи точное имя модели. Проверь, что у аккаунта есть доступ и лимиты.</p>',
+          anthropic: '<p><b>1.</b> Открой <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a>.</p><p><b>2.</b> Создай ключ в Anthropic Console, скопируй его полностью и вставь в поле API-ключ.</p><p><b>3.</b> Выбери Claude-модель. Если запрос не проходит, проверь кредиты, регион и доступность модели.</p>',
+          perplexity: '<p><b>1.</b> Открой <a href="https://www.perplexity.ai/settings/api" target="_blank" rel="noopener">perplexity.ai/settings/api</a>.</p><p><b>2.</b> Создай API-ключ, скопируй его и вставь в поле API-ключ.</p><p><b>3.</b> Выбери Sonar-модель. Perplexity лучше подходит для ответов, где нужен свежий веб-контекст.</p>',
+        }
+      : {
+          openrouter: '<p><b>1.</b> Open <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener">openrouter.ai/settings/keys</a> and sign in.</p><p><b>2.</b> Click <b>Create key</b>, name it, and copy the full key. It usually starts with <code>sk-or-v1-</code>.</p><p><b>3.</b> Paste it into API key, then pick a model. For a free start, keep OpenRouter Free Router or a free preset.</p><p><b>4.</b> If a model errors, create a fresh key on the same account or switch to another available free preset.</p>',
+          openai: '<p><b>1.</b> Open <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a> in your OpenAI Platform account.</p><p><b>2.</b> Click <b>Create new secret key</b>, copy it once, and paste it into API key.</p><p><b>3.</b> Pick an OpenAI model or Custom and enter the exact model name. Check that the account has access and limits.</p>',
+          anthropic: '<p><b>1.</b> Open <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a>.</p><p><b>2.</b> Create a key in Anthropic Console, copy the full value, and paste it into API key.</p><p><b>3.</b> Pick a Claude model. If requests fail, check credits, region, and model availability.</p>',
+          perplexity: '<p><b>1.</b> Open <a href="https://www.perplexity.ai/settings/api" target="_blank" rel="noopener">perplexity.ai/settings/api</a>.</p><p><b>2.</b> Create an API key, copy it, and paste it into API key.</p><p><b>3.</b> Pick a Sonar model. Perplexity is best for answers that need fresh web context.</p>',
+        };
+    return guides[provider] || guides.openrouter;
+  }
+
+  function openAiProviderGuide(provider: Settings['aiVideoChatProvider'] = settings.aiVideoChatProvider): void {
+    aiProviderGuideProvider = provider;
+    aiProviderGuideOpen = true;
   }
 
   function clampLogoScale(value: number, fallback: number): number {
@@ -848,7 +901,7 @@
     sectionChannelPage: ['channel page', 'channel tools', 'channel assets', 'channel stats', 'страница канала', 'инструменты канала', 'аватар канала', 'шапка канала', 'статистика канала'],
     sectionAssistant: ['ai assistant', 'video sense', 'openrouter', 'assistant chat', 'video chat', 'чат', 'ии', 'нейросеть', 'ассистент'],
     sectionWatchTimer: ['watch timer', 'daily limit', 'screen time', 'timeout', 'таймер', 'лимит времени', 'ограничение времени'],
-    sectionHomepageFilter: ['home', 'homepage', 'feed', 'recommendations', 'главная', 'лента', 'рекомендации'],
+    sectionHomepageFilter: ['home', 'homepage', 'feed', 'recommendations', 'responsive', 'adaptive', 'главная', 'лента', 'рекомендации', 'адаптив'],
     sectionSearchFilter: ['search', 'search page', 'search results', 'поиск', 'результаты поиска'],
     sectionTopBar: ['top bar', 'header', 'masthead', 'logo', 'branding', 'верхняя панель', 'шапка', 'логотип'],
     sectionSidebarFilter: ['sidebar', 'guide', 'left menu', 'боковая панель', 'левое меню'],
@@ -1127,10 +1180,8 @@
   }
 
   function shouldDetachBuiltinProfile(partial: Partial<Settings>): boolean {
-    const activeId = settings.activeProfile;
-    if (!activeId || activeId === 'none' || activeId === 'default' || activeId.startsWith('custom:')) return false;
-    if ('activeProfile' in partial || 'customProfiles' in partial) return false;
-    return Object.keys(partial).length > 0;
+    void partial;
+    return false;
   }
 
   function createDetachedBuiltinProfilePatch(partial: Partial<Settings>): Partial<Settings> {
@@ -1541,6 +1592,12 @@
     browser.tabs.create({ url: browser.runtime.getURL('popup.html?view=page') });
   }
 
+  function handleBrandClick(event: MouseEvent) {
+    if (isStandaloneView) return;
+    event.preventDefault();
+    openStandalonePage();
+  }
+
   function requestBetaEnable() {
     betaConfirmOpen = true;
   }
@@ -1698,7 +1755,8 @@
 
   function handleImportSuccess(target: 'popup' | 'sheet') {
     if (target === 'sheet') {
-      showSheetFeedback(t('importSuccess'));
+      clearSheetState();
+      showFeedback('imported');
       return;
     }
     showFeedback('imported');
@@ -1765,6 +1823,7 @@
       pendingProfileText = text;
       pendingProfileFileName = file.name;
       sheetProfileNameInput = parsed.configName || file.name.replace(/\.(json|txt)$/i, '');
+      sheetFeedback = null;
       return;
     }
 
@@ -1818,10 +1877,7 @@
     const newProfile: CustomProfile = { name, settings: parsed.settings };
     const profiles = cloneCustomProfiles([...(settings.customProfiles || []), newProfile]);
     await activateCustomProfile(newProfile, profiles);
-    pendingProfileText = '';
-    pendingProfileFileName = '';
-    sheetProfileNameInput = '';
-    showSheetFeedback(t('profileApplied'));
+    clearSheetState();
     showFeedback('profile');
   }
 
@@ -2221,6 +2277,7 @@
     database: 'M740.5-569Q840-618 840-680q0-63-99.5-111.5T480-840q-161 0-260.5 48.5T120-680q0 62 99.5 111T480-520q161 0 260.5-49ZM592-428.5q62-8.5 117.5-26.5t93-46.5Q840-530 840-570v100q0 40-37.5 68.5t-93 46.5Q654-337 592-328.5T480.5-320q-49.5 0-112-8.5t-118-27q-55.5-18.5-93-47T120-470v-100q0 39 37.5 67.5t93 47q55.5 18.5 118 27t112 8.5q49.5 0 111.5-8.5Zm0 200q62-8.5 117.5-26.5t93-46.5Q840-330 840-370v100q0 40-37.5 68.5t-93 46.5Q654-137 592-128.5T480.5-120q-49.5 0-112-8.5t-118-27q-55.5-18.5-93-47T120-270v-100q0 39 37.5 67.5t93 47q55.5 18.5 118 27t112 8.5q49.5 0 111.5-8.5Z',
     info: 'M504.5-288.63q8.5-8.62 8.5-21.37v-180q0-12.75-8.68-21.38-8.67-8.62-21.5-8.62-12.82 0-21.32 8.62-8.5 8.63-8.5 21.38v180q0 12.75 8.68 21.37 8.67 8.63 21.5 8.63 12.82 0 21.32-8.63Zm-1-314.57q9.5-9.2 9.5-22.8 0-14.45-9.48-24.22-9.48-9.78-23.5-9.78t-23.52 9.78Q447-640.45 447-626q0 13.6 9.48 22.8 9.48 9.2 23.5 9.2t23.52-9.2ZM480.27-80q-82.74 0-155.5-31.5Q252-143 197.5-197.5t-86-127.34Q80-397.68 80-480.5t31.5-155.66Q143-709 197.5-763t127.34-85.5Q397.68-880 480.5-880t155.66 31.5Q709-817 763-763t85.5 127Q880-563 880-480.27q0 82.74-31.5 155.5Q817-252 763-197.68q-54 54.31-127 86Q563-80 480.27-80Z',
     palette: 'M480-120q-74.23 0-139.19-28.5Q275.84-177 227.42-225.42 179-273.84 150.5-338.81 122-403.77 122-478q0-155 100.08-257.5Q322.15-838 477-838q149 0 255 96.5T838-494q0 75-50.57 124.5Q736.85-320 660-320h-63q-11 0-18.5 7.5T571-294q0 7 7.5 14.5T597-272q19 0 33 14.5t14 34.5q0 48-43.81 75.5Q556.38-120 480-120Zm-3-60q49 0 82.5-14.5T593-223q0-2-6.5-5.5T569-232q-34 0-58-24t-24-58q0-34 24-58t58-24h91q46 0 82-31.5t36-79.5q0-121-85-196t-216-75q-128 0-211.5 81T182-478q0 122 85.5 210T477-180Zm-197-223q25 0 42.5-17.5T340-463q0-25-17.5-42.5T280-523q-25 0-42.5 17.5T220-463q0 25 17.5 42.5T280-403Zm100-130q25 0 42.5-17.5T440-593q0-25-17.5-42.5T380-653q-25 0-42.5 17.5T320-593q0 25 17.5 42.5T380-533Zm200 0q25 0 42.5-17.5T640-593q0-25-17.5-42.5T580-653q-25 0-42.5 17.5T520-593q0 25 17.5 42.5T580-533Zm100 130q25 0 42.5-17.5T740-463q0-25-17.5-42.5T680-523q-25 0-42.5 17.5T620-463q0 25 17.5 42.5T680-403Z',
+    close: 'm249-207-42-42 231-231-231-231 42-42 231 231 231-231 42 42-231 231 231 231-42 42-231-231-231 231Z',
   } as const;
 
   // --- Custom Profiles ---
@@ -2244,6 +2301,7 @@
   }
 
   function importProfileFromFile() {
+    showProfileAdd = false;
     if (isStandaloneView) {
       activeSheet = 'profile-import';
       return;
@@ -2457,7 +2515,7 @@
   <div class="app-shell" data-locale={langVersion} class:app-shell-page={isStandaloneView} onclick={closeMenus} role="presentation">
       <header class="app-header">
         <div class="header-content">
-          <a class="header-brand" href="./popup.html?view=page" aria-label="YouTube Rewind settings">
+          <a class="header-brand" href="./popup.html?view=page" target={isStandaloneView ? undefined : '_blank'} onclick={handleBrandClick} aria-label="YouTube Rewind settings">
             <span class="app-logo" role="img" aria-label="YouTube Rewind"></span>
           </a>
           <div class="header-actions">
@@ -2671,7 +2729,7 @@
                   {t('profileExport')}
                 </button>
               {/if}
-              {#if profileModified && settings.activeProfile !== 'none'}
+              {#if profileModified && getActiveCustomProfile()}
                 <button class="action-btn action-btn-save" onclick={saveChangesToProfile}>
                   {t('profileSaveChanges')}
                 </button>
@@ -2747,7 +2805,7 @@
           {/if}
         </SettingsSection>
 
-        <SettingsSection title={t('sectionHomepageFilter')} icon={ICON.home} hidden={!sectionVisible(['sectionHomepageFilter', 'settingVideosPerRow', 'settingHideShorts', 'settingHidePosts', 'settingHideMixes', 'settingHideBreakingNews', 'settingHideLatestPosts', 'settingHideExploreTopics', 'settingHideNewBadge', 'settingHidePlayables', 'settingHideFilterBar'])}>
+        <SettingsSection title={t('sectionHomepageFilter')} icon={ICON.home} hidden={!sectionVisible(['sectionHomepageFilter', 'settingVideosPerRow', 'settingHomepageResponsiveGrid', 'settingHideShorts', 'settingHidePosts', 'settingHideMixes', 'settingHideBreakingNews', 'settingHideLatestPosts', 'settingHideExploreTopics', 'settingHideNewBadge', 'settingHidePlayables', 'settingHideFilterBar'])}>
           <Slider
             label={t('settingVideosPerRow')}
             value={settings.videosPerRow}
@@ -2756,6 +2814,9 @@
             defaultLabel={t('settingVideosPerRowDefault')}
             onchange={(v) => update('videosPerRow', v)}
           />
+          {#if settings.videosPerRow > 0}
+            <Toggle label={t('settingHomepageResponsiveGrid')} checked={settings.homepageResponsiveGrid} onchange={(v) => update('homepageResponsiveGrid', v)} />
+          {/if}
           <ChipGroup filters={visibleFilters(homepageFilters)} />
         </SettingsSection>
 
@@ -3032,37 +3093,40 @@
 
         <SettingsSection title={t('sectionAssistant')} icon={ICON.web_asset} hidden={!sectionVisible(['sectionAssistant', 'settingAiVideoChatEnabled', 'settingAiVideoChatProvider', 'settingAiVideoChatApiKey', 'aiVideoChatGuide'])}>
           <Toggle label={t('settingAiVideoChatEnabled')} checked={settings.aiVideoChatEnabled} onchange={(v) => void applySettingsPatch({ aiVideoChatEnabled: v })} />
-          {#if settings.aiVideoChatEnabled}
-            <div class="sub-label">{t('settingAiVideoChatProvider')}</div>
-            <div class="effect-picker">
-              {#each AI_CHAT_PROVIDER_PRESETS as preset (preset.id)}
-                <button
-                  class="effect-option provider-effect-option"
-                  class:active={settings.aiVideoChatProvider === preset.id}
-                  onclick={() => updateAiProvider(preset.id as Settings['aiVideoChatProvider'])}
-                  title={preset.label}
-                >
-                  <img class="provider-icon-img" src={AI_CHAT_PROVIDER_ICON_SRC[preset.id]} alt="" loading="lazy" decoding="async" />
-                  <span class="effect-option-label">{preset.label}</span>
-                </button>
-              {/each}
-            </div>
+          <div class="sub-label">{t('settingAiVideoChatProvider')}</div>
+          <div class="effect-picker">
+            {#each AI_CHAT_PROVIDER_PRESETS as preset (preset.id)}
+              <button
+                type="button"
+                class="effect-option provider-effect-option"
+                class:active={settings.aiVideoChatProvider === preset.id}
+                onclick={() => updateAiProvider(preset.id as Settings['aiVideoChatProvider'])}
+                title={preset.label}
+              >
+                <img class="provider-icon-img" src={AI_CHAT_PROVIDER_ICON_SRC[preset.id]} alt="" loading="lazy" decoding="async" />
+                <span class="effect-option-label">{preset.label}</span>
+              </button>
+            {/each}
+          </div>
 
-            <div class="sub-label">{t('settingAiVideoChatApiKey')}</div>
-            <input
-              class="profile-name-input ai-api-key-input"
-              type="password"
-              placeholder={t('settingAiVideoChatApiKey')}
-              value={settings.aiVideoChatApiKey}
-              onchange={(event) => update('aiVideoChatApiKey', (event.currentTarget as HTMLInputElement).value as Settings['aiVideoChatApiKey'])}
-            />
-            <div class="profile-helper">{t('aiVideoChatApiKeyHint')}</div>
-            <div class="profile-actions-row ai-settings-actions">
-              <a class="action-btn ai-settings-link" href={OPENROUTER_GUIDE_URL} target="_blank" rel="noopener">
-                <span>{t('aiVideoChatGuide')}</span>
-              </a>
-            </div>
-          {/if}
+          <div class="sub-label">{t('settingAiVideoChatApiKey')}</div>
+          <input
+            class="profile-name-input ai-api-key-input"
+            type="password"
+            placeholder={t('settingAiVideoChatApiKey')}
+            value={getAiProviderApiKey()}
+            onchange={(event) => updateAiProviderApiKey((event.currentTarget as HTMLInputElement).value)}
+          />
+          <div class="profile-actions-row ai-key-guide-actions">
+            <button class="inline-help-link ai-key-guide-inline" type="button" onclick={() => openAiProviderGuide(settings.aiVideoChatProvider)}>
+              {getAiProviderGuideTitle(settings.aiVideoChatProvider)}
+            </button>
+          </div>
+          <div class="profile-actions-row ai-settings-actions">
+            <a class="action-btn ai-settings-link" href={OPENROUTER_GUIDE_URL} target="_blank" rel="noopener">
+              <span>{t('aiVideoChatGuide')}</span>
+            </a>
+          </div>
         </SettingsSection>
 
         <SettingsSection title={t('sectionBeta')} icon={ICON.info} hidden={!sectionVisible(['sectionBeta', 'settingBetaEnabled', 'settingDefaultQuality', 'settingDisableAvatarLive', 'settingBetaStableDescriptionColors'])}>
@@ -3086,8 +3150,8 @@
               <div class="inline-confirm-title">{t('betaEnableTitle')}</div>
               <div class="inline-confirm-message">{t('betaEnableMessage')}</div>
               <div class="inline-confirm-actions">
-                <button class="action-btn" onclick={cancelBetaEnable}>{t('betaEnableCancel')}</button>
-                <button class="action-btn action-btn-save" onclick={confirmBetaEnable}>{t('betaEnableConfirm')}</button>
+                <button class="action-btn" type="button" onclick={cancelBetaEnable}>{t('betaEnableCancel')}</button>
+                <button class="action-btn action-btn-save" type="button" onclick={confirmBetaEnable}>{t('betaEnableConfirm')}</button>
               </div>
             </div>
           {/if}
@@ -3123,6 +3187,38 @@
       </footer>
 
   </div>
+  {#if aiProviderGuideOpen}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="provider-guide-backdrop" onclick={(event) => { if (event.target === event.currentTarget) aiProviderGuideOpen = false; }}>
+      <div class="provider-guide-card" role="dialog" aria-modal="true" aria-labelledby="popup-provider-guide-title">
+        <div class="provider-guide-header">
+          <h2 id="popup-provider-guide-title">
+            <img class="provider-icon-img" src={AI_CHAT_PROVIDER_ICON_SRC[aiProviderGuideProvider]} alt="" loading="lazy" decoding="async" />
+            <span>{getAiProviderGuideTitle(aiProviderGuideProvider)}</span>
+          </h2>
+          <button class="provider-guide-close" type="button" aria-label={t('close')} onclick={() => { aiProviderGuideOpen = false; }}>
+            <svg viewBox="0 -960 960 960" width="18" height="18" fill="currentColor" aria-hidden="true"><path d={ICON.close}></path></svg>
+          </button>
+        </div>
+        <div class="effect-picker provider-guide-picker">
+          {#each AI_CHAT_PROVIDER_PRESETS as preset (preset.id)}
+            <button
+              class="effect-option provider-effect-option"
+              class:active={aiProviderGuideProvider === preset.id}
+              type="button"
+              onclick={() => { aiProviderGuideProvider = preset.id as Settings['aiVideoChatProvider']; }}
+            >
+              <img class="provider-icon-img" src={AI_CHAT_PROVIDER_ICON_SRC[preset.id]} alt="" loading="lazy" decoding="async" />
+              <span class="effect-option-label">{preset.label}</span>
+            </button>
+          {/each}
+        </div>
+        <div class="provider-guide-body">
+          {@html getAiProviderGuideHtml(aiProviderGuideProvider)}
+        </div>
+      </div>
+    </div>
+  {/if}
   {#if activeSheet}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="sheet-backdrop" onclick={(event) => { if (event.target === event.currentTarget) clearSheetState(); }}>
@@ -4001,16 +4097,121 @@
 
   .ai-settings-actions {
     align-items: center;
-    padding-top: 8px;
+    padding: 8px 10px 0;
+  }
+
+  .ai-key-guide-actions {
+    padding: 4px 10px 0;
+  }
+
+  .ai-key-guide-inline {
+    appearance: none;
+    display: inline;
+    width: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--md-primary);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.35;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .ai-key-guide-inline:hover {
+    text-decoration: underline;
   }
 
   .ai-settings-link {
+    display: inline-flex;
+    align-items: center;
+    width: 100%;
+    justify-content: center;
     min-height: 40px;
     padding: 0 18px;
     border-radius: var(--md-shape-full);
     font-size: 13px;
     font-weight: 800;
     text-decoration: none;
+  }
+
+  .provider-guide-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgb(0 0 0 / 0.52);
+  }
+
+  .provider-guide-card {
+    width: min(680px, 100%);
+    max-height: min(720px, calc(100vh - 36px));
+    overflow: auto;
+    padding: 18px;
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--md-shape-lg);
+    background: var(--md-surface-container);
+    box-shadow: 0 24px 64px rgb(0 0 0 / 0.36);
+  }
+
+  .provider-guide-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 10px;
+  }
+
+  .provider-guide-header h2 {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    color: var(--md-on-surface);
+    font-size: 18px;
+    line-height: 1.2;
+  }
+
+  .provider-guide-close {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--md-on-surface-variant);
+    cursor: pointer;
+  }
+
+  .provider-guide-close:hover {
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface);
+  }
+
+  .provider-guide-picker {
+    padding: 4px 0 14px;
+  }
+
+  .provider-guide-body {
+    display: grid;
+    gap: 12px;
+    color: var(--md-on-surface-variant);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .provider-guide-body :global(p) {
+    margin: 0;
+  }
+
+  .provider-guide-body :global(a) {
+    color: var(--md-primary);
+    font-weight: 800;
   }
 
   .effect-option:hover .effect-option-label {

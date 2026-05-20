@@ -99,7 +99,7 @@
         justify-content: space-between;
         max-width: 1440px;
         margin: 0 auto;
-        padding: 12px 16px;
+        padding: 18px 24px;
       }
 
       .header-brand {
@@ -112,8 +112,8 @@
       }
 
       .app-logo {
-        height: 30px;
-        width: calc(30px * 3464 / 608);
+        height: 34px;
+        width: calc(34px * 3464 / 608);
         flex-shrink: 0;
         display: inline-block;
         user-select: none;
@@ -399,8 +399,8 @@
       .settings-section {
         display: inline-block;
         width: 100%;
-        margin: 0 0 14px;
-        padding: 0 6px 4px;
+        margin: 0 0 8px;
+        padding: 4px 0 8px;
         break-inside: avoid;
         vertical-align: top;
       }
@@ -831,6 +831,40 @@
         box-shadow: none;
       }
 
+      .response-language-wrapper {
+        position: relative;
+        width: 100%;
+      }
+
+      .response-language-button {
+        justify-content: space-between;
+        gap: 10px;
+        text-align: left;
+        background: transparent !important;
+        background-image: none !important;
+      }
+
+      .response-language-button::after {
+        content: "";
+        width: 9px;
+        height: 6px;
+        border: 0;
+        background: currentColor;
+        clip-path: polygon(0 0, 100% 0, 50% 100%);
+        transform: none;
+        opacity: 0.72;
+        flex: 0 0 auto;
+      }
+
+      .response-language-menu {
+        right: 0;
+        left: 0;
+        width: auto;
+        min-width: 100%;
+        max-height: min(340px, 55vh);
+        overflow-y: auto;
+      }
+
       .choice::after,
       .action::after {
         content: "";
@@ -847,6 +881,7 @@
         background: var(--md-surface-container-high);
         color: var(--md-on-surface);
         transform: scale(1.03);
+        border-color: var(--md-outline);
       }
 
       .choice:hover::after,
@@ -863,8 +898,17 @@
       .choice[aria-pressed="true"] {
         padding-left: 12px;
         border-color: transparent;
-        background: var(--md-secondary-container);
-        color: var(--md-on-secondary-container);
+        background: var(--md-primary);
+        color: var(--md-on-primary);
+      }
+
+      body[data-ytr-theme-mode="light"] .choice[aria-pressed="true"] {
+        border-color: color-mix(in srgb, var(--md-primary) 58%, var(--md-primary-container));
+        background: color-mix(in srgb, var(--md-primary-container) 88%, white 12%);
+        color: var(--md-on-primary-container);
+        box-shadow:
+          0 0 0 1px color-mix(in srgb, var(--md-primary) 18%, transparent) inset,
+          0 1px 2px rgb(0 0 0 / 0.06);
       }
 
       .provider-icon {
@@ -956,6 +1000,20 @@
         transform: scale(1.03);
       }
 
+      .provider-guide-jump.is-selected,
+      .provider-guide-jump[aria-pressed="true"] {
+        border-color: transparent;
+        background: var(--md-primary);
+        color: var(--md-on-primary);
+      }
+
+      body[data-ytr-theme-mode="light"] .provider-guide-jump.is-selected,
+      body[data-ytr-theme-mode="light"] .provider-guide-jump[aria-pressed="true"] {
+        border-color: color-mix(in srgb, var(--md-primary) 58%, var(--md-primary-container));
+        background: color-mix(in srgb, var(--md-primary-container) 88%, white 12%);
+        color: var(--md-on-primary-container);
+      }
+
       .action-primary {
         min-height: 38px;
         padding: 0 16px;
@@ -1012,16 +1070,19 @@
         flex-direction: column;
         align-items: center;
         gap: 12px;
-        padding: 20px 24px 28px;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 8px 24px 28px;
         color: var(--md-on-surface-variant);
         font-size: 13px;
         animation: footerFadeIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.18s both;
       }
 
       .about-description {
-        max-width: 420px;
+        max-width: 320px;
         margin: 0;
         text-align: center;
+        line-height: 1.5;
         opacity: 0.8;
       }
 
@@ -1081,6 +1142,11 @@
       .about-link > * {
         position: relative;
         z-index: 1;
+        transition: transform 0.24s cubic-bezier(0.2, 0, 0, 1);
+      }
+
+      .about-link:hover > * {
+        transform: translateY(-1px);
       }
 
       .about-link svg {
@@ -1106,6 +1172,21 @@
       .about-creator a:hover,
       .footer-link:hover {
         text-decoration: underline;
+      }
+
+      .app-footer .footer-link {
+        color: var(--md-on-surface-variant);
+        font-size: 11px;
+        opacity: 0.5;
+        transition:
+          transform 0.15s ease,
+          opacity 0.15s ease,
+          color 0.15s ease;
+      }
+
+      .app-footer .footer-link:hover {
+        opacity: 0.8;
+        transform: scale(1.03);
       }
 
       .modal-backdrop {
@@ -1285,7 +1366,11 @@
             <div class="setting-row">
               <div class="field">
                 <label data-i18n="responseLanguage">Response language</label>
-                <select id="ai-response-language" class="choice-select" data-setting="aiVideoChatResponseLanguage"></select>
+                <div class="response-language-wrapper">
+                  <input id="ai-response-language" data-setting="aiVideoChatResponseLanguage" type="hidden">
+                  <button class="choice-select response-language-button" type="button" data-role="response-language-button" aria-haspopup="true" aria-expanded="false"></button>
+                  <div class="lang-menu response-language-menu" data-role="response-language-menu" role="menu" hidden></div>
+                </div>
               </div>
             </div>
             <div class="setting-row">
@@ -1444,6 +1529,54 @@
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h2 class="section-title">
+            <svg class="section-icon" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor"><path d="M435.5-128.63Q427-137.25 427-150v-165q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v53h323q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H487v52q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63ZM150-202q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h187q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H150Z"></path></svg>
+            <span data-i18n="sectionProfiles">Profiles</span>
+          </h2>
+          <div class="section-content">
+            <div class="setting-row">
+              <div class="choice-group" data-choice-group="activeProfile">
+                <button class="choice" type="button" data-value="default" data-i18n="profileDefault">Default</button>
+                <button class="choice" type="button" data-value="none" data-i18n="profileCustom">Custom</button>
+                <button class="choice" type="button" data-value="focus" data-i18n="profileFocus">Focus</button>
+                <button class="choice" type="button" data-value="minimal" data-i18n="profileMinimal">Minimal</button>
+                <button class="choice" type="button" data-value="clean" data-i18n="profileClean">Clean</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <a class="action" href="./popup.html?view=page" target="_blank" rel="noopener" data-i18n="openFullSettings">Open full settings</a>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h2 class="section-title">
+            <svg class="section-icon" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor"><path d="M740.5-569Q840-618 840-680q0-63-99.5-111.5T480-840q-161 0-260.5 48.5T120-680q0 62 99.5 111T480-520q161 0 260.5-49ZM592-428.5q62-8.5 117.5-26.5t93-46.5Q840-530 840-570v100q0 40-37.5 68.5t-93 46.5Q654-337 592-328.5T480.5-320q-49.5 0-112-8.5t-118-27q-55.5-18.5-93-47T120-470v-100q0 39 37.5 67.5t93 47q55.5 18.5 118 27t112 8.5q49.5 0 111.5-8.5Z"></path></svg>
+            <span data-i18n="sectionDeveloper">Developer</span>
+          </h2>
+          <div class="section-content">
+            <label class="toggle-row">
+              <span class="toggle-copy">
+                <span class="toggle-title" data-i18n="developerEnabled">Enable developer tools</span>
+              </span>
+              <span class="toggle-track">
+                <span class="toggle-thumb"><svg class="toggle-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                <input class="toggle-input" data-setting="developerEnabled" type="checkbox">
+              </span>
+            </label>
+            <label class="toggle-row">
+              <span class="toggle-copy">
+                <span class="toggle-title" data-i18n="extensionLogs">Record extension logs</span>
+              </span>
+              <span class="toggle-track">
+                <span class="toggle-thumb"><svg class="toggle-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                <input class="toggle-input" data-setting="extensionLogEnabled" type="checkbox">
+              </span>
+            </label>
           </div>
         </section>
       </main>

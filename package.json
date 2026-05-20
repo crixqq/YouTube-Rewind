@@ -1,6 +1,6 @@
 {
   "name": "youtube-rewind",
-  "description": "Clean up YouTube's interface with customizable layout and filtering options",
+  "description": "Customize YouTube's interface and add practical tools for viewers and creators",
   "private": true,
   "version": "0.6.0",
   "type": "module",

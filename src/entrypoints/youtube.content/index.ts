@@ -745,7 +745,7 @@ function needsFullscreenTracking(settings: Settings): boolean {
 }
 
 function isAiVideoChatEnabled(settings: Settings | null): boolean {
-  return !!settings?.betaEnabled && !!settings.aiVideoChatEnabled;
+  return !!settings?.aiVideoChatEnabled;
 }
 
 function getEffectiveAiChatModel(settings: Settings | null): string {
@@ -759,6 +759,15 @@ function getEffectiveAiChatModel(settings: Settings | null): string {
 function getEffectiveAiChatProvider(settings: Settings | null): AiChatProvider {
   const value = settings?.aiVideoChatProvider || 'openrouter';
   return ['openrouter', 'openai', 'anthropic', 'perplexity'].includes(value) ? value as AiChatProvider : 'openrouter';
+}
+
+function getEffectiveAiChatApiKey(settings: Settings | null): string {
+  if (!settings) return '';
+  const provider = getEffectiveAiChatProvider(settings);
+  if (provider === 'openai') return settings.aiVideoChatOpenAiApiKey.trim();
+  if (provider === 'anthropic') return settings.aiVideoChatAnthropicApiKey.trim();
+  if (provider === 'perplexity') return settings.aiVideoChatPerplexityApiKey.trim();
+  return (settings.aiVideoChatOpenRouterApiKey || settings.aiVideoChatApiKey).trim();
 }
 
 function getEffectiveAiChatEndpoint(settings: Settings | null): string {
@@ -1001,10 +1010,12 @@ function applySettings(s: Settings): void {
 
   if (s.videosPerRow > 0) {
     d.ytrVideosPerRow = String(s.videosPerRow);
+    d.ytrHomeResponsiveGrid = String(!!s.homepageResponsiveGrid);
     el.style.setProperty('--ytr-videos-per-row', String(s.videosPerRow));
     scheduleLowPriorityTask(() => setupPrefetch(), 1400, 260);
   } else {
     delete d.ytrVideosPerRow;
+    delete d.ytrHomeResponsiveGrid;
     el.style.removeProperty('--ytr-videos-per-row');
     teardownPrefetch();
   }
@@ -8069,7 +8080,7 @@ function mountAiChatSidebar(videoId: string): void {
   const isRu = getContentLocale() === 'ru';
   const effectiveModel = getEffectiveAiChatModel(settings);
   const effectiveProvider = getEffectiveAiChatProvider(settings);
-  const hasApiKey = !!settings?.aiVideoChatApiKey.trim();
+  const hasApiKey = !!getEffectiveAiChatApiKey(settings);
   const panelKey = [videoId, effectiveProvider, effectiveModel || 'no-model', hasApiKey ? 'key' : 'no-key', isRu ? 'ru' : 'en'].join('::');
   const existingHost = document.querySelector('.ytr-ai-sidebar-host') as HTMLElement | null;
   if (existingHost?.dataset.key === panelKey) {
@@ -8602,7 +8613,7 @@ function mountAiChatSidebar(videoId: string): void {
       return;
     }
 
-    const apiKey = currentSettings?.aiVideoChatApiKey.trim();
+    const apiKey = getEffectiveAiChatApiKey(currentSettings);
     const modelId = getEffectiveAiChatModel(currentSettings);
     if (!apiKey || !modelId) {
       syncComposer();
@@ -9464,23 +9475,10 @@ function buildChannelStatsLinks(info: ChannelPageInfo): StatsServiceLink[] {
 function buildVideoStatsLinks(videoId: string, channelHandle = ''): StatsServiceLink[] {
   const encodedVideoId = encodeURIComponent(videoId);
   const normalizedHandle = channelHandle.trim().replace(/^@/, '');
-  const encodedVideoUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
   const viewstatsHref = normalizedHandle
     ? `https://www.viewstats.com/@${encodeURIComponent(normalizedHandle)}/videos/${encodedVideoId}`
     : `https://www.viewstats.com/search?q=${encodedVideoId}`;
   return [
-    {
-      label: 'Social Blade',
-      iconUrl: CHANNEL_STATS_ICON_URLS.socialBlade,
-      fallbackIconMarkup: GOOGLE_ROUNDED_ICON_SVGS.leaderboard,
-      href: `https://socialblade.com/search/search?query=${encodedVideoUrl}`,
-    },
-    {
-      label: 'vidIQ',
-      iconUrl: CHANNEL_STATS_ICON_URLS.vidiq,
-      fallbackIconMarkup: GOOGLE_ROUNDED_ICON_SVGS.queryStats,
-      href: `https://vidiq.com/youtube-stats/search?query=${encodedVideoUrl}`,
-    },
     {
       label: 'ViewStats',
       iconUrl: CHANNEL_STATS_ICON_URLS.viewstats,
@@ -9609,12 +9607,16 @@ function createChannelAssetsButton(info: ChannelPageInfo, isRu: boolean): HTMLEl
   const menu = createHtmlElement('div', 'ytr-download-menu ytr-channel-assets-menu');
   const assets = buildChannelAssetDescriptors(info, isRu ? 'ru' : 'en');
   let activePreviewIndex = 0;
-  const previewGrid = createHtmlElement('div', 'ytr-channel-assets-preview-grid');
   const carousel = createHtmlElement('div', 'ytr-channel-assets-carousel');
   const prevButton = createHtmlElement('button', 'ytr-channel-assets-arrow ytr-channel-assets-arrow-prev') as HTMLButtonElement;
   const nextButton = createHtmlElement('button', 'ytr-channel-assets-arrow ytr-channel-assets-arrow-next') as HTMLButtonElement;
   const actions = createHtmlElement('div', 'ytr-channel-assets-menu-actions');
-  let carouselProgrammaticUntil = 0;
+  const previewButton = createHtmlElement('button', 'ytr-download-preview ytr-channel-assets-single-preview') as HTMLButtonElement;
+  const previewStrip = createHtmlElement('span', 'ytr-channel-assets-preview-strip');
+  const previewSlides = new Map<ChannelAssetDescriptor, { image: HTMLImageElement; label: HTMLElement; skeleton: HTMLElement }>();
+
+  previewButton.type = 'button';
+  previewButton.append(previewStrip);
 
   prevButton.type = 'button';
   nextButton.type = 'button';
@@ -9628,13 +9630,53 @@ function createChannelAssetsButton(info: ChannelPageInfo, isRu: boolean): HTMLEl
     nextButton.disabled = activePreviewIndex >= assets.length - 1;
   };
 
-  const goToPreview = (index: number, behavior: ScrollBehavior = 'smooth') => {
+  const getPreviewActionLabel = (asset: ChannelAssetDescriptor): string => {
+    return isRu
+      ? asset.id === 'avatar' ? 'Открыть аватар' : 'Открыть шапку'
+      : asset.id === 'avatar' ? 'Open avatar' : 'Open banner';
+  };
+
+  const syncPreview = () => {
+    const asset = assets[activePreviewIndex];
+    if (!asset) return;
+    previewButton.title = getPreviewActionLabel(asset);
+    previewButton.setAttribute('aria-label', previewButton.title);
+    previewButton.dataset.assetId = asset.id;
+    previewStrip.style.transform = `translateX(-${activePreviewIndex * 100}%)`;
+
+    const slide = previewSlides.get(asset);
+    if (!slide || slide.image.dataset.loaded === 'true') return;
+    slide.image.dataset.loading = 'true';
+    slide.skeleton.dataset.visible = 'true';
+    void loadImage(asset.url)
+      .then((image) => {
+        slide.image.src = image.src;
+        slide.image.dataset.loading = 'false';
+        slide.image.dataset.loaded = 'true';
+        slide.skeleton.dataset.visible = '';
+      })
+      .catch(() => {
+        slide.image.src = asset.url;
+        slide.image.dataset.loading = 'false';
+        slide.image.dataset.loaded = 'true';
+        slide.skeleton.dataset.visible = '';
+      });
+  };
+
+  const goToPreview = (index: number) => {
     activePreviewIndex = clamp(index, 0, Math.max(0, assets.length - 1));
-    carouselProgrammaticUntil = Date.now() + (behavior === 'smooth' ? 520 : 80);
-    centerChannelAssetPreview(previewGrid, activePreviewIndex, behavior);
+    syncPreview();
     syncCarouselButtons();
   };
-  enableChannelAssetCarouselWheel(previewGrid, (delta) => goToPreview(activePreviewIndex + delta));
+
+  carousel.addEventListener('wheel', (event) => {
+    if (assets.length <= 1) return;
+    const primaryDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+    if (!primaryDelta) return;
+    event.preventDefault();
+    event.stopPropagation();
+    goToPreview(activePreviewIndex + (primaryDelta > 0 ? 1 : -1));
+  }, { passive: false });
 
   prevButton.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -9645,60 +9687,29 @@ function createChannelAssetsButton(info: ChannelPageInfo, isRu: boolean): HTMLEl
     goToPreview(activePreviewIndex + 1);
   });
 
-  previewGrid.addEventListener('scroll', () => {
-    if (Date.now() < carouselProgrammaticUntil) return;
-    const items = Array.from(previewGrid.querySelectorAll('.ytr-channel-asset-preview')) as HTMLElement[];
-    if (!items.length) return;
-    const center = previewGrid.scrollLeft + previewGrid.clientWidth / 2;
-    let bestIndex = activePreviewIndex;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    items.forEach((item, index) => {
-      const itemCenter = item.offsetLeft + item.offsetWidth / 2;
-      const distance = Math.abs(itemCenter - center);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestIndex = index;
-      }
-    });
-    activePreviewIndex = bestIndex;
-    syncCarouselButtons();
-  }, { passive: true });
+  previewButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const asset = assets[activePreviewIndex];
+    if (!asset) return;
+    closeAllYtrMenus();
+    showChannelAssetOverlay(assets, activePreviewIndex);
+  });
 
-  assets.forEach((asset, index) => {
-    const previewItem = createHtmlElement(
-      'button',
-      `ytr-channel-asset-preview ytr-channel-asset-preview-${asset.id}`,
-    ) as HTMLButtonElement;
-    previewItem.type = 'button';
-    previewItem.title = isRu
-      ? `Открыть ${asset.id === 'avatar' ? 'аватар' : 'шапку'}`
-      : `Open ${asset.id === 'avatar' ? 'avatar' : 'banner'}`;
-    previewItem.setAttribute('aria-label', previewItem.title);
-
-    const previewImage = createHtmlElement(
-      'img',
-      `ytr-channel-asset-preview-img ${asset.id === 'avatar' ? 'ytr-channel-asset-preview-img-avatar' : ''}`,
-    ) as HTMLImageElement;
-    previewImage.src = asset.url;
-    previewImage.alt = '';
-    previewImage.loading = 'eager';
-    previewImage.decoding = 'async';
-
-    const previewLabel = createHtmlElement(
-      'span',
-      'ytr-channel-asset-preview-label',
-      isRu
-        ? asset.id === 'avatar' ? 'Открыть аватар' : 'Открыть шапку'
-        : asset.id === 'avatar' ? 'Open avatar' : 'Open banner',
-    );
-
-    previewItem.append(previewImage, previewLabel);
-    previewItem.addEventListener('click', (event) => {
-      event.stopPropagation();
-      closeAllYtrMenus();
-      showChannelAssetOverlay(assets, index);
-    });
-    previewGrid.appendChild(previewItem);
+  assets.forEach((asset) => {
+    const slide = createHtmlElement('span', 'ytr-channel-assets-preview-slide');
+    const skeleton = createHtmlElement('span', 'ytr-download-preview-skeleton');
+    const image = createHtmlElement('img', 'ytr-download-preview-img') as HTMLImageElement;
+    const label = createHtmlElement('span', 'ytr-download-preview-label');
+    image.alt = getPreviewActionLabel(asset);
+    image.loading = 'eager';
+    image.decoding = 'async';
+    image.classList.toggle('ytr-download-preview-img-avatar', asset.id === 'avatar');
+    image.classList.toggle('ytr-download-preview-img-banner', asset.id === 'banner');
+    image.dataset.loading = 'true';
+    label.textContent = getPreviewActionLabel(asset);
+    slide.append(skeleton, image, label);
+    previewStrip.appendChild(slide);
+    previewSlides.set(asset, { image, label, skeleton });
 
     const downloadItem = createHtmlElement('button', 'ytr-download-menu-item') as HTMLButtonElement;
     downloadItem.type = 'button';
@@ -9721,12 +9732,11 @@ function createChannelAssetsButton(info: ChannelPageInfo, isRu: boolean): HTMLEl
     actions.appendChild(downloadItem);
   });
 
-  if (previewGrid.childElementCount) {
-    carousel.append(prevButton, previewGrid, nextButton);
+  if (assets.length) {
+    carousel.append(prevButton, previewButton, nextButton);
     menu.appendChild(carousel);
+    syncPreview();
     syncCarouselButtons();
-    window.requestAnimationFrame(() => goToPreview(activePreviewIndex, 'auto'));
-    window.setTimeout(() => goToPreview(activePreviewIndex, 'auto'), 180);
   }
   if (actions.childElementCount) {
     menu.appendChild(actions);
@@ -9745,10 +9755,7 @@ function createChannelAssetsButton(info: ChannelPageInfo, isRu: boolean): HTMLEl
       return;
     }
     openYtrMenu(menu, wrapper);
-    goToPreview(activePreviewIndex, 'auto');
-    window.requestAnimationFrame(() => goToPreview(activePreviewIndex, 'auto'));
-    window.setTimeout(() => goToPreview(activePreviewIndex, 'auto'), 120);
-    window.setTimeout(() => goToPreview(activePreviewIndex, 'auto'), 320);
+    syncPreview();
   });
 
   wrapper.append(button, menu);

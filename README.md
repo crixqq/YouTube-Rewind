@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <b>Clean up YouTube's interface — hide clutter, filter content, customize the look.</b>
+  <b>Customize YouTube and add practical tools for viewers and creators.</b>
 </p>
 
 <p align="center">
@@ -44,16 +44,18 @@
 
 ## <img src="docs/icons/overview.svg" width="18" height="18" alt=""> Overview
 
-This README has been rechecked against the current `0.6.0` version, including auto theme mode, linked light/dark palette behavior, fullscreen preview tools, frame screenshots, channel asset tools, hover-preview controls, auto-skip ads, AI video chat, and beta toggles that can be saved into profiles.
+This README has been rechecked against the current `0.6.0` version, including auto theme mode, linked light/dark palette behavior, fullscreen preview tools, frame screenshots, channel asset tools, external stats menus, hover-preview controls, auto-skip ads, Video Sense AI, and beta toggles that can be saved into profiles.
 
 All current features, supported UI languages, installation formats, and release-facing usage notes are listed in this `README.md`.
 
-YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and more personal without losing the parts that matter.
+YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, more personal, and more useful without losing the parts that matter. It now covers both interface customization and extra tools for everyday viewers, power users, and creators checking assets or analytics.
 
 - <img src="docs/icons/bullet_filter.svg" width="16" height="16" alt=""> Hide clutter across the homepage, search results, top bar, watch page, and sidebar
 - <img src="docs/icons/bullet_profiles.svg" width="16" height="16" alt=""> Save presets and custom profiles, including beta/labs setups
 - <img src="docs/icons/bullet_preview.svg" width="16" height="16" alt=""> Preview thumbnails fullscreen, copy the image or its link, and download it
 - <img src="docs/icons/bullet_screenshot.svg" width="16" height="16" alt=""> Capture clean video-frame screenshots
+- <img src="docs/icons/bullet_screenshot.svg" width="16" height="16" alt=""> Open channel/video stats shortcuts and download channel avatars or banners
+- <img src="docs/icons/bullet_languages.svg" width="16" height="16" alt=""> Ask Video Sense AI about the current video using page context, links, comments, web snippets, and source checks
 - <img src="docs/icons/bullet_appearance.svg" width="16" height="16" alt=""> Customize thumbnails, avatar shapes, banners, player layout, and even the YouTube logo
 - <img src="docs/icons/bullet_languages.svg" width="16" height="16" alt=""> Use the settings UI in 14 languages
 
@@ -95,10 +97,11 @@ YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and 
 | | |
 |---|---|
 | **Video Buttons** | Hide individual video action buttons: Join, Subscribe, Like/Dislike, Share, Download, Clip/Remix, Thanks, Save |
-| **Download Control** | Adds a native-style action near the YouTube buttons to open a thumbnail menu, preview the image fullscreen, copy it, copy its link, and download it |
+| **Download Control** | Adds a native-style action near the YouTube buttons to open a thumbnail menu, wait for a clean preview load, preview the image fullscreen, copy it, copy its link, and download it |
 | **Frame Screenshot** | Capture the current video frame without player chrome, then preview, annotate, copy, or download it |
 | **Banner Style** | Change channel banner appearance: default or sharp (no rounding) |
-| **Channel Assets** | Add tools next to Subscribe / Join on channel pages to preview or download the channel avatar and the full banner version, and open one compact stats menu for external analytics sites |
+| **Channel Assets** | Add tools next to Subscribe / Join on channel pages to preview or download the channel avatar and full banner version |
+| **Stats Menus** | Open compact external analytics menus for channels and videos: Social Blade, vidIQ, ViewStats, Playboard, and NoxInfluencer where supported |
 
 </details>
 
@@ -190,6 +193,18 @@ YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and 
 </details>
 
 <details open>
+<summary><b><img src="docs/icons/beta_features.svg" width="16" height="16" alt=""> Video Sense AI</b></summary>
+
+| | |
+|---|---|
+| **Video Assistant** | Optional side panel for asking questions about the current video, its description, links, visible comments, source videos, web snippets, and channel context |
+| **Multiple Providers** | Configure OpenRouter, OpenAI, Claude, or Perplexity-compatible presets from the assistant settings page |
+| **Answer Controls** | Tune response style, language, temperature, answer length, web search depth, source-link inspection, and sensitive-content behavior |
+| **Context Awareness** | The assistant is prompted to separate uploaders, clippers, streamers, original sources, ads, merch, and generic platforms instead of mixing them together |
+
+</details>
+
+<details open>
 <summary><b><img src="docs/icons/beta_features.svg" width="16" height="16" alt=""> Beta Features</b></summary>
 
 | | |
@@ -197,7 +212,6 @@ YouTube Rewind is made for people who want YouTube to feel calmer, cleaner, and 
 | **Default Quality** | Experimental preferred video quality override (144p–8K). It is still being tuned because YouTube can ignore or reset quality decisions unexpectedly |
 | **Homepage Reveal Animation** | Replays a lightweight entrance animation for homepage cards on load, SPA navigation, and when cards re-enter the viewport |
 | **Disable Avatar Live Redirect** | Prevent channel avatar clicks on the homepage from sending you into a live stream |
-| **AI Video Chat** | Optional OpenRouter-powered side panel that uses the current video's transcript as context for questions and summaries |
 
 </details>
 
