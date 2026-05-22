@@ -7268,6 +7268,41 @@ function buildAiVideoContextMessage(
   return contextLines.join('\n');
 }
 
+function buildAiToolContextMessage(
+  metadata: WatchMetadata,
+  linkedYouTubeContext: string,
+  channelContext: string,
+  relatedVideosContext: string,
+  webResearch: { text: string; usedWeb: boolean },
+  isRu: boolean,
+): string {
+  const youtubeGeminiSummary = getYouTubeAiGeneratedSummary(isRu);
+  return [
+    isRu ? 'Отчёт инструментов контекста:' : 'Context tools report:',
+    isRu
+      ? `- Метаданные страницы: использованы (${metadata.description ? 'описание есть' : 'описания нет'}, ссылок: ${metadata.links.length}, комментариев: ${metadata.comments.length}).`
+      : `- Page metadata: used (${metadata.description ? 'description present' : 'no description'}, links: ${metadata.links.length}, comments: ${metadata.comments.length}).`,
+    youtubeGeminiSummary
+      ? (isRu ? '- YouTube/Gemini: встроенная сводка на странице найдена и добавлена в контекст.' : '- YouTube/Gemini: built-in page summary was found and added to context.')
+      : (isRu ? '- YouTube/Gemini: встроенная сводка на странице не найдена; прямой приватный чат Gemini недоступен расширению.' : '- YouTube/Gemini: no built-in page summary was found; direct private Gemini chat is not available to the extension.'),
+    linkedYouTubeContext
+      ? (isRu ? '- YouTube-ссылки из описания: проверены и добавлены.' : '- Description YouTube links: inspected and added.')
+      : (isRu ? '- YouTube-ссылки из описания: не использовались для этого вопроса или не найдены.' : '- Description YouTube links: not used for this question or not found.'),
+    channelContext
+      ? (isRu ? '- Страница канала: проверена и добавлена.' : '- Channel page: inspected and added.')
+      : (isRu ? '- Страница канала: не использовалась для этого вопроса.' : '- Channel page: not used for this question.'),
+    relatedVideosContext
+      ? (isRu ? '- Похожие видео/контекст страницы: просмотрены.' : '- Related videos/page context: scanned.')
+      : (isRu ? '- Похожие видео/контекст страницы: не использовались.' : '- Related videos/page context: not used.'),
+    webResearch.usedWeb
+      ? (isRu ? '- Веб-поиск: выполнен, сниппеты добавлены ниже.' : '- Web search: performed, snippets are included below.')
+      : (isRu ? '- Веб-поиск: выключен настройками или не требовался.' : '- Web search: disabled by settings or not needed.'),
+    isRu
+      ? 'Правило: если вопрос про факты содержания ролика, сначала опирайся на метаданные, сводку YouTube/Gemini, описание, проверенные ссылки и веб-сниппеты. Если прямой проверки кадра/момента нет, не выдавай догадку за факт.'
+      : 'Rule: for factual questions about the video content, rely first on page metadata, YouTube/Gemini summary, description, inspected links, and web snippets. If a specific moment/frame was not directly verified, do not present a guess as fact.',
+  ].join('\n');
+}
+
 function extractAiPromptKeywords(prompt: string, isRu: boolean): string[] {
   const stopWords = new Set(isRu
     ? [
@@ -7441,6 +7476,9 @@ function buildAiSystemPrompt(isRu: boolean, settings: Settings | null, debugMode
   const researchRule = isRu
     ? 'Исследовательское правило: если пользователь просит найти соцсети/контакты/участников, сначала определи, о ком именно речь: автор текущего канала, нарезчик/перезаливщик, стример/реактор, человек из оригинального ролика, бренд или рекламодатель. Не подменяй запрошенного человека соцсетями загрузившего канала. Если пользователь просит соцсети стримера/человека из оригинала, не включай соцсети нарезчика в основной список; при необходимости вынеси их отдельной пометкой "канал/нарезчик". Если это реакция/нарезка и в описании есть Original Video/Источник/ролик из реакции, используй данные связанного ролика, его название, канал и описание; затем сопоставь имя из запроса с описанием, ссылками, комментариями, сводкой YouTube/Gemini, веб-сниппетами и страницей канала. Отдельно разделяй: подтвержденные личные соцсети запрошенного человека, соцсети канала/нарезчика, анонсы, мерч, донаты, рекламные сервисы и платформы. Ссылки вроде w.tv, магазинов, донатов или рекламных сервисов не являются личными соцсетями, если подпись/хендл/страница явно не принадлежат человеку. Если прямой ссылки нет, честно скажи это и предложи ближайший проверяемый путь поиска, но не выдумывай. Если в описании есть таймкоды, используй их как план, но не выписывай все главы при обычном пересказе.'
     : 'Research rule: when the user asks for socials/contacts/participants, first resolve exactly who they mean: current uploader, clipper/reuploader, streamer/reactor, person from the original video, brand, or advertiser. Never substitute the requested person with the uploader channel socials. If the user asks for socials of a streamer/person from the original source, do not include clipper/uploader socials in the main list; if useful, put them in a separate "uploader/clipper" note. If this is a reaction/clip and the description has Original Video/Source/reaction video links, use the linked video title, channel, and description; then match the requested name against description, links, comments, YouTube/Gemini summary, web snippets, and channel page. Separate confirmed personal socials of the requested person, uploader/clipper socials, announcements, merch, donations, ad services, and platforms. Links like w.tv, stores, donations, or ad services are not personal socials unless the label/handle/page clearly belongs to the person. If no direct link exists, say so and give the closest verifiable search path, but do not invent. If timestamps are present, use them as an outline, but do not list all chapters for a normal summary.';
+  const toolRule = isRu
+    ? 'Правило инструментов: перед ответом учитывай отчёт инструментов контекста. Для пересказа и фактчека используй доступные источники в таком порядке: транскрипция, сводка YouTube/Gemini на странице, описание и таймкоды, проверенные YouTube-ссылки, контекст канала, веб-сниппеты. Если встроенной сводки Gemini нет или прямой чат Gemini недоступен, не притворяйся, что спрашивал его напрямую; скажи вывод по доступному контексту.'
+    : 'Tool rule: before answering, use the context tools report. For summaries and fact checks, prefer available sources in this order: transcript, YouTube/Gemini page summary, description and timestamps, inspected YouTube links, channel context, web snippets. If no Gemini summary is present or direct Gemini chat is unavailable, do not pretend you asked Gemini directly; answer from the available context.';
   const typedSettings = settings as (Settings & Record<string, unknown>) | null;
   const responseLanguage = typedSettings?.aiVideoChatResponseLanguage;
   const adultMode = typedSettings?.aiVideoChatAdultMode;
@@ -7475,7 +7513,7 @@ function buildAiSystemPrompt(isRu: boolean, settings: Settings | null, debugMode
     : reasoningDepth === 'fast'
       ? (isRu ? 'Глубина: отвечай быстрее и короче, но не пропускай проверку ролей и ссылок для соцсетей, источников и оригиналов.' : 'Depth: answer faster and shorter, but do not skip role/link checks for socials, sources, and originals.')
       : (isRu ? 'Глубина: балансируй скорость и проверку; углубляйся, когда вопрос зависит от ролей, ссылок или свежего контекста.' : 'Depth: balance speed and verification; dig deeper when the answer depends on roles, links, or fresh context.');
-  return [custom || [base, presetLine].filter(Boolean).join('\n\n'), researchRule, languageRule, adultRule, reasoningRule, debug].filter(Boolean).join('\n\n');
+  return [custom || [base, presetLine].filter(Boolean).join('\n\n'), researchRule, toolRule, languageRule, adultRule, reasoningRule, debug].filter(Boolean).join('\n\n');
 }
 
 function escapeAiHtml(text: string): string {
@@ -8681,6 +8719,14 @@ function mountAiChatSidebar(videoId: string): void {
     }
 
     const contextMessage = buildAiVideoContextMessage(videoId, null, isRu, prompt);
+    const toolContextMessage = buildAiToolContextMessage(
+      metadata,
+      linkedYouTubeContext,
+      channelContext,
+      relatedVideosContext,
+      webResearch,
+      isRu,
+    );
     const priorHistory = isRetry && previousVariantState
       ? history.slice(0, previousVariantState.historyIndex)
       : history.slice(0, -1);
@@ -8698,6 +8744,7 @@ function mountAiChatSidebar(videoId: string): void {
         role: 'user',
         content: [
           contextMessage,
+          toolContextMessage,
           linkedYouTubeContext,
           channelContext,
           relatedVideosContext,

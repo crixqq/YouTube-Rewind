@@ -40,22 +40,27 @@
   const AI_CHAT_MODEL_PRESETS_BY_PROVIDER = {
     openrouter: AI_CHAT_MODEL_PRESETS,
     openai: [
-      { id: 'gpt-4.1-mini', label: 'GPT-4.1 mini' },
-      { id: 'gpt-4o-mini', label: 'GPT-4o mini' },
       { id: 'gpt-4.1', label: 'GPT-4.1' },
-      { id: 'custom', label: 'custom' },
+      { id: 'gpt-4.1-mini', label: 'GPT-4.1 mini' },
+      { id: 'gpt-4.1-nano', label: 'GPT-4.1 nano' },
+      { id: 'gpt-4o', label: 'GPT-4o' },
+      { id: 'gpt-4o-mini', label: 'GPT-4o mini' },
+      { id: 'o4-mini', label: 'o4-mini' },
+      { id: 'o3-mini', label: 'o3-mini' },
     ],
     anthropic: [
-      { id: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
+      { id: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
       { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
       { id: 'claude-3-7-sonnet-20250219', label: 'Claude 3.7 Sonnet' },
-      { id: 'custom', label: 'custom' },
+      { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
+      { id: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
     ],
     perplexity: [
       { id: 'sonar', label: 'Sonar' },
       { id: 'sonar-pro', label: 'Sonar Pro' },
+      { id: 'sonar-reasoning', label: 'Sonar Reasoning' },
       { id: 'sonar-reasoning-pro', label: 'Sonar Reasoning Pro' },
-      { id: 'custom', label: 'custom' },
+      { id: 'sonar-deep-research', label: 'Sonar Deep Research' },
     ],
   } as const satisfies Record<Settings['aiVideoChatProvider'], readonly { id: string; label: string }[]>;
   const AI_CHAT_PROVIDER_PRESETS = [
@@ -556,6 +561,48 @@
     return presets.find((preset) => preset.id === modelId)?.label || modelId;
   }
 
+  function getAiProviderApiKeySetting(provider: Settings['aiVideoChatProvider'] = settings.aiVideoChatProvider): keyof Settings {
+    if (provider === 'openai') return 'aiVideoChatOpenAiApiKey';
+    if (provider === 'anthropic') return 'aiVideoChatAnthropicApiKey';
+    if (provider === 'perplexity') return 'aiVideoChatPerplexityApiKey';
+    return 'aiVideoChatOpenRouterApiKey';
+  }
+
+  function getAiProviderApiKey(provider: Settings['aiVideoChatProvider'] = settings.aiVideoChatProvider): string {
+    const value = settings[getAiProviderApiKeySetting(provider)];
+    return typeof value === 'string' ? value : settings.aiVideoChatApiKey;
+  }
+
+  function getAiProviderGuideTitle(provider: Settings['aiVideoChatProvider'] = settings.aiVideoChatProvider): string {
+    const label = AI_CHAT_PROVIDER_PRESETS.find((preset) => preset.id === provider)?.label || 'AI';
+    return `How to get a ${label} key`;
+  }
+
+  function getAiModelIconSrc(modelId: string, provider: Settings['aiVideoChatProvider'] = settings.aiVideoChatProvider): string {
+    const normalized = modelId.toLowerCase();
+    let domain = '';
+    if (modelId === 'custom') domain = provider === 'anthropic' ? 'claude.ai' : provider === 'perplexity' ? 'perplexity.ai' : provider === 'openai' ? 'openai.com' : 'openrouter.ai';
+    else if (normalized.includes('claude') || provider === 'anthropic') domain = 'claude.ai';
+    else if (normalized.includes('sonar') || provider === 'perplexity') domain = 'perplexity.ai';
+    else if (normalized.includes('qwen')) domain = 'qwenlm.ai';
+    else if (normalized.includes('gemma') || normalized.startsWith('google/')) domain = 'google.com';
+    else if (normalized.includes('nvidia') || normalized.includes('nemotron')) domain = 'nvidia.com';
+    else if (normalized.includes('arcee')) domain = 'arcee.ai';
+    else if (normalized.includes('openai') || normalized.includes('gpt') || normalized.startsWith('o')) domain = 'openai.com';
+    else domain = provider === 'openrouter' ? 'openrouter.ai' : 'openai.com';
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+  }
+
+  function getAiModelSuggestions(provider: Settings['aiVideoChatProvider'] = settings.aiVideoChatProvider, query = settings.aiVideoChatCustomModel): readonly { id: string; label: string }[] {
+    const needle = query.trim().toLowerCase();
+    const presets = AI_CHAT_MODEL_PRESETS_BY_PROVIDER[provider] || AI_CHAT_MODEL_PRESETS;
+    const candidates = [...AI_CHAT_MODEL_PRESETS, ...presets]
+      .filter((preset) => preset.id !== 'custom')
+      .filter((preset, index, array) => array.findIndex((entry) => entry.id === preset.id) === index);
+    if (!needle) return candidates.slice(0, 8);
+    return candidates.filter((preset) => preset.id.toLowerCase().includes(needle) || preset.label.toLowerCase().includes(needle)).slice(0, 8);
+  }
+
   function getEffectiveAiChatModel(source: Pick<Settings, 'aiVideoChatModel' | 'aiVideoChatCustomModel'> = settings): string {
     if (source.aiVideoChatModel === 'custom') {
       return source.aiVideoChatCustomModel.trim();
@@ -573,10 +620,27 @@
   function updateAiProvider(provider: Settings['aiVideoChatProvider']): void {
     const presets = AI_CHAT_MODEL_PRESETS_BY_PROVIDER[provider] || AI_CHAT_MODEL_PRESETS;
     const modelExists = presets.some((preset) => preset.id === settings.aiVideoChatModel);
+    const apiKey = getAiProviderApiKey(provider);
     void applySettingsPatch({
       aiVideoChatProvider: provider,
+      aiVideoChatApiKey: apiKey,
       aiVideoChatModel: modelExists ? settings.aiVideoChatModel : presets[0]?.id || DEFAULT_SETTINGS.aiVideoChatModel,
     });
+  }
+
+  function updateAiProviderApiKey(value: string): void {
+    void applySettingsPatch({
+      aiVideoChatApiKey: value,
+      [getAiProviderApiKeySetting(settings.aiVideoChatProvider)]: value,
+    } as Partial<Settings>);
+  }
+
+  function updateAiModel(modelId: string): void {
+    void applySettingsPatch({ aiVideoChatModel: modelId });
+  }
+
+  function openAiSettingsPage(): void {
+    void browser.tabs.create({ url: OPENROUTER_GUIDE_URL });
   }
 
   function clampLogoScale(value: number, fallback: number): number {
@@ -1055,14 +1119,6 @@
     }
   }
 
-  function pickSettingsKeys(source: Partial<Settings>, keys: readonly (keyof Settings)[]): Record<string, unknown> {
-    const picked: Record<string, unknown> = {};
-    for (const key of keys) {
-      picked[key as string] = source[key];
-    }
-    return picked;
-  }
-
   function computeProfileModifiedState(nextSettings: Settings): boolean {
     const activeId = nextSettings.activeProfile;
     if (!activeId || activeId === 'none') return false;
@@ -1098,9 +1154,16 @@
     const profile = PROFILES[activeId];
     if (!profile) return false;
 
-    const profileKeys = Object.keys(profile) as (keyof Settings)[];
-    const baseline = { ...DEFAULT_SETTINGS, ...profile };
-    return JSON.stringify(pickSettingsKeys(nextSettings, profileKeys)) !== JSON.stringify(pickSettingsKeys(baseline, profileKeys));
+    const baseline = normalizeLocalSettings({
+      ...DEFAULT_SETTINGS,
+      ...profile,
+      activeProfile: activeId,
+      language: nextSettings.language,
+      customProfiles: cloneCustomProfiles(nextSettings.customProfiles || []),
+      developerEnabled: nextSettings.developerEnabled,
+      extensionLogEnabled: nextSettings.extensionLogEnabled,
+    });
+    return JSON.stringify(extractProfileSettings(nextSettings)) !== JSON.stringify(extractProfileSettings(baseline));
   }
 
   function syncProfileModifiedState(nextSettings: Settings = settings): void {
@@ -1128,10 +1191,7 @@
   }
 
   function shouldDetachBuiltinProfile(partial: Partial<Settings>): boolean {
-    const activeId = settings.activeProfile;
-    if (!activeId || activeId === 'none' || activeId === 'default' || activeId.startsWith('custom:')) return false;
-    if ('activeProfile' in partial || 'customProfiles' in partial) return false;
-    return Object.keys(partial).length > 0;
+    return false;
   }
 
   function createDetachedBuiltinProfilePatch(partial: Partial<Settings>): Partial<Settings> {
@@ -2923,7 +2983,7 @@
           </div>
         </SettingsSection>
 
-        <SettingsSection title={t('sectionAssistant')} icon={ICON.web_asset} hidden={!sectionVisible(['sectionAssistant', 'settingAiVideoChatEnabled', 'settingAiVideoChatProvider', 'settingAiVideoChatApiKey', 'aiVideoChatGuide'])}>
+        <SettingsSection title={t('sectionAssistant')} icon={ICON.web_asset} hidden={!sectionVisible(['sectionAssistant', 'settingAiVideoChatEnabled', 'settingAiVideoChatProvider', 'settingAiVideoChatApiKey', 'settingAiVideoChatModel', 'aiVideoChatGuide'])}>
           <Toggle label={t('settingAiVideoChatEnabled')} checked={settings.aiVideoChatEnabled} onchange={(v) => void applySettingsPatch({ aiVideoChatEnabled: v })} />
           {#if settings.aiVideoChatEnabled}
             <div class="sub-label">{t('settingAiVideoChatProvider')}</div>
@@ -2946,14 +3006,46 @@
               class="profile-name-input ai-api-key-input"
               type="password"
               placeholder={t('settingAiVideoChatApiKey')}
-              value={settings.aiVideoChatApiKey}
-              onchange={(event) => update('aiVideoChatApiKey', (event.currentTarget as HTMLInputElement).value as Settings['aiVideoChatApiKey'])}
+              value={getAiProviderApiKey(settings.aiVideoChatProvider)}
+              onchange={(event) => updateAiProviderApiKey((event.currentTarget as HTMLInputElement).value)}
             />
-            <div class="profile-helper">{t('aiVideoChatApiKeyHint')}</div>
+            <button type="button" class="inline-help-link ai-key-guide-inline" onclick={openAiSettingsPage}>
+              {getAiProviderGuideTitle(settings.aiVideoChatProvider)}
+            </button>
+
+            <div class="sub-label">{t('settingAiVideoChatModel')}</div>
+            <div class="effect-picker ai-model-picker">
+              {#each (AI_CHAT_MODEL_PRESETS_BY_PROVIDER[settings.aiVideoChatProvider] || AI_CHAT_MODEL_PRESETS) as preset (preset.id)}
+                <button
+                  class="effect-option provider-effect-option ai-model-option"
+                  class:active={settings.aiVideoChatModel === preset.id}
+                  onclick={() => updateAiModel(preset.id)}
+                  title={preset.id}
+                >
+                  <img class="provider-icon-img" src={getAiModelIconSrc(preset.id, settings.aiVideoChatProvider)} alt="" loading="lazy" decoding="async" />
+                  <span class="effect-option-label">{preset.id === 'custom' ? t('aiVideoChatModelCustom') : preset.label}</span>
+                </button>
+              {/each}
+            </div>
+            {#if settings.aiVideoChatModel === 'custom'}
+              <input
+                class="profile-name-input ai-custom-model-input"
+                type="text"
+                placeholder="openai/gpt-oss-120b:free"
+                list="ai-model-suggestions"
+                value={settings.aiVideoChatCustomModel}
+                onchange={(event) => update('aiVideoChatCustomModel', (event.currentTarget as HTMLInputElement).value as Settings['aiVideoChatCustomModel'])}
+              />
+              <datalist id="ai-model-suggestions">
+                {#each getAiModelSuggestions(settings.aiVideoChatProvider, settings.aiVideoChatCustomModel) as suggestion (suggestion.id)}
+                  <option value={suggestion.id}>{suggestion.label}</option>
+                {/each}
+              </datalist>
+            {/if}
             <div class="profile-actions-row ai-settings-actions">
-              <a class="action-btn ai-settings-link" href={OPENROUTER_GUIDE_URL} target="_blank" rel="noopener">
+              <button type="button" class="action-btn ai-settings-link" onclick={openAiSettingsPage}>
                 <span>{t('aiVideoChatGuide')}</span>
-              </a>
+              </button>
             </div>
           {/if}
         </SettingsSection>
@@ -3999,6 +4091,42 @@
     max-width: calc(100% - 20px);
     min-width: 0;
     margin: 8px 10px 4px;
+  }
+
+  .inline-help-link {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--md-primary);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .inline-help-link:hover {
+    text-decoration: underline;
+  }
+
+  .ai-key-guide-inline {
+    margin: 0 10px 10px;
+  }
+
+  .ai-model-picker {
+    padding-bottom: 6px;
+  }
+
+  .ai-custom-model-input {
+    display: block;
+    box-sizing: border-box;
+    width: calc(100% - 20px);
+    max-width: calc(100% - 20px);
+    min-width: 0;
+    margin: 0 10px 10px;
   }
 
   .ai-settings-actions {

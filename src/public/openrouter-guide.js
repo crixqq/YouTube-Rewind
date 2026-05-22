@@ -27,6 +27,11 @@ const DEFAULT_SETTINGS = {
   aiVideoChatReasoningDepth: 'balanced',
   activeProfile: 'none',
   customProfiles: [],
+  betaEnabled: false,
+  defaultQuality: 'auto',
+  disableAvatarLiveRedirect: false,
+  betaHomepageRevealAnimation: true,
+  betaStableDescriptionColors: true,
   developerEnabled: false,
   extensionLogEnabled: false,
 };
@@ -37,25 +42,34 @@ const MODEL_PRESETS_BY_PROVIDER = {
     ['openai/gpt-oss-120b:free', 'OpenAI GPT-OSS 120B'],
     ['qwen/qwen3-next-80b-a3b-instruct:free', 'Qwen3 Next 80B'],
     ['google/gemma-4-31b-it:free', 'Gemma 4 31B'],
+    ['google/gemma-4-26b-a4b-it:free', 'Gemma 4 26B A4B'],
+    ['nvidia/nemotron-3-super-120b-a12b:free', 'Nemotron Super 120B'],
+    ['arcee-ai/trinity-large-preview:free', 'Trinity Large Preview'],
+    ['openai/gpt-oss-20b:free', 'OpenAI GPT-OSS 20B'],
     ['custom', 'Custom'],
   ],
   openai: [
-    ['gpt-4.1-mini', 'GPT-4.1 mini'],
-    ['gpt-4o-mini', 'GPT-4o mini'],
     ['gpt-4.1', 'GPT-4.1'],
-    ['custom', 'Custom'],
+    ['gpt-4.1-mini', 'GPT-4.1 mini'],
+    ['gpt-4.1-nano', 'GPT-4.1 nano'],
+    ['gpt-4o', 'GPT-4o'],
+    ['gpt-4o-mini', 'GPT-4o mini'],
+    ['o4-mini', 'o4-mini'],
+    ['o3-mini', 'o3-mini'],
   ],
   anthropic: [
-    ['claude-3-5-haiku-20241022', 'Claude 3.5 Haiku'],
+    ['claude-opus-4-20250514', 'Claude Opus 4'],
     ['claude-sonnet-4-20250514', 'Claude Sonnet 4'],
     ['claude-3-7-sonnet-20250219', 'Claude 3.7 Sonnet'],
-    ['custom', 'Custom'],
+    ['claude-3-5-sonnet-20241022', 'Claude 3.5 Sonnet'],
+    ['claude-3-5-haiku-20241022', 'Claude 3.5 Haiku'],
   ],
   perplexity: [
     ['sonar', 'Sonar'],
     ['sonar-pro', 'Sonar Pro'],
+    ['sonar-reasoning', 'Sonar Reasoning'],
     ['sonar-reasoning-pro', 'Sonar Reasoning Pro'],
-    ['custom', 'Custom'],
+    ['sonar-deep-research', 'Sonar Deep Research'],
   ],
 };
 
@@ -146,6 +160,10 @@ const I18N = {
     profileFocus: 'Focus',
     profileMinimal: 'Minimal',
     profileClean: 'Clean',
+    sectionBeta: 'Beta',
+    settingBetaEnabled: 'Enable beta features',
+    settingDisableAvatarLive: 'Disable live redirect on avatars',
+    settingBetaStableDescriptionColors: 'Stable description colors',
     sectionDeveloper: 'Developer',
     developerEnabled: 'Enable developer tools',
     extensionLogs: 'Record extension logs',
@@ -220,6 +238,10 @@ const I18N = {
     profileFocus: 'Фокус',
     profileMinimal: 'Минимальный',
     profileClean: 'Чистый',
+    sectionBeta: 'Бета',
+    settingBetaEnabled: 'Включить бета-функции',
+    settingDisableAvatarLive: 'Не открывать live при клике по аватару',
+    settingBetaStableDescriptionColors: 'Стабильные цвета описания',
     sectionDeveloper: 'Разработчик',
     developerEnabled: 'Включить инструменты разработчика',
     extensionLogs: 'Записывать логи расширения',
@@ -862,6 +884,55 @@ function getChoiceValue(setting, fallback = '') {
   return pressed instanceof HTMLButtonElement ? pressed.dataset.value || fallback : fallback;
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+function getModelIconUrl(modelId, provider) {
+  const normalized = String(modelId || '').toLowerCase();
+  let domain = '';
+  if (modelId === 'custom') domain = provider === 'anthropic' ? 'claude.ai' : provider === 'perplexity' ? 'perplexity.ai' : provider === 'openai' ? 'openai.com' : 'openrouter.ai';
+  else if (normalized.includes('claude') || provider === 'anthropic') domain = 'claude.ai';
+  else if (normalized.includes('sonar') || provider === 'perplexity') domain = 'perplexity.ai';
+  else if (normalized.includes('qwen')) domain = 'qwenlm.ai';
+  else if (normalized.includes('gemma') || normalized.startsWith('google/')) domain = 'google.com';
+  else if (normalized.includes('nvidia') || normalized.includes('nemotron')) domain = 'nvidia.com';
+  else if (normalized.includes('arcee')) domain = 'arcee.ai';
+  else if (normalized.includes('openai') || normalized.includes('gpt') || normalized.startsWith('o')) domain = 'openai.com';
+  else domain = provider === 'openrouter' ? 'openrouter.ai' : 'openai.com';
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+}
+
+function getModelSuggestions(provider, query = '') {
+  const needle = String(query || '').trim().toLowerCase();
+  const combined = [...MODEL_PRESETS_BY_PROVIDER.openrouter, ...(MODEL_PRESETS_BY_PROVIDER[provider] || [])];
+  const unique = combined
+    .filter(([id]) => id !== 'custom')
+    .filter(([id], index, array) => array.findIndex(([candidateId]) => candidateId === id) === index);
+  const filtered = needle
+    ? unique.filter(([id, label]) => id.toLowerCase().includes(needle) || label.toLowerCase().includes(needle))
+    : unique;
+  return filtered.slice(0, 10);
+}
+
+function syncCustomModelSuggestions(provider) {
+  const list = document.querySelector('#ai-custom-model-suggestions');
+  const field = document.querySelector('[data-setting="aiVideoChatCustomModel"]');
+  if (!(list instanceof HTMLDataListElement)) return;
+  const query = field instanceof HTMLInputElement ? field.value : '';
+  list.replaceChildren();
+  getModelSuggestions(provider, query).forEach(([id, label]) => {
+    const option = document.createElement('option');
+    option.value = id;
+    option.label = label;
+    list.appendChild(option);
+  });
+}
+
 function fillModelChoices(provider, selectedModel) {
   const modelGroup = document.querySelector('[data-choice-group="aiVideoChatModel"]');
   if (!(modelGroup instanceof HTMLElement)) return;
@@ -872,7 +943,7 @@ function fillModelChoices(provider, selectedModel) {
     button.className = 'choice';
     button.type = 'button';
     button.dataset.value = id;
-    button.textContent = label;
+    button.innerHTML = `<img class="choice-icon-img" src="${escapeHtml(getModelIconUrl(id, provider))}" alt="" loading="lazy" decoding="async"><span>${escapeHtml(label)}</span>`;
     button.addEventListener('click', () => {
       setChoiceValue('aiVideoChatModel', id);
       syncAiSettingsForm({ ...(window.__ytrAiSettings || {}), ...collectAiSettingsFormPatch() });
@@ -881,6 +952,7 @@ function fillModelChoices(provider, selectedModel) {
     modelGroup.appendChild(button);
   });
   setChoiceValue('aiVideoChatModel', presets.some(([id]) => id === selectedModel) ? selectedModel : presets[0][0]);
+  syncCustomModelSuggestions(provider);
 }
 
 function syncAutoTextarea(textarea) {
@@ -1018,6 +1090,7 @@ function syncAiSettingsForm(settings = {}, options = {}) {
   if (customModelField instanceof HTMLElement) {
     customModelField.hidden = getChoiceValue('aiVideoChatModel', merged.aiVideoChatModel) !== 'custom';
   }
+  syncCustomModelSuggestions(provider);
   updateCustomModelIcon();
   syncPromptField(merged, Boolean(options.forcePresetPrompt));
   renderPromptPresets(merged);
@@ -1056,7 +1129,9 @@ function collectAiSettingsFormPatch() {
   patch.aiVideoChatSystemPreset = getChoiceValue('aiVideoChatSystemPreset', activeSavedPromptName ? 'custom' : DEFAULT_SETTINGS.aiVideoChatSystemPreset) || 'custom';
   patch.aiVideoChatAdultMode = getChoiceValue('aiVideoChatAdultMode', DEFAULT_SETTINGS.aiVideoChatAdultMode);
   patch.aiVideoChatReasoningDepth = getChoiceValue('aiVideoChatReasoningDepth', DEFAULT_SETTINGS.aiVideoChatReasoningDepth);
-  patch.activeProfile = getChoiceValue('activeProfile', DEFAULT_SETTINGS.activeProfile);
+  if (document.querySelector('[data-choice-group="activeProfile"]')) {
+    patch.activeProfile = getChoiceValue('activeProfile', DEFAULT_SETTINGS.activeProfile);
+  }
   return patch;
 }
 
@@ -1287,6 +1362,7 @@ function bindAiSettingsForm() {
         syncSliderControl(key, value);
       }
       if (field instanceof HTMLInputElement && field.dataset.setting === 'aiVideoChatCustomModel') {
+        syncCustomModelSuggestions(getChoiceValue('aiVideoChatProvider', DEFAULT_SETTINGS.aiVideoChatProvider));
         updateCustomModelIcon();
       }
       scheduleAutoSave();
