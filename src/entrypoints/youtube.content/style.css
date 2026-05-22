@@ -1396,6 +1396,10 @@ html[data-ytr-hide-save-button="true"] [data-ytr-action="save"] {
   display: none !important;
 }
 
+html[data-ytr-hide-ask-button="true"] [data-ytr-action="ask"] {
+  display: none !important;
+}
+
 /* --- Classic Like/Dislike Icons --- */
 
 html[data-ytr-classic-like-icons="true"] {

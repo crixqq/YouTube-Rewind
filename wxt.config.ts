@@ -23,6 +23,10 @@ export default defineConfig({
         '128': 'icon/128.png',
       },
     },
+    options_ui: {
+      page: 'popup.html?view=page',
+      open_in_tab: true,
+    },
     permissions: ['storage', 'unlimitedStorage', 'clipboardRead', 'clipboardWrite', 'downloads'],
     host_permissions: [
       '*://*.youtube.com/*',

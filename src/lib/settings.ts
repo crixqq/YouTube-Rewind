@@ -44,6 +44,7 @@ export interface Settings {
   hideClipButton: boolean;
   hideThanksButton: boolean;
   hideSaveButton: boolean;
+  hideAskButton: boolean;
   hideNewBadge: boolean;
   logoVariant: 'youtube' | 'rewind' | 'custom';
   customLogo: string;
@@ -150,6 +151,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideClipButton: false,
   hideThanksButton: false,
   hideSaveButton: false,
+  hideAskButton: false,
   hideNewBadge: false,
   logoVariant: 'rewind',
   customLogo: '',

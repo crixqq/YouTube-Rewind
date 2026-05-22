@@ -891,6 +891,7 @@
     hideClipButton: ['clip', 'remix', 'клип', 'ремикс'],
     hideThanksButton: ['thanks', 'super thanks', 'спасибо'],
     hideSaveButton: ['save', 'playlist', 'сохранить'],
+    hideAskButton: ['ask', 'ask ai', 'video sense', 'спросить'],
     hideShorts: ['shorts', 'reels', 'шортс', 'короткие видео'],
     hidePosts: ['posts', 'community', 'посты', 'сообщество'],
     hideMixes: ['mixes', 'playlist mixes', 'миксы'],
@@ -2435,6 +2436,7 @@
       { key: 'hideClipButton', label: t('settingHideClipButton'), checked: settings.hideClipButton, onchange: (v: boolean) => update('hideClipButton', v) },
       { key: 'hideThanksButton', label: t('settingHideThanksButton'), checked: settings.hideThanksButton, onchange: (v: boolean) => update('hideThanksButton', v) },
       { key: 'hideSaveButton', label: t('settingHideSaveButton'), checked: settings.hideSaveButton, onchange: (v: boolean) => update('hideSaveButton', v) },
+      { key: 'hideAskButton', label: t('settingHideAskButton'), checked: settings.hideAskButton, onchange: (v: boolean) => update('hideAskButton', v) },
     ];
   });
 
@@ -2706,13 +2708,18 @@
           <Toggle label={t('settingClassicLikeIcons')} checked={settings.classicLikeIcons} onchange={(v) => update('classicLikeIcons', v)} />
         </SettingsSection>
 
-        <SettingsSection title={t('sectionWatchPage')} icon={ICON.visibility} hidden={!sectionVisible(['sectionWatchPage', 'settingHideJoinButton', 'settingHideSubscribeButton', 'settingHideLikeDislike', 'settingHideShareButton', 'settingHideDownloadButton', 'settingHideClipButton', 'settingHideThanksButton', 'settingHideSaveButton', 'sectionBannerStyle', 'settingDownloadThumbnail', 'settingBetaVideoFrameScreenshot', 'settingBetaScreenshotInstantDownload'])}>
+        <SettingsSection title={t('sectionWatchPage')} icon={ICON.visibility} hidden={!sectionVisible(['sectionWatchPage', 'settingHideJoinButton', 'settingHideSubscribeButton', 'settingHideLikeDislike', 'settingHideShareButton', 'settingHideDownloadButton', 'settingHideClipButton', 'settingHideThanksButton', 'settingHideSaveButton', 'settingHideAskButton', 'settingDownloadThumbnail', 'settingBetaVideoFrameScreenshot', 'settingBetaScreenshotInstantDownload'])}>
           <ChipGroup filters={visibleFilters(videoButtonFilters)} />
           <Toggle label={t('settingDownloadThumbnail')} checked={settings.downloadThumbnailButton} onchange={(v) => void applySettingsPatch({ downloadThumbnailButton: v })} />
           <Toggle label={t('settingBetaVideoFrameScreenshot')} checked={settings.betaVideoFrameScreenshot} onchange={toggleBetaVideoFrameScreenshot} />
           {#if settings.betaVideoFrameScreenshot}
             <Toggle label={t('settingBetaScreenshotInstantDownload')} checked={settings.betaScreenshotInstantDownload} onchange={(v) => void applySettingsPatch({ betaScreenshotInstantDownload: v })} />
           {/if}
+        </SettingsSection>
+
+        <SettingsSection title={t('sectionChannelPage')} icon={ICON.person} hidden={!sectionVisible(['sectionChannelPage', 'settingDownloadChannelAssets', 'settingShowChannelStatsLinks', 'sectionBannerStyle'], ['channel', 'avatar', 'banner', 'stats'])}>
+          <Toggle label={t('settingDownloadChannelAssets')} checked={settings.downloadChannelAssets} onchange={(v) => void applySettingsPatch({ downloadChannelAssets: v })} />
+          <Toggle label={t('settingShowChannelStatsLinks')} checked={settings.showChannelStatsLinks} onchange={(v) => void applySettingsPatch({ showChannelStatsLinks: v })} />
           <div class="sub-label">{t('sectionBannerStyle')}</div>
           <div class="effect-picker">
             {#each BANNER_STYLES as style (style.id)}
@@ -2725,11 +2732,6 @@
               </button>
             {/each}
           </div>
-        </SettingsSection>
-
-        <SettingsSection title={t('sectionChannelPage')} icon={ICON.person} hidden={!sectionVisible(['sectionChannelPage', 'settingDownloadChannelAssets', 'settingShowChannelStatsLinks'], ['channel', 'avatar', 'banner', 'stats'])}>
-          <Toggle label={t('settingDownloadChannelAssets')} checked={settings.downloadChannelAssets} onchange={(v) => void applySettingsPatch({ downloadChannelAssets: v })} />
-          <Toggle label={t('settingShowChannelStatsLinks')} checked={settings.showChannelStatsLinks} onchange={(v) => void applySettingsPatch({ showChannelStatsLinks: v })} />
         </SettingsSection>
 
         <SettingsSection title={t('sectionWatchTimer')} icon={ICON.timer} hidden={!sectionVisible(['sectionWatchTimer', 'settingWatchTimerEnabled', 'settingWatchTimeLimit', 'settingWatchTimeLimitBlockRepeat'])}>

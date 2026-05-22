@@ -982,7 +982,8 @@ function needsActionTags(): boolean {
     || d.ytrHideDownloadButton === 'true'
     || d.ytrHideClipButton === 'true'
     || d.ytrHideThanksButton === 'true'
-    || d.ytrHideSaveButton === 'true';
+    || d.ytrHideSaveButton === 'true'
+    || d.ytrHideAskButton === 'true';
 }
 
 function applySettings(s: Settings): void {
@@ -1057,6 +1058,7 @@ function applySettings(s: Settings): void {
   d.ytrHideClipButton = String(s.hideClipButton);
   d.ytrHideThanksButton = String(s.hideThanksButton);
   d.ytrHideSaveButton = String(s.hideSaveButton);
+  d.ytrHideAskButton = String(s.hideAskButton);
 
   // Logo presentation
   const resolvedLogoKind = getResolvedLogoKind(s);
@@ -1576,6 +1578,7 @@ function tagSidebarSections(): void {
 // --- Action buttons: tag by aria-label ---
 
 const ACTION_BUTTON_KEYWORDS: Record<string, string[]> = {
+  ask: ['ask', 'спросить'],
   share: ['share', 'поделиться', 'compartir', 'compartilhar', 'partager', 'teilen', 'paylaş', '共有', '공유', '分享'],
   download: ['download', 'скачать', 'descargar', 'baixar', 'télécharger', 'herunterladen', 'indir', 'ダウンロード', '다운로드', '下载', 'offline'],
   clip: ['clip', 'клип', 'recortar', 'recorte', 'extrait', 'schneiden', 'klip', 'クリップ', '클립', '剪辑', 'remix', 'ремикс'],
@@ -1585,9 +1588,9 @@ const ACTION_BUTTON_KEYWORDS: Record<string, string[]> = {
 
 function tagActionButtons(): void {
   if (!needsActionTags()) return;
-  const containers = document.querySelectorAll('#top-level-buttons-computed, ytd-menu-renderer.ytd-watch-metadata');
+  const containers = document.querySelectorAll('#top-level-buttons-computed, #flexible-item-buttons, ytd-menu-renderer.ytd-watch-metadata');
   containers.forEach((container) => {
-    container.querySelectorAll('yt-button-view-model:not([data-ytr-action]), ytd-button-renderer:not([data-ytr-action]), ytd-download-button-renderer:not([data-ytr-action])').forEach((btn) => {
+    container.querySelectorAll('yt-button-view-model:not([data-ytr-action]), button-view-model:not([data-ytr-action]), ytd-button-renderer:not([data-ytr-action]), ytd-download-button-renderer:not([data-ytr-action])').forEach((btn) => {
       const label = (btn.getAttribute('aria-label') || btn.querySelector('button')?.getAttribute('aria-label') || btn.textContent || '').toLowerCase();
       for (const [action, keywords] of Object.entries(ACTION_BUTTON_KEYWORDS)) {
         if (keywords.some((kw) => label.includes(kw))) {

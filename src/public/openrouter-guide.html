@@ -258,12 +258,13 @@
 
       .version-button {
         position: relative;
+        font-size: 11px;
+        color: var(--md-on-surface-variant);
+        background: var(--md-surface-container);
         padding: 2px 8px;
         border: none;
         border-radius: var(--md-shape-full);
-        background: var(--md-surface-container);
-        color: var(--md-on-surface-variant);
-        font: 11px ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+        font-family: monospace;
         cursor: pointer;
         transition:
           transform 0.15s cubic-bezier(0.2, 0, 0, 1),
@@ -1070,20 +1071,19 @@
         flex-direction: column;
         align-items: center;
         gap: 12px;
-        max-width: 1440px;
-        margin: 0 auto;
-        padding: 8px 24px 28px;
-        color: var(--md-on-surface-variant);
+        padding: 20px 24px 28px;
         font-size: 13px;
-        animation: footerFadeIn var(--md-duration-medium) var(--md-easing-emphasized-decel) 0.18s both;
+        color: var(--md-on-surface-variant);
+        animation: footerFadeIn var(--md-duration-long) var(--md-easing-emphasized-decel) 0.4s both;
       }
 
       .about-description {
-        max-width: 320px;
-        margin: 0;
         text-align: center;
+        font-size: 13px;
         line-height: 1.5;
+        color: var(--md-on-surface-variant);
         opacity: 0.8;
+        max-width: 320px;
       }
 
       .about-links {
@@ -1163,30 +1163,71 @@
         transition-duration: 0.06s;
       }
 
-      .about-creator a,
+      .about-creator {
+        font-size: 12px;
+        color: var(--md-on-surface-variant);
+        opacity: 0.7;
+      }
+
+      .about-creator a {
+        color: var(--md-primary);
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.15s ease;
+      }
+
+      .about-creator a:visited {
+        color: var(--md-primary);
+      }
+
+      .about-creator a:hover {
+        text-decoration: underline;
+        color: var(--md-on-surface);
+      }
+
       .footer-link {
         color: var(--md-primary);
         text-decoration: none;
+        font-weight: 500;
+        transition:
+          color 0.15s ease,
+          transform 0.15s ease,
+          opacity 0.15s ease;
       }
 
-      .about-creator a:hover,
+      .footer-link:visited {
+        color: var(--md-primary);
+      }
+
       .footer-link:hover {
+        color: color-mix(in oklab, var(--md-primary), white 18%);
         text-decoration: underline;
       }
 
       .app-footer .footer-link {
-        color: var(--md-on-surface-variant);
         font-size: 11px;
+        color: var(--md-on-surface-variant);
+        text-decoration: none;
         opacity: 0.5;
         transition:
           transform 0.15s ease,
           opacity 0.15s ease,
           color 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        line-height: 1.1;
+        transform-origin: center;
+        backface-visibility: hidden;
       }
 
       .app-footer .footer-link:hover {
         opacity: 0.8;
+        text-decoration: underline;
         transform: scale(1.03);
+      }
+
+      .app-footer .footer-link:active {
+        transform: scale(0.98);
       }
 
       .modal-backdrop {
@@ -1305,27 +1346,6 @@
       </div>
 
       <main class="app-body">
-        <section class="settings-section">
-          <h2 class="section-title">
-            <svg class="section-icon" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor"><path d="M435.5-128.63Q427-137.25 427-150v-165q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v53h323q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H487v52q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63ZM150-202q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h187q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H150Z"></path></svg>
-            <span data-i18n="sectionProfiles">Profiles</span>
-          </h2>
-          <div class="section-content">
-            <div class="setting-row">
-              <div class="choice-group" data-choice-group="activeProfile">
-                <button class="choice" type="button" data-value="default" data-i18n="profileDefault">Default</button>
-                <button class="choice" type="button" data-value="none" data-i18n="profileCustom">Custom</button>
-                <button class="choice" type="button" data-value="focus" data-i18n="profileFocus">Focus</button>
-                <button class="choice" type="button" data-value="minimal" data-i18n="profileMinimal">Minimal</button>
-                <button class="choice" type="button" data-value="clean" data-i18n="profileClean">Clean</button>
-              </div>
-            </div>
-            <div class="setting-row">
-              <a class="action" href="./popup.html?view=page" target="_blank" rel="noopener" data-i18n="openFullSettings">Open full settings</a>
-            </div>
-          </div>
-        </section>
-
         <section class="settings-section">
           <h2 class="section-title">
             <svg class="section-icon" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor"><path d="M180-120q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h600q24 0 42 18t18 42v600q0 24-18 42t-42 18H180Zm0-60h600v-600H180v600Zm80-100h440v-60H260v60Zm0-120h440v-60H260v60Zm0-120h260v-60H260v60Zm0-120h440v-60H260v60Zm-80 360v-600 600Z"></path></svg>
@@ -1553,32 +1573,6 @@
           </div>
         </section>
 
-        <section class="settings-section">
-          <h2 class="section-title">
-            <svg class="section-icon" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor"><path d="M740.5-569Q840-618 840-680q0-63-99.5-111.5T480-840q-161 0-260.5 48.5T120-680q0 62 99.5 111T480-520q161 0 260.5-49ZM592-428.5q62-8.5 117.5-26.5t93-46.5Q840-530 840-570v100q0 40-37.5 68.5t-93 46.5Q654-337 592-328.5T480.5-320q-49.5 0-112-8.5t-118-27q-55.5-18.5-93-47T120-470v-100q0 39 37.5 67.5t93 47q55.5 18.5 118 27t112 8.5q49.5 0 111.5-8.5Z"></path></svg>
-            <span data-i18n="sectionDeveloper">Developer</span>
-          </h2>
-          <div class="section-content">
-            <label class="toggle-row">
-              <span class="toggle-copy">
-                <span class="toggle-title" data-i18n="developerEnabled">Enable developer tools</span>
-              </span>
-              <span class="toggle-track">
-                <span class="toggle-thumb"><svg class="toggle-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
-                <input class="toggle-input" data-setting="developerEnabled" type="checkbox">
-              </span>
-            </label>
-            <label class="toggle-row">
-              <span class="toggle-copy">
-                <span class="toggle-title" data-i18n="extensionLogs">Record extension logs</span>
-              </span>
-              <span class="toggle-track">
-                <span class="toggle-thumb"><svg class="toggle-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
-                <input class="toggle-input" data-setting="extensionLogEnabled" type="checkbox">
-              </span>
-            </label>
-          </div>
-        </section>
       </main>
 
       <footer class="form-footer">
@@ -1605,7 +1599,9 @@
             <span data-i18n="aboutGitHub">GitHub</span>
           </a>
         </div>
-        <div class="about-creator"><span data-i18n="aboutCreator">Created by</span> <a href="https://github.com/crixqq" target="_blank" rel="noopener">crixqq</a></div>
+        <div class="about-creator">
+          <span data-i18n="aboutCreator">Created by</span> <a href="https://github.com/crixqq" target="_blank" rel="noopener">crixqq</a>
+        </div>
         <a class="footer-link" href="https://github.com/crixqq/YouTube-Rewind/blob/main/LICENSE" target="_blank" rel="noopener">GPL-3.0</a>
       </footer>
 
