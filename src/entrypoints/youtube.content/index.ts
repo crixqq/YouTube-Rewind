@@ -1013,11 +1013,14 @@ function applySettings(s: Settings): void {
     d.ytrVideosPerRow = String(s.videosPerRow);
     d.ytrHomeResponsiveGrid = String(!!s.homepageResponsiveGrid);
     el.style.setProperty('--ytr-videos-per-row', String(s.videosPerRow));
+    syncResponsiveHomeGridColumns(s);
     scheduleLowPriorityTask(() => setupPrefetch(), 1400, 260);
   } else {
     delete d.ytrVideosPerRow;
     delete d.ytrHomeResponsiveGrid;
     el.style.removeProperty('--ytr-videos-per-row');
+    el.style.removeProperty('--ytr-responsive-videos-per-row');
+    teardownResponsiveHomeGrid();
     teardownPrefetch();
   }
 
@@ -1972,6 +1975,59 @@ function setupPrefetch(): void {
 // --- Thumbnail: inject SVG pixelation filter ---
 
 let pixelFilterInjected = false;
+let responsiveHomeGridObserver: ResizeObserver | null = null;
+let responsiveHomeGridObservedRoot: HTMLElement | null = null;
+let responsiveHomeGridResizeListener = false;
+
+function getHomeRichGridContents(): HTMLElement | null {
+  return document.querySelector('ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:not(ytd-rich-section-renderer *) > #contents') as HTMLElement | null;
+}
+
+function calculateResponsiveHomeGridColumns(containerWidth: number, desiredColumns: number): number {
+  const desired = Math.min(8, Math.max(1, Math.round(desiredColumns)));
+  if (desired <= 1) return 1;
+  const fullHdContentWidth = 1760;
+  const targetCardWidth = Math.min(420, Math.max(180, fullHdContentWidth / desired));
+  return Math.min(desired, Math.max(1, Math.floor((containerWidth + 8) / targetCardWidth)));
+}
+
+function updateResponsiveHomeGridColumns(settings: Settings | null = currentSettings): void {
+  if (!settings || settings.videosPerRow <= 0 || !settings.homepageResponsiveGrid) {
+    document.documentElement.style.removeProperty('--ytr-responsive-videos-per-row');
+    return;
+  }
+  const contents = getHomeRichGridContents();
+  const containerWidth = Math.max(0, contents?.getBoundingClientRect().width || window.innerWidth);
+  const columns = calculateResponsiveHomeGridColumns(containerWidth, settings.videosPerRow);
+  document.documentElement.style.setProperty('--ytr-responsive-videos-per-row', String(columns));
+}
+
+function syncResponsiveHomeGridColumns(settings: Settings): void {
+  if (!settings.homepageResponsiveGrid || settings.videosPerRow <= 0) {
+    document.documentElement.style.removeProperty('--ytr-responsive-videos-per-row');
+    teardownResponsiveHomeGrid();
+    return;
+  }
+  const contents = getHomeRichGridContents();
+  if (contents && responsiveHomeGridObservedRoot !== contents) {
+    responsiveHomeGridObserver?.disconnect();
+    responsiveHomeGridObservedRoot = contents;
+    responsiveHomeGridObserver = new ResizeObserver(() => updateResponsiveHomeGridColumns());
+    responsiveHomeGridObserver.observe(contents);
+  }
+  if (!responsiveHomeGridResizeListener) {
+    responsiveHomeGridResizeListener = true;
+    window.addEventListener('resize', () => updateResponsiveHomeGridColumns(), { passive: true });
+    document.addEventListener('yt-navigate-finish', () => window.setTimeout(() => syncResponsiveHomeGridColumns(currentSettings || DEFAULT_SETTINGS), 240));
+  }
+  updateResponsiveHomeGridColumns(settings);
+}
+
+function teardownResponsiveHomeGrid(): void {
+  responsiveHomeGridObserver?.disconnect();
+  responsiveHomeGridObserver = null;
+  responsiveHomeGridObservedRoot = null;
+}
 
 function injectPixelFilter(): void {
   if (pixelFilterInjected) return;
@@ -7211,7 +7267,7 @@ function buildAiVideoContextMessage(
         : `The description contains timestamps (${timestampCount}). Use them as an outline, but do not dump all timestamps unless the user explicitly asks for chapters/timestamps.`);
     }
   }
-  const youtubeAiSummary = getYouTubeAiGeneratedSummary(isRu);
+  const youtubeAiSummary = currentSettings?.aiVideoChatUseYouTubeSummary ? getYouTubeAiGeneratedSummary(isRu) : '';
   if (youtubeAiSummary) {
     contextLines.push(
       isRu ? 'Сводка YouTube/Gemini на странице:' : 'YouTube/Gemini summary on the page:',
@@ -7276,7 +7332,7 @@ function buildAiToolContextMessage(
   webResearch: { text: string; usedWeb: boolean },
   isRu: boolean,
 ): string {
-  const youtubeGeminiSummary = getYouTubeAiGeneratedSummary(isRu);
+  const youtubeGeminiSummary = currentSettings?.aiVideoChatUseYouTubeSummary ? getYouTubeAiGeneratedSummary(isRu) : '';
   return [
     isRu ? 'Отчёт инструментов контекста:' : 'Context tools report:',
     isRu
@@ -7284,7 +7340,9 @@ function buildAiToolContextMessage(
       : `- Page metadata: used (${metadata.description ? 'description present' : 'no description'}, links: ${metadata.links.length}, comments: ${metadata.comments.length}).`,
     youtubeGeminiSummary
       ? (isRu ? '- YouTube/Gemini: встроенная сводка на странице найдена и добавлена в контекст.' : '- YouTube/Gemini: built-in page summary was found and added to context.')
-      : (isRu ? '- YouTube/Gemini: встроенная сводка на странице не найдена; прямой приватный чат Gemini недоступен расширению.' : '- YouTube/Gemini: no built-in page summary was found; direct private Gemini chat is not available to the extension.'),
+      : currentSettings?.aiVideoChatUseYouTubeSummary
+        ? (isRu ? '- YouTube/Gemini: встроенная сводка на странице не найдена; прямой приватный чат Gemini недоступен расширению.' : '- YouTube/Gemini: no built-in page summary was found; direct private Gemini chat is not available to the extension.')
+        : (isRu ? '- YouTube/Gemini: экспериментальная сводка выключена в настройках.' : '- YouTube/Gemini: experimental summary use is disabled in settings.'),
     linkedYouTubeContext
       ? (isRu ? '- YouTube-ссылки из описания: проверены и добавлены.' : '- Description YouTube links: inspected and added.')
       : (isRu ? '- YouTube-ссылки из описания: не использовались для этого вопроса или не найдены.' : '- Description YouTube links: not used for this question or not found.'),
@@ -7477,8 +7535,8 @@ function buildAiSystemPrompt(isRu: boolean, settings: Settings | null, debugMode
     ? 'Исследовательское правило: если пользователь просит найти соцсети/контакты/участников, сначала определи, о ком именно речь: автор текущего канала, нарезчик/перезаливщик, стример/реактор, человек из оригинального ролика, бренд или рекламодатель. Не подменяй запрошенного человека соцсетями загрузившего канала. Если пользователь просит соцсети стримера/человека из оригинала, не включай соцсети нарезчика в основной список; при необходимости вынеси их отдельной пометкой "канал/нарезчик". Если это реакция/нарезка и в описании есть Original Video/Источник/ролик из реакции, используй данные связанного ролика, его название, канал и описание; затем сопоставь имя из запроса с описанием, ссылками, комментариями, сводкой YouTube/Gemini, веб-сниппетами и страницей канала. Отдельно разделяй: подтвержденные личные соцсети запрошенного человека, соцсети канала/нарезчика, анонсы, мерч, донаты, рекламные сервисы и платформы. Ссылки вроде w.tv, магазинов, донатов или рекламных сервисов не являются личными соцсетями, если подпись/хендл/страница явно не принадлежат человеку. Если прямой ссылки нет, честно скажи это и предложи ближайший проверяемый путь поиска, но не выдумывай. Если в описании есть таймкоды, используй их как план, но не выписывай все главы при обычном пересказе.'
     : 'Research rule: when the user asks for socials/contacts/participants, first resolve exactly who they mean: current uploader, clipper/reuploader, streamer/reactor, person from the original video, brand, or advertiser. Never substitute the requested person with the uploader channel socials. If the user asks for socials of a streamer/person from the original source, do not include clipper/uploader socials in the main list; if useful, put them in a separate "uploader/clipper" note. If this is a reaction/clip and the description has Original Video/Source/reaction video links, use the linked video title, channel, and description; then match the requested name against description, links, comments, YouTube/Gemini summary, web snippets, and channel page. Separate confirmed personal socials of the requested person, uploader/clipper socials, announcements, merch, donations, ad services, and platforms. Links like w.tv, stores, donations, or ad services are not personal socials unless the label/handle/page clearly belongs to the person. If no direct link exists, say so and give the closest verifiable search path, but do not invent. If timestamps are present, use them as an outline, but do not list all chapters for a normal summary.';
   const toolRule = isRu
-    ? 'Правило инструментов: перед ответом учитывай отчёт инструментов контекста. Для пересказа и фактчека используй доступные источники в таком порядке: транскрипция, сводка YouTube/Gemini на странице, описание и таймкоды, проверенные YouTube-ссылки, контекст канала, веб-сниппеты. Если встроенной сводки Gemini нет или прямой чат Gemini недоступен, не притворяйся, что спрашивал его напрямую; скажи вывод по доступному контексту.'
-    : 'Tool rule: before answering, use the context tools report. For summaries and fact checks, prefer available sources in this order: transcript, YouTube/Gemini page summary, description and timestamps, inspected YouTube links, channel context, web snippets. If no Gemini summary is present or direct Gemini chat is unavailable, do not pretend you asked Gemini directly; answer from the available context.';
+    ? 'Правило инструментов: перед ответом учитывай отчёт инструментов контекста. Для пересказа и фактчека используй доступные источники в таком порядке: транскрипция, сводка YouTube/Gemini на странице если пользователь включил эксперимент, описание и таймкоды, проверенные YouTube-ссылки, контекст канала, веб-сниппеты. Игнорируй Auto-dubbed/автодубляж, рекламные интеграции, промокоды, донаты, магазины и спонсорские блоки, если пользователь прямо не спросил о них. Если встроенной сводки Gemini нет или прямой чат Gemini недоступен, не притворяйся, что спрашивал его напрямую; скажи вывод по доступному контексту.'
+    : 'Tool rule: before answering, use the context tools report. For summaries and fact checks, prefer available sources in this order: transcript, YouTube/Gemini page summary when the user enabled the experiment, description and timestamps, inspected YouTube links, channel context, web snippets. Ignore Auto-dubbed labels, sponsorships, promo codes, donations, shops, and ad blocks unless the user directly asks about them. If no Gemini summary is present or direct Gemini chat is unavailable, do not pretend you asked Gemini directly; answer from the available context.';
   const typedSettings = settings as (Settings & Record<string, unknown>) | null;
   const responseLanguage = typedSettings?.aiVideoChatResponseLanguage;
   const adultMode = typedSettings?.aiVideoChatAdultMode;
@@ -7567,13 +7625,28 @@ function renderAiMarkdown(text: string): string {
 
 function renderAiMarkdownInline(text: string): string {
   const linkTokens: string[] = [];
+  const getFallbackLinkLabel = (rawUrl: string): string => {
+    try {
+      const url = new URL(/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl.replace(/^\/+/, '')}`);
+      const host = url.hostname.replace(/^www\./i, '');
+      if (host === 'youtu.be') return 'YouTube video';
+      if (host.endsWith('youtube.com') && url.pathname === '/watch') return 'YouTube video';
+      if (host === 't.me' || host === 'telegram.me') return `Telegram ${url.pathname.replace(/^\/+/, '@') || 'link'}`;
+      if (host === 'twitch.tv') return `Twitch ${url.pathname.replace(/^\/+/, '') || 'link'}`;
+      if (host === 'vk.com') return `VK ${url.pathname.replace(/^\/+/, '') || 'link'}`;
+      if (host === 'boosty.to') return `Boosty ${url.pathname.replace(/^\/+/, '') || 'link'}`;
+      return host;
+    } catch {
+      return rawUrl;
+    }
+  };
   const createLinkToken = (label: string, rawUrl: string): string => {
     const compactUrl = rawUrl.replace(/\s+/g, '');
     const url = /^https?:\/\//i.test(compactUrl) ? compactUrl : `https://${compactUrl.replace(/^\/+/, '')}`;
     if (!/^https?:\/\/[^\s<>"']+$/i.test(url)) {
       return escapeAiHtml(label);
     }
-    const safeLabel = escapeAiHtml(label.trim() || compactUrl);
+    const safeLabel = escapeAiHtml(label.trim() || getFallbackLinkLabel(compactUrl));
     const safeUrl = escapeAiHtml(url);
     let faviconUrl = '';
     try {
@@ -7584,7 +7657,7 @@ function renderAiMarkdownInline(text: string): string {
       ? `<img class="ytr-ai-link-favicon" src="${escapeAiHtml(faviconUrl)}" alt="" loading="lazy" decoding="async">`
       : '';
     const token = `\uE000${linkTokens.length}\uE001`;
-    linkTokens.push(`<a class="ytr-ai-link" href="${safeUrl}" target="_blank" rel="noopener noreferrer">${iconMarkup}<span>${safeLabel}</span></a>`);
+    linkTokens.push(`<a class="ytr-ai-link" href="${safeUrl}" title="${safeUrl}" data-ytr-ai-link-url="${safeUrl}" target="_blank" rel="noopener noreferrer">${iconMarkup}<span>${safeLabel}</span></a>`);
     return token;
   };
 
@@ -7598,7 +7671,7 @@ function renderAiMarkdownInline(text: string): string {
     const trailing = trailingMatch?.[0] || '';
     const url = trailing ? rawUrl.slice(0, -trailing.length) : rawUrl;
     if (!url) return rawUrl;
-    return `${createLinkToken(url, url)}${trailing}`;
+    return `${createLinkToken(getFallbackLinkLabel(url), url)}${trailing}`;
   });
 
   const escaped = escapeAiHtml(tokenizedLinks)
@@ -7609,6 +7682,80 @@ function renderAiMarkdownInline(text: string): string {
     .replace(/_([^_]+)_/g, '<em>$1</em>');
 
   return escaped.replace(/\uE000(\d+)\uE001/g, (_match, index: string) => linkTokens[Number(index)] || '');
+}
+
+const aiLinkTitleCache = new Map<string, string>();
+
+function cleanAiLinkTitle(title: string, url: string): string {
+  const cleaned = title
+    .replace(/\s+-\s+YouTube\s*$/i, '')
+    .replace(/\s*\|\s*YouTube\s*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (cleaned) return cleaned.slice(0, 140);
+  try {
+    return new URL(url).hostname.replace(/^www\./i, '');
+  } catch {
+    return url;
+  }
+}
+
+function stripAiHtmlTags(value: string): string {
+  return value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function decodeAiHtmlEntities(value: string): string {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = value;
+  return textarea.value;
+}
+
+async function fetchAiLinkTitle(url: string): Promise<string | null> {
+  if (aiLinkTitleCache.has(url)) return aiLinkTitleCache.get(url) || null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (!/(^|\.)youtube\.com$/i.test(parsed.hostname) && !/youtu\.be$/i.test(parsed.hostname)) {
+    return null;
+  }
+  const watchUrl = resolveYouTubeRedirectUrl(parsed).toString();
+  try {
+    const response = await browser.runtime.sendMessage({
+      type: 'ytr_fetch_text',
+      url: watchUrl,
+    }) as FetchTextResponse | undefined;
+    const html = response?.text || '';
+    const match = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i)
+      || html.match(/<title>([\s\S]*?)<\/title>/i);
+    const title = match?.[1] ? decodeAiHtmlEntities(stripAiHtmlTags(match[1])) : '';
+    const cleaned = cleanAiLinkTitle(title, watchUrl);
+    aiLinkTitleCache.set(url, cleaned);
+    return cleaned;
+  } catch {
+    aiLinkTitleCache.set(url, '');
+    return null;
+  }
+}
+
+function hydrateAiMessageLinks(root: ParentNode): void {
+  root.querySelectorAll?.('a.ytr-ai-link[data-ytr-ai-link-url]:not([data-ytr-title-state])').forEach((anchor) => {
+    if (!(anchor instanceof HTMLAnchorElement)) return;
+    const url = anchor.dataset.ytrAiLinkUrl || anchor.href;
+    anchor.dataset.ytrTitleState = 'loading';
+    void fetchAiLinkTitle(url).then((title) => {
+      if (!title) {
+        anchor.dataset.ytrTitleState = 'done';
+        return;
+      }
+      const label = anchor.querySelector('span');
+      if (label) label.textContent = title;
+      anchor.title = url;
+      anchor.dataset.ytrTitleState = 'done';
+    });
+  });
 }
 
 function looksLikeCollapsedAiText(text: string): boolean {
@@ -8263,6 +8410,7 @@ function mountAiChatSidebar(videoId: string): void {
       bubble.innerHTML = role === 'assistant'
         ? renderAiMarkdown(content)
         : escapeAiHtml(content).replace(/\n/g, '<br>');
+      if (role === 'assistant') hydrateAiMessageLinks(bubble);
     }
     messages.appendChild(bubble);
     messages.appendChild(status);
@@ -8284,6 +8432,12 @@ function mountAiChatSidebar(videoId: string): void {
   };
 
   messages.addEventListener('scroll', syncScrollToBottomButton, { passive: true });
+  messages.addEventListener('click', (event) => {
+    const link = event.target instanceof Element ? event.target.closest('a.ytr-ai-link') as HTMLAnchorElement | null : null;
+    if (!link?.href) return;
+    event.preventDefault();
+    window.open(link.href, '_blank', 'noopener,noreferrer');
+  });
   scrollToBottomButton.addEventListener('click', scrollMessagesToBottom);
 
   const appendMessage = (role: UiMessage['role'], content: string, persist = true) => {
@@ -8296,6 +8450,7 @@ function mountAiChatSidebar(videoId: string): void {
   const renderStreamingBubble = (bubble: HTMLElement, content: string, streaming: boolean) => {
     const shouldStickToBottom = isMessagesNearBottom();
     bubble.innerHTML = content ? renderAiMarkdown(content) : '';
+    hydrateAiMessageLinks(bubble);
     if (streaming) {
       const cursor = createHtmlElement('span', 'ytr-ai-sidebar-message-cursor');
       const inlineTarget = bubble.querySelector('p:last-child, li:last-child, td:last-child, th:last-child') as HTMLElement | null;

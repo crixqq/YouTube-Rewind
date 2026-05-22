@@ -1815,6 +1815,7 @@
 
   async function loadImportFile(file: File, mode: 'import' | 'profile-import') {
     if (!file) return;
+    importDragging = false;
     const text = await file.text();
     const parsed = parseSettingsTransfer(text);
     if (!parsed) {
@@ -1882,6 +1883,8 @@
     pendingProfileText = '';
     pendingProfileFileName = '';
     sheetProfileNameInput = '';
+    activeSheet = '';
+    showProfileAdd = false;
     showSheetFeedback(t('profileApplied'));
     showFeedback('profile');
   }
@@ -2305,6 +2308,7 @@
   }
 
   function importProfileFromFile() {
+    showProfileAdd = false;
     if (isStandaloneView) {
       activeSheet = 'profile-import';
       return;
@@ -2809,7 +2813,7 @@
           {/if}
         </SettingsSection>
 
-        <SettingsSection title={t('sectionHomepageFilter')} icon={ICON.home} hidden={!sectionVisible(['sectionHomepageFilter', 'settingVideosPerRow', 'settingHideShorts', 'settingHidePosts', 'settingHideMixes', 'settingHideBreakingNews', 'settingHideLatestPosts', 'settingHideExploreTopics', 'settingHideNewBadge', 'settingHidePlayables', 'settingHideFilterBar'])}>
+        <SettingsSection title={t('sectionHomepageFilter')} icon={ICON.home} hidden={!sectionVisible(['sectionHomepageFilter', 'settingVideosPerRow', 'settingHomepageResponsiveGrid', 'settingHideShorts', 'settingHidePosts', 'settingHideMixes', 'settingHideBreakingNews', 'settingHideLatestPosts', 'settingHideExploreTopics', 'settingHideNewBadge', 'settingHidePlayables', 'settingHideFilterBar'])}>
           <Slider
             label={t('settingVideosPerRow')}
             value={settings.videosPerRow}
@@ -2818,6 +2822,9 @@
             defaultLabel={t('settingVideosPerRowDefault')}
             onchange={(v) => update('videosPerRow', v)}
           />
+          {#if settings.videosPerRow > 0}
+            <Toggle label={t('settingHomepageResponsiveGrid')} checked={settings.homepageResponsiveGrid} onchange={(v) => update('homepageResponsiveGrid', v)} />
+          {/if}
           <ChipGroup filters={visibleFilters(homepageFilters)} />
         </SettingsSection>
 
@@ -3012,6 +3019,7 @@
             <button type="button" class="inline-help-link ai-key-guide-inline" onclick={openAiSettingsPage}>
               {getAiProviderGuideTitle(settings.aiVideoChatProvider)}
             </button>
+            <div class="profile-helper ai-privacy-notice">{t('aiVideoChatPrivacyNotice')}</div>
 
             <div class="sub-label">{t('settingAiVideoChatModel')}</div>
             <div class="effect-picker ai-model-picker">
@@ -3050,7 +3058,7 @@
           {/if}
         </SettingsSection>
 
-        <SettingsSection title={t('sectionBeta')} icon={ICON.info} hidden={!sectionVisible(['sectionBeta', 'settingBetaEnabled', 'settingDefaultQuality', 'settingDisableAvatarLive', 'settingBetaStableDescriptionColors'])}>
+        <SettingsSection title={t('sectionBeta')} icon={ICON.info} hidden={!sectionVisible(['sectionBeta', 'settingBetaEnabled', 'settingDefaultQuality', 'settingDisableAvatarLive', 'settingBetaStableDescriptionColors', 'settingAiVideoChatUseYouTubeSummary'])}>
           <Toggle label={t('settingBetaEnabled')} checked={settings.betaEnabled} onchange={toggleBetaFeatures} />
           {#if settings.betaEnabled}
             <Slider
@@ -3064,6 +3072,7 @@
             />
             <Toggle label={t('settingDisableAvatarLive')} checked={settings.disableAvatarLiveRedirect} onchange={(v) => void applySettingsPatch({ disableAvatarLiveRedirect: v })} />
             <Toggle label={t('settingBetaStableDescriptionColors')} checked={settings.betaStableDescriptionColors} onchange={(v) => void applySettingsPatch({ betaStableDescriptionColors: v })} />
+            <Toggle label={t('settingAiVideoChatUseYouTubeSummary')} checked={settings.aiVideoChatUseYouTubeSummary} onchange={(v) => void applySettingsPatch({ aiVideoChatUseYouTubeSummary: v })} />
           {/if}
 
           {#if betaConfirmOpen}

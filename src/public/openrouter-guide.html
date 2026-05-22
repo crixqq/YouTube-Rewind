@@ -645,6 +645,13 @@
         text-decoration: underline;
       }
 
+      .privacy-note {
+        margin: 8px 0 0;
+        color: var(--md-on-surface-variant);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
       .prompt-toolbar {
         display: flex;
         flex-wrap: wrap;
@@ -1398,6 +1405,7 @@
                 <input id="ai-key" data-setting="aiVideoChatApiKey" type="password" autocomplete="off" placeholder="sk-...">
               </div>
               <button class="inline-help-link" type="button" data-role="provider-guide-link">How to get a key</button>
+              <p class="privacy-note" data-i18n="privacyNotice">Video context, your question, and selected links may be sent to the selected AI provider. AI answers can be inaccurate.</p>
             </div>
           </div>
         </section>
@@ -1529,6 +1537,16 @@
               <span class="toggle-track">
                 <span class="toggle-thumb"><svg class="toggle-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
                 <input class="toggle-input" data-setting="aiVideoChatUseWeb" type="checkbox">
+              </span>
+            </label>
+            <label class="toggle-row">
+              <span class="toggle-copy">
+                <span class="toggle-title" data-i18n="useYouTubeSummaryTitle">Use YouTube/Gemini summary</span>
+                <span class="toggle-description" data-i18n="useYouTubeSummaryDescription">Experimental: read the built-in YouTube AI summary when it is already visible on the page.</span>
+              </span>
+              <span class="toggle-track">
+                <span class="toggle-thumb"><svg class="toggle-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                <input class="toggle-input" data-setting="aiVideoChatUseYouTubeSummary" type="checkbox">
               </span>
             </label>
             <label class="toggle-row">

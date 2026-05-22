@@ -85,6 +85,7 @@ export interface Settings {
   aiVideoChatSavedPrompts: Array<{ name: string; prompt: string }>;
   aiVideoChatAutoOpen: boolean;
   aiVideoChatUseWeb: boolean;
+  aiVideoChatUseYouTubeSummary: boolean;
   aiVideoChatUseChannelContext: boolean;
   aiVideoChatDeepLinkInspection: boolean;
   aiVideoChatMaxWebSnippets: number;
@@ -174,7 +175,7 @@ export const DEFAULT_SETTINGS: Settings = {
   downloadThumbnailButton: false,
   downloadChannelAssets: false,
   showChannelStatsLinks: false,
-  homepageResponsiveGrid: true,
+  homepageResponsiveGrid: false,
   betaChannelTvBannerLookup: true,
   aiVideoChatEnabled: false,
   aiVideoChatApiKey: '',
@@ -192,6 +193,7 @@ export const DEFAULT_SETTINGS: Settings = {
   aiVideoChatSavedPrompts: [],
   aiVideoChatAutoOpen: true,
   aiVideoChatUseWeb: true,
+  aiVideoChatUseYouTubeSummary: false,
   aiVideoChatUseChannelContext: true,
   aiVideoChatDeepLinkInspection: true,
   aiVideoChatMaxWebSnippets: 8,
@@ -522,6 +524,9 @@ function normalizeSettings(input: Partial<Settings> = {}): Settings {
   if (typeof normalized.aiVideoChatUseWeb !== 'boolean') {
     normalized.aiVideoChatUseWeb = DEFAULT_SETTINGS.aiVideoChatUseWeb;
   }
+  if (typeof normalized.aiVideoChatUseYouTubeSummary !== 'boolean') {
+    normalized.aiVideoChatUseYouTubeSummary = DEFAULT_SETTINGS.aiVideoChatUseYouTubeSummary;
+  }
   if (typeof normalized.aiVideoChatUseChannelContext !== 'boolean') {
     normalized.aiVideoChatUseChannelContext = DEFAULT_SETTINGS.aiVideoChatUseChannelContext;
   }
@@ -592,6 +597,9 @@ function normalizeSettings(input: Partial<Settings> = {}): Settings {
     }
     if (typeof profileSettings.aiVideoChatEnabled !== 'boolean') {
       delete profileSettings.aiVideoChatEnabled;
+    }
+    if (typeof profileSettings.aiVideoChatUseYouTubeSummary !== 'boolean') {
+      delete profileSettings.aiVideoChatUseYouTubeSummary;
     }
     if (typeof profileSettings.aiVideoChatApiKey !== 'string') {
       delete profileSettings.aiVideoChatApiKey;

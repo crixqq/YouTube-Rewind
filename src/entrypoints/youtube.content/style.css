@@ -616,7 +616,7 @@ html[data-ytr-videos-per-row] ytd-browse[page-subtype="home"] ytd-rich-grid-rend
 }
 
 html[data-ytr-videos-per-row][data-ytr-home-responsive-grid="true"] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:not(ytd-rich-section-renderer *) > #contents {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)) !important;
+  grid-template-columns: repeat(var(--ytr-responsive-videos-per-row, var(--ytr-videos-per-row)), minmax(0, 1fr)) !important;
 }
 
 /* Force equal sizing on items — only top-level grid */
@@ -4255,31 +4255,29 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
 
 .ytr-playback-rate-bubble {
   position: absolute;
-  top: 24px;
+  top: 52px;
   left: 50%;
-  transform: translateX(-50%) translateY(-6px) scale(0.96);
-  min-width: 86px;
-  padding: 12px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 18px;
-  background: rgba(18, 17, 22, 0.72);
-  color: #f7f2ff;
-  font: 700 16px/1 'Google Sans', 'Roboto', 'Arial', sans-serif;
+  transform: translateX(-50%) translateY(-4px);
+  min-width: 72px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 2px;
+  background: rgba(49, 49, 49, 0.92);
+  color: #fff;
+  font: 500 18px/1.15 'Roboto', 'Arial', sans-serif;
   text-align: center;
-  letter-spacing: 0.01em;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(12px);
+  letter-spacing: 0;
+  box-shadow: none;
+  backdrop-filter: none;
   pointer-events: none;
   opacity: 0;
-  transition:
-    opacity 0.22s ease,
-    transform 0.22s cubic-bezier(0.2, 0, 0, 1);
+  transition: opacity 0.16s ease, transform 0.16s ease;
   z-index: 2147483000;
 }
 
 .ytr-playback-rate-bubble[data-visible="true"] {
   opacity: 1;
-  transform: translateX(-50%) translateY(0) scale(1);
+  transform: translateX(-50%) translateY(0);
 }
 
 .ytr-ai-chat-panel {
