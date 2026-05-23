@@ -3639,6 +3639,26 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
   }
 }
 
+@keyframes ytr-ai-stop-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ytr-ui-error, #ff6b6b) 0%, transparent);
+  }
+
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--ytr-ui-error, #ff6b6b) 16%, transparent);
+  }
+}
+
+@keyframes ytr-ai-stop-icon-pop {
+  from {
+    transform: scale(0.76) rotate(-8deg);
+  }
+
+  to {
+    transform: scale(1) rotate(0);
+  }
+}
+
 @keyframes ytr-status-pulse {
   0%, 100% {
     opacity: 0.92;
@@ -3971,8 +3991,8 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin-top: -22px;
-  padding-top: 24px;
+  margin-top: 0;
+  padding: 2px 0 4px;
   overflow: visible;
 }
 
@@ -4014,8 +4034,8 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
   content: attr(data-tooltip);
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 5px);
-  z-index: 2;
+  top: calc(100% + 7px);
+  z-index: 5;
   max-width: 160px;
   padding: 6px 8px;
   border: 1px solid color-mix(in srgb, var(--ytr-ui-text) 14%, transparent);
@@ -4027,7 +4047,7 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, 4px);
+  transform: translate(-50%, -4px);
   transition: opacity 0.16s ease 0.65s, transform 0.16s ease 0.65s;
 }
 
@@ -4035,16 +4055,16 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 1px);
-  z-index: 3;
+  top: calc(100% + 3px);
+  z-index: 6;
   width: 7px;
   height: 7px;
-  border-right: 1px solid color-mix(in srgb, var(--ytr-ui-text) 14%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--ytr-ui-text) 14%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--ytr-ui-text) 14%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--ytr-ui-text) 14%, transparent);
   background: var(--ytr-ui-surface-highest);
   opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, 4px) rotate(45deg);
+  transform: translate(-50%, -4px) rotate(45deg);
   transition: opacity 0.16s ease 0.65s, transform 0.16s ease 0.65s;
 }
 
@@ -4235,6 +4255,15 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
   transform: scale(1.04);
 }
 
+.ytr-ai-sidebar-send[data-mode="stop"] {
+  background: color-mix(in srgb, var(--ytr-ui-error, #ff6b6b) 18%, var(--ytr-ui-primary));
+  animation: ytr-ai-stop-pulse 1.15s ease-in-out infinite;
+}
+
+.ytr-ai-sidebar-send[data-mode="stop"] .ytr-ai-sidebar-send-icon {
+  animation: ytr-ai-stop-icon-pop 0.42s cubic-bezier(0.2, 0, 0, 1);
+}
+
 .ytr-ai-sidebar-send:active:not(:disabled) {
   transform: scale(0.95);
 }
@@ -4243,6 +4272,7 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
   opacity: 0.45;
   cursor: default;
   transform: none !important;
+  animation: none;
 }
 
 .ytr-ai-sidebar-send-icon {

@@ -265,6 +265,7 @@ const GOOGLE_ROUNDED_ICON_SVGS = {
   queryStats: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M19.88 18.47c.48-.77.75-1.67.69-2.66c-.13-2.15-1.84-3.97-3.97-4.2a4.5 4.5 0 0 0-5.02 4.47c0 2.49 2.01 4.5 4.49 4.5c.88 0 1.7-.26 2.39-.7l2.41 2.41c.39.39 1.03.39 1.42 0c.39-.39.39-1.03 0-1.42l-2.41-2.4zm-3.8.11a2.5 2.5 0 0 1 0-5a2.5 2.5 0 0 1 0 5zm-.36-8.5c-.74.02-1.45.18-2.1.45l-.55-.83l-3.08 5.01a1 1 0 0 1-1.61.13l-2.12-2.47l-3.06 4.9c-.31.49-.97.62-1.44.28c-.42-.31-.54-.89-.26-1.34l3.78-6.05c.36-.57 1.17-.63 1.61-.12L9 12.5l3.18-5.17a.996.996 0 0 1 1.68-.03l1.86 2.78zm2.59.5c-.64-.28-1.33-.45-2.05-.49L20.8 2.9c.31-.49.97-.61 1.43-.27c.43.31.54.9.26 1.34l-4.18 6.61z"/></svg>',
   insights: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M21 8c-1.45 0-2.26 1.44-1.93 2.51l-3.55 3.56c-.3-.09-.74-.09-1.04 0l-2.55-2.55C12.27 10.45 11.46 9 10 9c-1.45 0-2.27 1.44-1.93 2.52l-4.56 4.55C2.44 15.74 1 16.55 1 18c0 1.1.9 2 2 2c1.45 0 2.26-1.44 1.93-2.51l4.55-4.56c.3.09.74.09 1.04 0l2.55 2.55C12.73 16.55 13.54 18 15 18c1.45 0 2.27-1.44 1.93-2.52l3.56-3.55c1.07.33 2.51-.48 2.51-1.93c0-1.1-.9-2-2-2z"/><path d="M15 9l.94-2.07L18 6l-2.06-.93L15 3l-.92 2.07L12 6l2.08.93zM3.5 11L4 9l2-.5L4 8l-.5-2L3 8l-2 .5L3 9z"/></svg>',
   send: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960"><path d="M120-160v-240l320-80-320-80v-240l760 320-760 320Zm80-117 474-203-474-203v85l242 59-242 61v201Zm0 0v-406 406Z"/></svg>',
+  stopCircle: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960"><path d="M360-320h240q17 0 28.5-11.5T640-360v-240q0-17-11.5-28.5T600-640H360q-17 0-28.5 11.5T320-600v240q0 17 11.5 28.5T360-320Zm120 240q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z"/></svg>',
   refresh: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960"><path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z"/></svg>',
   contentCopy: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>',
   settings: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h80l14-106q31-8 57.5-23.5T639-327l99 41 40-68-86-65q5-14 6.5-29.5T700-480q0-16-1.5-31.5T692-541l86-65-40-68-99 42q-22-23-48.5-38.5T534-694l-14-106h-80l-14 106q-31 8-57.5 23.5T321-633l-99-41-40 68 86 64q-5 15-6.5 30T260-480q0 16 1.5 31.5T268-419l-86 65 40 68 99-42q22 23 48.5 38.5T426-266l14 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></svg>',
@@ -2074,6 +2075,8 @@ let playbackSpeedMenuSelectionTimer: number | null = null;
 let playbackSpeedMenuIntentUntil = 0;
 let playbackPointerHoldActive = false;
 let playbackPointerHoldStartRate: number | null = null;
+let playbackKeyboardHoldActive = false;
+let playbackKeyboardHoldStartRate: number | null = null;
 let playbackTemporaryBoostUntil = 0;
 let autoSkipAdsSetup = false;
 let lastAutoSkipAdsClickAt = 0;
@@ -2081,6 +2084,10 @@ let autoSkipAdsInFlight = false;
 let playbackSpeedInitialApplyUntil = 0;
 let playbackRateBubbleHideTimer: number | null = null;
 let playbackRateBubbleEl: HTMLElement | null = null;
+
+function isPlaybackNativeHoldActive(): boolean {
+  return playbackPointerHoldActive || playbackKeyboardHoldActive;
+}
 
 function getCurrentWatchPlaybackKey(): string {
   const url = new URL(window.location.href);
@@ -2129,7 +2136,7 @@ function schedulePlaybackSpeedApply(delays: number[] = [80, 320, 900, 1800]): vo
 
 function schedulePlaybackSpeedRestore(delay = 80): void {
   window.setTimeout(() => {
-    if (playbackPointerHoldActive || Date.now() <= playbackTemporaryBoostUntil) {
+    if (isPlaybackNativeHoldActive() || Date.now() <= playbackTemporaryBoostUntil) {
       return;
     }
     bindPlaybackSpeedVideo(getMainVideoElement());
@@ -2138,7 +2145,7 @@ function schedulePlaybackSpeedRestore(delay = 80): void {
 }
 
 function applyDesiredPlaybackRate(force = false): void {
-  if (!force && (playbackPointerHoldActive || Date.now() <= playbackTemporaryBoostUntil)) return;
+  if (!force && (isPlaybackNativeHoldActive() || Date.now() <= playbackTemporaryBoostUntil)) return;
 
   const manualOverride = clampPlaybackRate(pagePlaybackOverride);
   const target = manualOverride ?? clampPlaybackRate(currentSettings?.playbackSpeed);
@@ -2178,8 +2185,8 @@ function handleObservedPlaybackRateChange(event: Event): void {
   if (now <= playbackSpeedMenuIntentUntil) return;
 
   const desiredRate = getDesiredPlaybackRate();
-  const holdStartRate = clampPlaybackRate(playbackPointerHoldStartRate);
-  const looksLikeYoutubeHoldBoost = playbackPointerHoldActive
+  const holdStartRate = clampPlaybackRate(playbackPointerHoldStartRate ?? playbackKeyboardHoldStartRate);
+  const looksLikeYoutubeHoldBoost = isPlaybackNativeHoldActive()
     && Math.abs(nextRate - 2) < 0.01
     && (holdStartRate === null || Math.abs(holdStartRate - 2) > 0.01);
 
@@ -2231,9 +2238,51 @@ function getPlaybackBubbleHost(): HTMLElement | null {
   return document.querySelector('#movie_player, .html5-video-player') as HTMLElement | null;
 }
 
+function formatPlaybackRateBubbleLabel(rate: number): string {
+  return `${rate.toFixed(1).replace(/\.0$/, '')}x`;
+}
+
+function showNativePlaybackRateBezel(label: string): boolean {
+  const host = getPlaybackBubbleHost();
+  const bezel = host?.querySelector('.ytp-bezel') as HTMLElement | null;
+  const text = bezel?.querySelector('.ytp-bezel-text') as HTMLElement | null;
+  const wrapper = bezel?.querySelector('.ytp-bezel-text-wrapper') as HTMLElement | null;
+  if (!bezel || !text) return false;
+
+  playbackRateBubbleEl?.remove();
+  playbackRateBubbleEl = null;
+
+  if (playbackRateBubbleHideTimer !== null) {
+    clearTimeout(playbackRateBubbleHideTimer);
+  }
+
+  text.textContent = label;
+  bezel.setAttribute('aria-label', `${label} playback speed`);
+  bezel.dataset.ytrPlaybackRateBezel = 'true';
+  bezel.style.display = 'block';
+  text.style.display = '';
+  if (wrapper) wrapper.style.display = '';
+
+  bezel.classList.remove('ytp-bezel-text-hide');
+  void bezel.offsetWidth;
+
+  playbackRateBubbleHideTimer = window.setTimeout(() => {
+    if (bezel.dataset.ytrPlaybackRateBezel === 'true' && text.textContent === label) {
+      bezel.style.display = 'none';
+      delete bezel.dataset.ytrPlaybackRateBezel;
+    }
+    playbackRateBubbleHideTimer = null;
+  }, 900);
+
+  return true;
+}
+
 function showPlaybackRateBubble(rate: number): void {
   const host = getPlaybackBubbleHost();
   if (!host) return;
+  const label = formatPlaybackRateBubbleLabel(rate);
+
+  if (showNativePlaybackRateBezel(label)) return;
 
   if (window.getComputedStyle(host).position === 'static') {
     host.style.position = 'relative';
@@ -2245,7 +2294,7 @@ function showPlaybackRateBubble(rate: number): void {
     host.appendChild(playbackRateBubbleEl);
   }
 
-  playbackRateBubbleEl.textContent = `${rate.toFixed(1).replace(/\.0$/, '')}x`;
+  playbackRateBubbleEl.textContent = label;
   playbackRateBubbleEl.dataset.visible = 'true';
   playbackRateBubbleEl.style.zIndex = '2147483000';
 
@@ -2258,7 +2307,7 @@ function showPlaybackRateBubble(rate: number): void {
       playbackRateBubbleEl.dataset.visible = 'false';
     }
     playbackRateBubbleHideTimer = null;
-  }, 3000);
+  }, 900);
 }
 
 function getPlaybackRateMenuItem(target: EventTarget | null): HTMLElement | null {
@@ -2325,20 +2374,47 @@ function handlePlaybackPointerRelease(): void {
   if (!playbackPointerHoldActive) return;
 
   playbackPointerHoldActive = false;
+  finishPlaybackNativeHold(playbackPointerHoldStartRate);
+  playbackPointerHoldStartRate = null;
+}
+
+function finishPlaybackNativeHold(startRate: number | null): void {
   const video = getMainVideoElement();
   const nextRate = clampPlaybackRate(video?.playbackRate);
-  const holdStartRate = clampPlaybackRate(playbackPointerHoldStartRate);
+  const holdStartRate = clampPlaybackRate(startRate);
   if (nextRate !== null && Math.abs(nextRate - 2) < 0.01 && (holdStartRate === null || Math.abs(holdStartRate - 2) > 0.01)) {
     playbackTemporaryBoostUntil = Date.now() + 900;
   }
   const shouldRestore = Date.now() <= playbackTemporaryBoostUntil + 500;
-  playbackPointerHoldStartRate = null;
 
   if (shouldRestore && getDesiredPlaybackRate() !== null) {
     schedulePlaybackSpeedRestore(120);
     schedulePlaybackSpeedRestore(980);
     schedulePlaybackSpeedRestore(1260);
   }
+}
+
+function isPlaybackTextEntryTarget(target: EventTarget | null): boolean {
+  return target instanceof Element
+    && !!target.closest('input, textarea, select, [contenteditable="true"], [contenteditable="plaintext-only"]');
+}
+
+function handlePlaybackKeyboardDown(event: KeyboardEvent): void {
+  if (event.code !== 'Space') return;
+  if (!isWatchPlaybackPage() || isPlaybackTextEntryTarget(event.target)) return;
+  if (playbackKeyboardHoldActive) return;
+
+  playbackKeyboardHoldActive = true;
+  playbackKeyboardHoldStartRate = clampPlaybackRate(getMainVideoElement()?.playbackRate);
+}
+
+function handlePlaybackKeyboardRelease(event?: KeyboardEvent): void {
+  if (event && event.code !== 'Space') return;
+  if (!playbackKeyboardHoldActive) return;
+
+  playbackKeyboardHoldActive = false;
+  finishPlaybackNativeHold(playbackKeyboardHoldStartRate);
+  playbackKeyboardHoldStartRate = null;
 }
 
 function bindPlaybackSpeedVideo(video: HTMLVideoElement | null): void {
@@ -2443,6 +2519,9 @@ function setupPlaybackSpeed(s: Settings): void {
     document.addEventListener('pointerdown', handlePlaybackPointerDown, true);
     document.addEventListener('pointerup', handlePlaybackPointerRelease, true);
     document.addEventListener('pointercancel', handlePlaybackPointerRelease, true);
+    document.addEventListener('keydown', handlePlaybackKeyboardDown, true);
+    document.addEventListener('keyup', handlePlaybackKeyboardRelease, true);
+    window.addEventListener('blur', () => handlePlaybackKeyboardRelease());
     document.addEventListener('wheel', handlePlaybackCtrlWheel, { capture: true, passive: false });
   }
 
@@ -7085,7 +7164,7 @@ function getDescriptionLinks(root: Element | null, limit = 24): WatchDescription
   return links;
 }
 
-function getVisibleWatchComments(limit = 5): Array<{ author: string; text: string; pinned: boolean }> {
+function getVisibleWatchComments(limit = 24): Array<{ author: string; text: string; pinned: boolean }> {
   const comments: Array<{ author: string; text: string; pinned: boolean }> = [];
   const seen = new Set<string>();
   const roots = Array.from(document.querySelectorAll('ytd-comment-thread-renderer, ytd-comment-view-model'));
@@ -7097,7 +7176,7 @@ function getVisibleWatchComments(limit = 5): Array<{ author: string; text: strin
     );
     const text = normalizeAiTextContent(
       root.querySelector('#content-text, yt-attributed-string#content-text, .yt-core-attributed-string')?.textContent || '',
-      700,
+      360,
     );
     if (!text) continue;
     const pinned = /pinned|закреп/i.test(root.textContent || '');
@@ -7129,6 +7208,53 @@ function inferVideoRoleHints(metadata: Pick<WatchMetadata, 'title' | 'channel' |
       ? 'В описании есть указание на оригинальное видео/источник; используй его для понимания ролей.'
       : 'The description mentions an original video/source; use it to understand roles.');
   }
+  return hints;
+}
+
+function normalizeAiLooseToken(value: string): string {
+  return value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+function buildAiInitialism(value: string): string {
+  const words = value.match(/[\p{L}\p{N}]+/gu) || [];
+  const initials = words
+    .filter((word) => /\p{L}/u.test(word) && word.length <= 28)
+    .map((word) => Array.from(word)[0] || '')
+    .join('');
+  return initials.length >= 2 && initials.length <= 7 ? initials.toUpperCase() : '';
+}
+
+function buildAiAcronymHints(metadata: WatchMetadata, prompt: string, isRu: boolean): string[] {
+  const promptTokens = new Set((prompt.match(/[\p{L}\p{N}]{2,10}/gu) || []).map(normalizeAiLooseToken));
+  if (!promptTokens.size) return [];
+
+  const candidateSources = [
+    { source: isRu ? 'канал текущего видео' : 'current video channel', value: metadata.channel },
+    ...metadata.title
+      .split(/[|:—–-]+/g)
+      .map((value) => ({ source: isRu ? 'название текущего видео' : 'current video title', value })),
+    ...metadata.links
+      .filter((link) => link.kind === 'youtube-video' || link.kind === 'youtube-channel')
+      .map((link) => ({ source: isRu ? 'ссылка из описания' : 'description link', value: link.text })),
+  ];
+  const seen = new Set<string>();
+  const hints: string[] = [];
+
+  for (const candidate of candidateSources) {
+    const value = normalizeAiTextContent(candidate.value || '', 120);
+    if (!value) continue;
+    const initialism = buildAiInitialism(value);
+    const normalizedInitialism = normalizeAiLooseToken(initialism);
+    if (!normalizedInitialism || !promptTokens.has(normalizedInitialism)) continue;
+    const key = `${normalizedInitialism}::${value}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    hints.push(isRu
+      ? `- ${initialism} может означать "${value}" (${candidate.source}). Проверь это по названию, описанию, ссылкам и веб-сниппетам.`
+      : `- ${initialism} may mean "${value}" (${candidate.source}). Verify it against the title, description, links, and web snippets.`);
+    if (hints.length >= 4) break;
+  }
+
   return hints;
 }
 
@@ -7290,6 +7416,13 @@ function buildAiVideoContextMessage(
   if (roleHints.length) {
     contextLines.push(`${isRu ? 'Подсказки по формату' : 'Format hints'}: ${roleHints.join(' ')}`);
   }
+  const acronymHints = buildAiAcronymHints(metadata, prompt, isRu);
+  if (acronymHints.length) {
+    contextLines.push(
+      isRu ? 'Возможные сокращения из контекста:' : 'Possible context abbreviations:',
+      ...acronymHints,
+    );
+  }
   if (metadata.links.length) {
     contextLines.push(
       isRu ? 'Ссылки из описания:' : 'Description links:',
@@ -7298,7 +7431,9 @@ function buildAiVideoContextMessage(
   }
   if (metadata.comments.length) {
     contextLines.push(
-      isRu ? 'Видимые комментарии/закреп:' : 'Visible comments/pinned comment:',
+      isRu
+        ? 'Видимые комментарии/закреп (вспомогательный сигнал для вопросов и терминов зрителей, не основной источник фактов):'
+        : 'Visible comments/pinned comment (auxiliary signal for viewer questions and terms, not primary factual evidence):',
       ...metadata.comments.map((comment, index) => `${index + 1}. ${comment.pinned ? (isRu ? '[закреп] ' : '[pinned] ') : ''}${comment.author ? `${comment.author}: ` : ''}${comment.text}`),
     );
   }
@@ -7538,8 +7673,8 @@ function buildAiSystemPrompt(isRu: boolean, settings: Settings | null, debugMode
     ? (isRu ? 'Режим разработчика: в конце кратко добавь блок "Debug" с использованными источниками контекста, без скрытых рассуждений.' : 'Developer mode: append a short "Debug" block with used context sources, without hidden reasoning.')
     : '';
   const researchRule = isRu
-    ? 'Исследовательское правило: если пользователь просит найти соцсети/контакты/участников, сначала определи, о ком именно речь: автор текущего канала, нарезчик/перезаливщик, стример/реактор, человек из оригинального ролика, бренд или рекламодатель. Не подменяй запрошенного человека соцсетями загрузившего канала. Если пользователь просит соцсети стримера/человека из оригинала, не включай соцсети нарезчика в основной список; при необходимости вынеси их отдельной пометкой "канал/нарезчик". Если это реакция/нарезка и в описании есть Original Video/Источник/ролик из реакции, используй данные связанного ролика, его название, канал и описание; затем сопоставь имя из запроса с описанием, ссылками, комментариями, сводкой YouTube/Gemini, веб-сниппетами и страницей канала. Отдельно разделяй: подтвержденные личные соцсети запрошенного человека, соцсети канала/нарезчика, анонсы, мерч, донаты, рекламные сервисы и платформы. Ссылки вроде w.tv, магазинов, донатов или рекламных сервисов не являются личными соцсетями, если подпись/хендл/страница явно не принадлежат человеку. Если прямой ссылки нет, честно скажи это и предложи ближайший проверяемый путь поиска, но не выдумывай. Если в описании есть таймкоды, используй их как план, но не выписывай все главы при обычном пересказе.'
-    : 'Research rule: when the user asks for socials/contacts/participants, first resolve exactly who they mean: current uploader, clipper/reuploader, streamer/reactor, person from the original video, brand, or advertiser. Never substitute the requested person with the uploader channel socials. If the user asks for socials of a streamer/person from the original source, do not include clipper/uploader socials in the main list; if useful, put them in a separate "uploader/clipper" note. If this is a reaction/clip and the description has Original Video/Source/reaction video links, use the linked video title, channel, and description; then match the requested name against description, links, comments, YouTube/Gemini summary, web snippets, and channel page. Separate confirmed personal socials of the requested person, uploader/clipper socials, announcements, merch, donations, ad services, and platforms. Links like w.tv, stores, donations, or ad services are not personal socials unless the label/handle/page clearly belongs to the person. If no direct link exists, say so and give the closest verifiable search path, but do not invent. If timestamps are present, use them as an outline, but do not list all chapters for a normal summary.';
+    ? 'Исследовательское правило: если пользователь просит найти соцсети/контакты/участников, сначала определи, о ком именно речь: автор текущего канала, нарезчик/перезаливщик, стример/реактор, человек из оригинального ролика, бренд или рекламодатель. Не подменяй запрошенного человека соцсетями загрузившего канала. Если пользователь просит соцсети стримера/человека из оригинала, не включай соцсети нарезчика в основной список; при необходимости вынеси их отдельной пометкой "канал/нарезчик". Если это реакция/нарезка и в описании есть Original Video/Источник/ролик из реакции, используй данные связанного ролика, его название, канал и описание; затем сопоставь имя из запроса с описанием, ссылками, комментариями, сводкой YouTube/Gemini, веб-сниппетами и страницей канала. Сокращения и сленговые аббревиатуры вроде "РЗТ" сначала сопоставляй с названиями каналов, проектов, источников и оригинальных роликов в текущем контексте, затем проверяй вебом. Отдельно разделяй: подтвержденные личные соцсети запрошенного человека, соцсети канала/нарезчика, анонсы, мерч, донаты, рекламные сервисы и платформы. Ссылки вроде w.tv, магазинов, донатов или рекламных сервисов не являются личными соцсетями, если подпись/хендл/страница явно не принадлежат человеку. Если прямой ссылки нет, честно скажи это и предложи ближайший проверяемый путь поиска, но не выдумывай. Если в описании есть таймкоды, используй их как план, но не выписывай все главы при обычном пересказе.'
+    : 'Research rule: when the user asks for socials/contacts/participants, first resolve exactly who they mean: current uploader, clipper/reuploader, streamer/reactor, person from the original video, brand, or advertiser. Never substitute the requested person with the uploader channel socials. If the user asks for socials of a streamer/person from the original source, do not include clipper/uploader socials in the main list; if useful, put them in a separate "uploader/clipper" note. If this is a reaction/clip and the description has Original Video/Source/reaction video links, use the linked video title, channel, and description; then match the requested name against description, links, comments, YouTube/Gemini summary, web snippets, and channel page. For short abbreviations and slang initials, first match them against channel, project, source, and original video names in the current context, then verify with web snippets. Separate confirmed personal socials of the requested person, uploader/clipper socials, announcements, merch, donations, ad services, and platforms. Links like w.tv, stores, donations, or ad services are not personal socials unless the label/handle/page clearly belongs to the person. If no direct link exists, say so and give the closest verifiable search path, but do not invent. If timestamps are present, use them as an outline, but do not list all chapters for a normal summary.';
   const toolRule = isRu
     ? 'Правило инструментов: перед ответом учитывай отчёт инструментов контекста. Для пересказа и фактчека используй доступные источники в таком порядке: транскрипция, сводка YouTube/Gemini на странице если пользователь включил эксперимент, описание и таймкоды, проверенные YouTube-ссылки, контекст канала, веб-сниппеты. Игнорируй Auto-dubbed/автодубляж, рекламные интеграции, промокоды, донаты, магазины и спонсорские блоки, если пользователь прямо не спросил о них; не упоминай, что такие ссылки или блоки были отброшены. Если встроенной сводки Gemini нет или прямой чат Gemini недоступен, не притворяйся, что спрашивал его напрямую; скажи вывод по доступному контексту.'
     : 'Tool rule: before answering, use the context tools report. For summaries and fact checks, prefer available sources in this order: transcript, YouTube/Gemini page summary when the user enabled the experiment, description and timestamps, inspected YouTube links, channel context, web snippets. Ignore Auto-dubbed labels, sponsorships, promo codes, donations, shops, and ad blocks unless the user directly asks about them; do not mention that these links or blocks were omitted. If no Gemini summary is present or direct Gemini chat is unavailable, do not pretend you asked Gemini directly; answer from the available context.';
@@ -8365,6 +8500,18 @@ function mountAiChatSidebar(videoId: string): void {
   sendButton.setAttribute('aria-label', isRu ? 'Отправить сообщение' : 'Send message');
   sendButton.appendChild(createSvgIcon(GOOGLE_ROUNDED_ICON_SVGS.send, 'ytr-ai-sidebar-send-icon'));
 
+  const setSendButtonMode = (mode: 'send' | 'stop') => {
+    if (sendButton.dataset.mode === mode) return;
+    sendButton.dataset.mode = mode;
+    sendButton.setAttribute('aria-label', mode === 'stop'
+      ? (isRu ? 'Остановить ответ' : 'Stop response')
+      : (isRu ? 'Отправить сообщение' : 'Send message'));
+    sendButton.replaceChildren(createSvgIcon(
+      mode === 'stop' ? GOOGLE_ROUNDED_ICON_SVGS.stopCircle : GOOGLE_ROUNDED_ICON_SVGS.send,
+      'ytr-ai-sidebar-send-icon',
+    ));
+  };
+
   const setCollapsed = (collapsed: boolean) => {
     card.dataset.collapsed = String(collapsed);
   };
@@ -8402,6 +8549,7 @@ function mountAiChatSidebar(videoId: string): void {
   let chatTemperature = getEffectiveAiTemperature(settings);
   let debugContextMode = false;
   let streamPort: browser.runtime.Port | null = null;
+  let stopRequested = false;
 
   const disconnectStreamPort = () => {
     try {
@@ -8409,6 +8557,17 @@ function mountAiChatSidebar(videoId: string): void {
     } catch {}
     streamPort = null;
   };
+
+  const createAiStopError = () => {
+    const error = new Error(isRu ? 'Ответ остановлен пользователем.' : 'Response stopped by the user.');
+    error.name = 'AbortError';
+    return error;
+  };
+
+  const isAiStopError = (error: unknown) => (
+    stopRequested
+    || (error instanceof Error && error.name === 'AbortError')
+  );
 
   const createMessageBubble = (role: UiMessage['role'], content = '') => {
     const bubble = createHtmlElement('div', `ytr-ai-sidebar-message ytr-ai-sidebar-message-${role}`);
@@ -8469,8 +8628,13 @@ function mountAiChatSidebar(videoId: string): void {
     }
   };
 
-  const clearAssistantActionRows = () => {
-    messages.querySelectorAll('.ytr-ai-sidebar-actions').forEach((node) => node.remove());
+  const removeAssistantActionRowsForBubble = (bubble: HTMLElement) => {
+    let next = bubble.nextElementSibling;
+    while (next instanceof HTMLElement && next.classList.contains('ytr-ai-sidebar-actions')) {
+      const current = next;
+      next = next.nextElementSibling;
+      current.remove();
+    }
   };
 
   const setHistoryVariant = (state: AssistantVariantState) => {
@@ -8482,6 +8646,7 @@ function mountAiChatSidebar(videoId: string): void {
 
   const renderAssistantVariant = (bubble: HTMLElement, state: AssistantVariantState, counter?: HTMLElement) => {
     bubble.innerHTML = renderAiMarkdown(state.variants[state.index] || '');
+    hydrateAiMessageLinks(bubble);
     if (counter) {
       counter.textContent = `${state.index + 1}/${state.variants.length}`;
     }
@@ -8494,8 +8659,8 @@ function mountAiChatSidebar(videoId: string): void {
     prompt: string,
     historyIndex: number,
     addVariant = false,
-  ) => {
-    clearAssistantActionRows();
+	  ) => {
+    removeAssistantActionRowsForBubble(bubble);
     let state = assistantVariantStates.get(bubble);
     if (!state) {
       state = { variants: [content], index: 0, prompt, historyIndex };
@@ -8572,7 +8737,7 @@ function mountAiChatSidebar(videoId: string): void {
     modelId: string,
     payloadMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
     onDelta: (accumulatedText: string) => void,
-  ): Promise<{ text: string; model: string }> => {
+  ): Promise<{ text: string; model: string; stopped?: boolean }> => {
     disconnectStreamPort();
 
     return await new Promise((resolve, reject) => {
@@ -8582,7 +8747,7 @@ function mountAiChatSidebar(videoId: string): void {
 
       streamPort = browser.runtime.connect({ name: 'ytr-openrouter-stream' });
 
-      const finish = (result: { text: string; model: string }) => {
+      const finish = (result: { text: string; model: string; stopped?: boolean }) => {
         if (resolved) return;
         resolved = true;
         disconnectStreamPort();
@@ -8626,9 +8791,22 @@ function mountAiChatSidebar(videoId: string): void {
 
       streamPort.onDisconnect.addListener(() => {
         if (resolved) return;
+        if (stopRequested) {
+          finish({
+            text: accumulatedText.trim(),
+            model: resolvedModel,
+            stopped: true,
+          });
+          return;
+        }
         const runtimeError = browser.runtime.lastError?.message;
         fail(runtimeError || (isRu ? 'Соединение со стримом оборвалось.' : 'The streaming connection was closed.'));
       });
+
+      if (stopRequested) {
+        finish({ text: accumulatedText.trim(), model: resolvedModel, stopped: true });
+        return;
+      }
 
       streamPort.postMessage({
         type: 'start',
@@ -8697,9 +8875,14 @@ function mountAiChatSidebar(videoId: string): void {
     isRu ? 'Проверь источники из описания' : 'Check the description sources',
   ];
 
-	  const syncCommandSuggestions = () => {
-	    const value = textarea.value.trimStart();
-	    commandSuggestions.replaceChildren();
+		  const syncCommandSuggestions = () => {
+    if (sending) {
+      commandSuggestions.replaceChildren();
+      commandSuggestions.dataset.visible = 'false';
+      return;
+    }
+		    const value = textarea.value.trimStart();
+		    commandSuggestions.replaceChildren();
     const suggestions = value
       ? value.startsWith('/')
         ? getAvailableCommands()
@@ -8730,11 +8913,26 @@ function mountAiChatSidebar(videoId: string): void {
 	  };
 
 	  const syncComposer = () => {
-	    const hasModel = !!getEffectiveAiChatModel(currentSettings);
-	    sendButton.disabled = sending || !textarea.value.trim() || !contextReady || !hasApiKey || !hasModel;
-	    textarea.disabled = !hasApiKey || !hasModel;
-	    syncCommandSuggestions();
-	  };
+		    const hasModel = !!getEffectiveAiChatModel(currentSettings);
+    setSendButtonMode(sending ? 'stop' : 'send');
+    sendButton.disabled = sending
+      ? stopRequested
+      : !textarea.value.trim() || !contextReady || !hasApiKey || !hasModel;
+		    textarea.disabled = sending || !hasApiKey || !hasModel;
+		    syncCommandSuggestions();
+		  };
+
+  const stopAssistantReply = () => {
+    if (!sending || stopRequested) return;
+    stopRequested = true;
+    disconnectStreamPort();
+    setStatus(isRu ? 'Останавливаю ответ…' : 'Stopping response…');
+    syncComposer();
+  };
+
+  const assertAssistantNotStopped = () => {
+    if (stopRequested) throw createAiStopError();
+  };
 
   const initializeAssistant = () => {
     if (!hasApiKey) {
@@ -8827,8 +9025,9 @@ function mountAiChatSidebar(videoId: string): void {
     }
 
     sending = true;
+    stopRequested = false;
     lastUserPrompt = prompt;
-    clearAssistantActionRows();
+    if (retryBubble) removeAssistantActionRowsForBubble(retryBubble);
     syncComposer();
     let assistantHistoryIndex = -1;
     if (!isRetry) {
@@ -8846,6 +9045,7 @@ function mountAiChatSidebar(videoId: string): void {
       true,
     );
 
+    try {
     const metadata = getCurrentWatchMetadata();
     logExtensionEvent('ai.context', 'building ai context', {
       videoId,
@@ -8856,32 +9056,39 @@ function mountAiChatSidebar(videoId: string): void {
       retry: isRetry,
     });
 
-    let relatedVideosContext = '';
-    if (shouldInspectDescriptionLinks(prompt, metadata, false, isRu)) {
-      setStatus(isRu ? 'Собираю похожие видео…' : 'Scanning related videos…');
-      relatedVideosContext = buildAiRelatedVideosContext(isRu);
-    }
+	    let relatedVideosContext = '';
+	    if (shouldInspectDescriptionLinks(prompt, metadata, false, isRu)) {
+      assertAssistantNotStopped();
+	      setStatus(isRu ? 'Собираю похожие видео…' : 'Scanning related videos…');
+	      relatedVideosContext = buildAiRelatedVideosContext(isRu);
+	    }
 
-    let linkedYouTubeContext = '';
-    if (shouldInspectDescriptionLinks(prompt, metadata, false, isRu)) {
-      setStatus(isRu ? 'Проверяю ссылки из описания…' : 'Checking description links…');
-      linkedYouTubeContext = await fetchLinkedYouTubeContext(metadata, prompt, isRu, false);
-    }
+	    let linkedYouTubeContext = '';
+	    if (shouldInspectDescriptionLinks(prompt, metadata, false, isRu)) {
+      assertAssistantNotStopped();
+	      setStatus(isRu ? 'Проверяю ссылки из описания…' : 'Checking description links…');
+	      linkedYouTubeContext = await fetchLinkedYouTubeContext(metadata, prompt, isRu, false);
+      assertAssistantNotStopped();
+	    }
 
-    let channelContext = '';
-    if (shouldFetchAiChannelContext(prompt, isRu)) {
-      setStatus(isRu ? 'Проверяю страницу канала…' : 'Checking channel page…');
-      channelContext = await fetchCurrentChannelContext(prompt, isRu);
-    }
+	    let channelContext = '';
+	    if (shouldFetchAiChannelContext(prompt, isRu)) {
+      assertAssistantNotStopped();
+	      setStatus(isRu ? 'Проверяю страницу канала…' : 'Checking channel page…');
+	      channelContext = await fetchCurrentChannelContext(prompt, isRu);
+      assertAssistantNotStopped();
+	    }
 
-    let webResearch = { text: '', usedWeb: false };
-    if (shouldFetchAiWebResearch(prompt, false, isRu)) {
-      const topic = buildAiStatusTopic(prompt, isRu);
-      setStatus(topic
-        ? (isRu ? `Ищу в интернете: ${topic}…` : `Searching the web: ${topic}…`)
-        : (isRu ? 'Проверяю сущности и термины в интернете…' : 'Verifying names and terms on the web…'));
-      webResearch = await fetchAiWebResearch(prompt, isRu);
-    }
+	    let webResearch = { text: '', usedWeb: false };
+	    if (shouldFetchAiWebResearch(prompt, false, isRu)) {
+      assertAssistantNotStopped();
+	      const topic = buildAiStatusTopic(prompt, isRu);
+	      setStatus(topic
+	        ? (isRu ? `Ищу в интернете: ${topic}…` : `Searching the web: ${topic}…`)
+	        : (isRu ? 'Проверяю сущности и термины в интернете…' : 'Verifying names and terms on the web…'));
+	      webResearch = await fetchAiWebResearch(prompt, isRu);
+      assertAssistantNotStopped();
+	    }
 
     const contextMessage = buildAiVideoContextMessage(videoId, null, isRu, prompt);
     const toolContextMessage = buildAiToolContextMessage(
@@ -8921,26 +9128,27 @@ function mountAiChatSidebar(videoId: string): void {
       },
     ];
 
-    assistantText = '';
-    renderStreamingBubble(assistantBubble, assistantText, true);
+	    assistantText = '';
+	    renderStreamingBubble(assistantBubble, assistantText, true);
 
-    try {
-      setStatus(
-        webResearch.usedWeb
-          ? (isRu ? 'AI анализирует ролик и веб-источники…' : 'AI is analyzing the video and web sources…')
+	      setStatus(
+	        webResearch.usedWeb
+	          ? (isRu ? 'AI анализирует ролик и веб-источники…' : 'AI is analyzing the video and web sources…')
           : (isRu ? 'AI анализирует ролик…' : 'AI is analyzing the video…'),
       );
 
       const modelAttempts = getAiModelAttempts(modelId);
 
-      let resolvedAssistantText = '';
-      let resolvedAssistantModel = modelId;
-      let lastModelError = '';
+	      let resolvedAssistantText = '';
+	      let resolvedAssistantModel = modelId;
+	      let lastModelError = '';
+      let stoppedByUser = false;
 
-      for (const [attemptIndex, attemptModel] of modelAttempts.entries()) {
-        if (attemptIndex > 0) {
-          assistantText = '';
-          renderStreamingBubble(assistantBubble, assistantText, true);
+	      for (const [attemptIndex, attemptModel] of modelAttempts.entries()) {
+        assertAssistantNotStopped();
+	        if (attemptIndex > 0) {
+	          assistantText = '';
+	          renderStreamingBubble(assistantBubble, assistantText, true);
           setStatus(
             isRu
               ? 'Повторяю запрос через запасной маршрут OpenRouter…'
@@ -8967,10 +9175,18 @@ function mountAiChatSidebar(videoId: string): void {
               maxTokens: (currentSettings as (Settings & Record<string, unknown>) | null)?.aiVideoChatMaxTokens,
             }) as { text?: string; model?: string; error?: string };
 
-          let candidateText = normalizeAiAssistantText(streamedResponse.text);
-          let candidateModel = streamedResponse.model || attemptModel;
+	          let candidateText = normalizeAiAssistantText(streamedResponse.text);
+	          let candidateModel = streamedResponse.model || attemptModel;
+          if (streamedResponse.stopped || stopRequested) {
+            stoppedByUser = true;
+            if (candidateText) {
+              resolvedAssistantText = candidateText;
+              resolvedAssistantModel = candidateModel;
+            }
+            break;
+          }
 
-          if (!candidateText || looksLikeCollapsedAiText(candidateText)) {
+	          if (!candidateText || looksLikeCollapsedAiText(candidateText)) {
               const directResponse = await browser.runtime.sendMessage({
                 type: 'ytr_ai_chat',
                 provider: getEffectiveAiChatProvider(currentSettings),
@@ -8979,9 +9195,10 @@ function mountAiChatSidebar(videoId: string): void {
                 model: attemptModel,
                 messages: payloadMessages,
                 temperature: chatTemperature,
-              }) as OpenRouterChatResponse | undefined;
+	              }) as OpenRouterChatResponse | undefined;
+              assertAssistantNotStopped();
 
-            if (directResponse?.text) {
+	            if (directResponse?.text) {
               candidateText = normalizeAiAssistantText(directResponse.text);
               candidateModel = directResponse.model || candidateModel;
             } else {
@@ -9001,18 +9218,23 @@ function mountAiChatSidebar(videoId: string): void {
               ? 'Модель вернула плохо сформированный текст.'
               : 'The model returned malformed text.';
           }
-        } catch (streamError) {
-          const directResponse = await browser.runtime.sendMessage({
+	        } catch (streamError) {
+          if (isAiStopError(streamError)) {
+            stoppedByUser = true;
+            break;
+          }
+	          const directResponse = await browser.runtime.sendMessage({
             type: 'ytr_ai_chat',
             provider: getEffectiveAiChatProvider(currentSettings),
             endpoint: getEffectiveAiChatEndpoint(currentSettings),
             apiKey,
             model: attemptModel,
             messages: payloadMessages,
-            temperature: chatTemperature,
-          }) as OpenRouterChatResponse | undefined;
+	            temperature: chatTemperature,
+	          }) as OpenRouterChatResponse | undefined;
+          assertAssistantNotStopped();
 
-          if (directResponse?.text) {
+	          if (directResponse?.text) {
             const candidateText = normalizeAiAssistantText(directResponse.text);
             if (candidateText && !looksLikeCollapsedAiText(candidateText)) {
               resolvedAssistantText = candidateText;
@@ -9024,14 +9246,15 @@ function mountAiChatSidebar(videoId: string): void {
           lastModelError = directResponse?.error
             || (streamError instanceof Error ? streamError.message : String(streamError));
         }
-      }
+	      }
 
-      if (!resolvedAssistantText) {
-        throw new Error(lastModelError || (isRu ? 'Не удалось получить ответ от OpenRouter.' : 'Could not get a response from OpenRouter.'));
-      }
+	      if (!resolvedAssistantText) {
+        if (stoppedByUser || stopRequested) throw createAiStopError();
+	        throw new Error(lastModelError || (isRu ? 'Не удалось получить ответ от OpenRouter.' : 'Could not get a response from OpenRouter.'));
+	      }
 
-      assistantText = resolvedAssistantText;
-      renderStreamingBubble(assistantBubble, assistantText, false);
+	      assistantText = resolvedAssistantText;
+	      renderStreamingBubble(assistantBubble, assistantText, false);
       if (isRetry && previousVariantState) {
         assistantHistoryIndex = previousVariantState.historyIndex;
         appendAssistantActions(assistantBubble, assistantText, prompt, assistantHistoryIndex, true);
@@ -9039,9 +9262,23 @@ function mountAiChatSidebar(videoId: string): void {
         assistantHistoryIndex = history.push({ role: 'assistant', content: assistantText }) - 1;
         appendAssistantActions(assistantBubble, assistantText, prompt, assistantHistoryIndex);
       }
-      setStatus('', 'ok');
-    } catch (streamError) {
-      if (isRetry && previousVariantState) {
+	      setStatus(stoppedByUser ? (isRu ? 'Ответ остановлен.' : 'Response stopped.') : '', 'ok');
+	    } catch (streamError) {
+      if (isAiStopError(streamError)) {
+        if (isRetry && previousVariantState) {
+          previousVariantState.index = previousVariantIndex;
+          renderAssistantVariant(assistantBubble, previousVariantState);
+        } else {
+          assistantBubble.remove();
+        }
+	        setStatus(isRu ? 'Ответ остановлен.' : 'Response stopped.', 'ok');
+	        sending = false;
+	        stopRequested = false;
+        disconnectStreamPort();
+	        syncComposer();
+	        return;
+      }
+	      if (isRetry && previousVariantState) {
         previousVariantState.index = previousVariantIndex;
         renderAssistantVariant(assistantBubble, previousVariantState);
       } else {
@@ -9058,9 +9295,11 @@ function mountAiChatSidebar(videoId: string): void {
       setStatus(isRu ? 'Ошибка модели' : 'Model error', 'error');
     }
 
-    sending = false;
-    syncComposer();
-  };
+	    sending = false;
+    stopRequested = false;
+    disconnectStreamPort();
+	    syncComposer();
+	  };
 
   const handleTextareaKeydown = (event: KeyboardEvent) => {
     if (event.key !== 'Enter' || event.shiftKey) return;
@@ -9078,7 +9317,13 @@ function mountAiChatSidebar(videoId: string): void {
   };
 
   activeAiChatCleanup = cleanup;
-  sendButton.addEventListener('click', () => void sendMessage());
+  sendButton.addEventListener('click', () => {
+    if (sending) {
+      stopAssistantReply();
+      return;
+    }
+    void sendMessage();
+  });
   textarea.addEventListener('input', syncComposer);
   textarea.addEventListener('keydown', handleTextareaKeydown);
   syncComposer();

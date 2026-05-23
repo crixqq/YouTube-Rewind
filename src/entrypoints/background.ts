@@ -394,6 +394,57 @@ function extractQuotedSearchTerms(value: string): string[] {
     .filter(Boolean);
 }
 
+function normalizeSearchToken(value: string): string {
+  return value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+function buildSearchInitialism(value: string): string {
+  const words = value.match(/[\p{L}\p{N}]+/gu) || [];
+  const initials = words
+    .filter((word) => /\p{L}/u.test(word) && word.length <= 28)
+    .map((word) => Array.from(word)[0] || '')
+    .join('');
+  return initials.length >= 2 && initials.length <= 7 ? initials.toUpperCase() : '';
+}
+
+function buildAcronymSearchQueries(
+  title: string,
+  channel: string,
+  prompt: string,
+  description: string,
+  links: Array<{ text?: string; url?: string; kind?: string }>,
+): string[] {
+  const promptTokens = new Set((prompt.match(/[\p{L}\p{N}]{2,10}/gu) || []).map(normalizeSearchToken));
+  if (!promptTokens.size) return [];
+
+  const candidates = [
+    channel,
+    ...title.split(/[|:—–-]+/g),
+    ...extractQuotedSearchTerms(description),
+    ...links.map((link) => link.text || ''),
+  ]
+    .map((value) => value.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const queries: string[] = [];
+  const seen = new Set<string>();
+
+  for (const candidate of candidates) {
+    const initialism = buildSearchInitialism(candidate);
+    const normalizedInitialism = normalizeSearchToken(initialism);
+    if (!normalizedInitialism || !promptTokens.has(normalizedInitialism)) continue;
+
+    for (const query of [`${normalizedInitialism} ${candidate}`, `${candidate} ${initialism}`]) {
+      const normalizedQuery = query.trim();
+      if (!normalizedQuery || seen.has(normalizedQuery)) continue;
+      seen.add(normalizedQuery);
+      queries.push(normalizedQuery);
+    }
+    if (queries.length >= 6) break;
+  }
+
+  return queries;
+}
+
 function buildEnrichmentQueries(
   title: string,
   channel: string,
@@ -406,6 +457,7 @@ function buildEnrichmentQueries(
   const normalizedPrompt = prompt.replace(/["'`]+/g, ' ').replace(/\s+/g, ' ').trim();
   const normalizedDescription = description.replace(/["'`]+/g, ' ').replace(/\s+/g, ' ').trim();
   const quotedTerms = extractQuotedSearchTerms(`${title}\n${prompt}\n${description}`).slice(0, 4);
+  const acronymQueries = buildAcronymSearchQueries(title, channel, prompt, description, links);
   const sourceLinkQueries = links
     .filter((link) => /youtube-video|external|music/i.test(link.kind || '') || /оригинал|original|source|источник|cover|кавер/i.test(`${link.text || ''} ${link.url || ''}`))
     .map((link) => `${link.text || ''} ${link.url || ''}`.replace(/\s+/g, ' ').trim())
@@ -416,10 +468,11 @@ function buildEnrichmentQueries(
   const genericPromptWords = new Set([
     'дай', 'скинь', 'ссылки', 'соцсети', 'соц', 'сет', 'автора', 'автор', 'кто', 'что', 'как', 'где',
     'почему', 'ролик', 'видос', 'видео', 'про', 'это', 'мне', 'его', 'ее', 'её', 'их', 'the', 'what',
+    'такой', 'такая', 'такие', 'такое',
     'who', 'where', 'why', 'how', 'video', 'author', 'socials', 'links', 'contacts', 'send', 'give',
   ]);
   const entityTerms = extractQuotedSearchTerms(`${prompt}\n${title}`)
-    .concat((normalizedPrompt.match(/[@\p{L}\p{N}_-]{4,}/gu) || []).slice(0, 4))
+    .concat((normalizedPrompt.match(/[@\p{L}\p{N}_-]{2,}/gu) || []).slice(0, 6))
     .map((term) => term.replace(/^[@#]+/, '').trim())
     .filter((term) => term && !genericPromptWords.has(term.toLowerCase()))
     .slice(0, 5);
@@ -443,6 +496,7 @@ function buildEnrichmentQueries(
 
   return [
     ...quotedTerms,
+    ...acronymQueries,
     ...socialQueries,
     ...originalQueries,
     intentQuery,
@@ -663,10 +717,15 @@ async function gatherAiWebSnippets(
   const seen = new Set<string>();
 
   for (const query of queries) {
+    const [duckDuckGoSnippets, htmlSnippets, wikipediaSnippets] = await Promise.all([
+      fetchDuckDuckGoSnippets(query, maxSnippets),
+      fetchDuckDuckGoHtmlResults(query, maxSnippets),
+      fetchWikipediaSnippets(query, locale, maxSnippets),
+    ]);
     const querySnippets = [
-      ...await fetchDuckDuckGoSnippets(query, maxSnippets),
-      ...await fetchDuckDuckGoHtmlResults(query, maxSnippets),
-      ...await fetchWikipediaSnippets(query, locale, maxSnippets),
+      ...duckDuckGoSnippets,
+      ...htmlSnippets,
+      ...wikipediaSnippets,
     ];
 
     for (const snippet of querySnippets) {
