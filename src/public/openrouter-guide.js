@@ -20,8 +20,8 @@ const DEFAULT_SETTINGS = {
   aiVideoChatUseYouTubeSummary: false,
   aiVideoChatUseChannelContext: true,
   aiVideoChatDeepLinkInspection: true,
-  aiVideoChatMaxWebSnippets: 8,
-  aiVideoChatMaxYouTubeLinks: 8,
+  aiVideoChatMaxWebSnippets: 5,
+  aiVideoChatMaxYouTubeLinks: 5,
   aiVideoChatResponseLanguage: 'auto',
   aiVideoChatAdultMode: 'brief',
   aiVideoChatMaxTokens: 700,
@@ -161,13 +161,32 @@ const I18N = {
     profileFocus: 'Focus',
     profileMinimal: 'Minimal',
     profileClean: 'Clean',
+    profileSaveCurrent: 'Save current',
+    profileSaveChanges: 'Save to profile',
+    profileFromFile: 'From file',
+    profileNamePlaceholder: 'Profile name',
+    profileExport: 'Export profile',
+    profileRenameHelper: 'Double-click a custom profile name to rename it.',
     sectionBeta: 'Beta',
     settingBetaEnabled: 'Enable beta features',
+    settingDefaultQuality: 'Default quality',
     settingDisableAvatarLive: 'Disable live redirect on avatars',
     settingBetaStableDescriptionColors: 'Stable description colors',
     sectionDeveloper: 'Developer',
     developerEnabled: 'Enable developer tools',
     extensionLogs: 'Record extension logs',
+    exportLabel: 'Export',
+    importLabel: 'Import',
+    developerDiagnostics: 'Diagnostics',
+    developerMaintenance: 'Maintenance',
+    developerCopyDebug: 'Copy debug snapshot',
+    developerOpenLogs: 'Open logs',
+    developerCopyLogs: 'Copy logs',
+    developerSaveLogs: 'Save logs',
+    developerClearLogs: 'Clear logs',
+    developerClearUpdateCache: 'Clear update cache',
+    developerResetWatchTime: 'Reset watch timer',
+    developerReloadExtension: 'Reload extension',
     openFullSettings: 'Open full settings',
     autoOpenTitle: 'Open assistant automatically',
     autoOpenDescription: 'Show the chat panel on watch pages when the feature is enabled.',
@@ -242,13 +261,32 @@ const I18N = {
     profileFocus: 'Фокус',
     profileMinimal: 'Минимальный',
     profileClean: 'Чистый',
+    profileSaveCurrent: 'Сохранить',
+    profileSaveChanges: 'Сохранить в профиль',
+    profileFromFile: 'Из файла',
+    profileNamePlaceholder: 'Имя профиля',
+    profileExport: 'Экспорт профиля',
+    profileRenameHelper: 'Дважды нажмите по кастомному профилю, чтобы переименовать его.',
     sectionBeta: 'Бета',
     settingBetaEnabled: 'Включить бета-функции',
+    settingDefaultQuality: 'Качество по умолчанию',
     settingDisableAvatarLive: 'Не открывать live при клике по аватару',
     settingBetaStableDescriptionColors: 'Стабильные цвета описания',
     sectionDeveloper: 'Разработчик',
     developerEnabled: 'Включить инструменты разработчика',
     extensionLogs: 'Записывать логи расширения',
+    exportLabel: 'Экспорт',
+    importLabel: 'Импорт',
+    developerDiagnostics: 'Диагностика',
+    developerMaintenance: 'Обслуживание',
+    developerCopyDebug: 'Скопировать debug-снимок',
+    developerOpenLogs: 'Открыть логи',
+    developerCopyLogs: 'Скопировать логи',
+    developerSaveLogs: 'Сохранить логи',
+    developerClearLogs: 'Очистить логи',
+    developerClearUpdateCache: 'Очистить кэш обновлений',
+    developerResetWatchTime: 'Сбросить таймер просмотра',
+    developerReloadExtension: 'Перезагрузить расширение',
     openFullSettings: 'Открыть полные настройки',
     autoOpenTitle: 'Открывать ассистента автоматически',
     autoOpenDescription: 'Показывать чат на страницах видео, когда функция включена.',
@@ -773,6 +811,158 @@ function setChoiceValue(setting, value) {
   });
 }
 
+const BUILTIN_PROFILES = {
+  focus: {
+    hideShorts: true, hidePosts: true, hideMixes: true, hideBreakingNews: true, hideLatestPosts: true,
+    hideExploreTopics: true, hidePlayables: true, hideFilterBar: true, hideTopbarCreate: true,
+    hideTopbarVoiceSearch: true, hideTopbarNotifications: true, hideCountryCode: true, hideSearchShorts: true,
+    hideSearchPeopleWatched: true, hideSidebarExplore: true, hideSidebarMoreFromYT: true, hideSidebarFooter: true,
+    hideJoinButton: true, hideClipButton: true, hideThanksButton: true, hideSaveButton: true, hideNewBadge: true,
+    thumbnailEffect: 'grayscale', thumbnailHoverReveal: false, disableThumbnailPreview: true,
+    disableHoverAnimation: true, widePlayer: true, watchTimerEnabled: true, watchTimeLimitMinutes: 45,
+    watchTimeLimitBlockRepeat: true, downloadThumbnailButton: true, downloadChannelAssets: true,
+    showChannelStatsLinks: true, homepageResponsiveGrid: true, aiVideoChatAutoOpen: false,
+    disableAvatarLiveRedirect: true,
+  },
+  minimal: {
+    hideShorts: true, hidePosts: true, hideMixes: true, hideBreakingNews: true, hideLatestPosts: true,
+    hideExploreTopics: true, hidePlayables: true, hideFilterBar: true, hideTopbarCreate: true,
+    hideTopbarVoiceSearch: true, hideTopbarNotifications: true, hideTopbarSearch: true, hideCountryCode: true,
+    hideSearchShorts: true, hideSearchChannels: true, hideSearchPeopleWatched: true,
+    hideSidebarSubscriptions: true, hideSidebarYou: true, hideSidebarExplore: true, hideSidebarMoreFromYT: true,
+    hideSidebarReportHistory: true, hideSidebarFooter: true, hideNewBadge: true, hideJoinButton: true,
+    hideDownloadButton: true, hideThanksButton: true, hideClipButton: true, hideSaveButton: true,
+    hideSubscribeButton: true, hideLogoAnimation: true, disableThumbnailPreview: true,
+    disableHoverAnimation: true, homepageResponsiveGrid: true, bannerStyle: 'sharp',
+    thumbnailShape: 'sharp', avatarShape: 'superellipse', classicLikeIcons: true,
+  },
+  clean: {
+    hideBreakingNews: true, hideLatestPosts: true, hideExploreTopics: true, hidePlayables: true,
+    hideFilterBar: true, hideTopbarCreate: true, hideCountryCode: true, hideSidebarFooter: true,
+    hideNewBadge: true, hideClipButton: true, hideThanksButton: true, hideSaveButton: true,
+    disableThumbnailPreview: true, disableHoverAnimation: true, betaStableDescriptionColors: true,
+    classicLikeIcons: true,
+  },
+};
+
+function cloneCustomProfiles(profiles = []) {
+  return profiles.map((profile) => ({ ...profile, settings: { ...(profile?.settings || {}) } }));
+}
+
+function extractProfileSettings(source = {}) {
+  const profileSettings = { ...source };
+  ['language', 'customProfiles', 'activeProfile', 'developerEnabled', 'extensionLogEnabled', 'betaStandalonePage'].forEach((key) => {
+    delete profileSettings[key];
+  });
+  return profileSettings;
+}
+
+function getActiveCustomProfile(settings = window.__ytrAiSettings || {}) {
+  const activeId = String(settings.activeProfile || '');
+  if (!activeId.startsWith('custom:')) return null;
+  const name = activeId.slice(7);
+  return (settings.customProfiles || []).find((profile) => profile.name === name) || null;
+}
+
+async function applyProfile(profileId) {
+  const current = { ...DEFAULT_SETTINGS, ...(window.__ytrAiSettings || await loadStoredSettings()) };
+  if (profileId === 'none') {
+    await saveStoredSettings({ activeProfile: 'none' });
+    return;
+  }
+  if (profileId === 'default') {
+    await saveStoredSettings({ ...DEFAULT_SETTINGS, language: current.language, customProfiles: cloneCustomProfiles(current.customProfiles || []), activeProfile: 'default', developerEnabled: current.developerEnabled, extensionLogEnabled: current.extensionLogEnabled });
+    return;
+  }
+  const profileSettings = BUILTIN_PROFILES[profileId];
+  if (!profileSettings) return;
+  await saveStoredSettings({ ...DEFAULT_SETTINGS, language: current.language, customProfiles: cloneCustomProfiles(current.customProfiles || []), ...profileSettings, activeProfile: profileId, developerEnabled: current.developerEnabled, extensionLogEnabled: current.extensionLogEnabled });
+}
+
+async function applyCustomProfile(profile) {
+  const current = { ...DEFAULT_SETTINGS, ...(window.__ytrAiSettings || await loadStoredSettings()) };
+  await saveStoredSettings({
+    ...DEFAULT_SETTINGS,
+    language: current.language,
+    customProfiles: cloneCustomProfiles(current.customProfiles || []),
+    ...extractProfileSettings(profile.settings || {}),
+    activeProfile: `custom:${profile.name}`,
+  });
+}
+
+function renderProfileChoices(settings = window.__ytrAiSettings || {}) {
+  const host = document.querySelector('[data-role="profile-choices"]');
+  if (!(host instanceof HTMLElement)) return;
+  const customProfiles = cloneCustomProfiles(settings.customProfiles || []);
+  Array.from(host.querySelectorAll('[data-custom-profile="true"]')).forEach((node) => node.remove());
+  customProfiles.forEach((profile, index) => {
+    const wrap = document.createElement('span');
+    wrap.className = 'custom-profile-chip';
+    wrap.dataset.customProfile = 'true';
+    const button = document.createElement('button');
+    button.className = 'choice';
+    button.type = 'button';
+    button.dataset.value = `custom:${profile.name}`;
+    button.textContent = profile.name;
+    button.addEventListener('click', () => void applyCustomProfile(profile));
+    button.addEventListener('dblclick', async () => {
+      const name = window.prompt(t('profileNamePlaceholder'), profile.name)?.trim();
+      if (!name) return;
+      const nextProfiles = cloneCustomProfiles(settings.customProfiles || []);
+      nextProfiles[index] = { ...nextProfiles[index], name };
+      await saveStoredSettings({ customProfiles: nextProfiles, activeProfile: settings.activeProfile === `custom:${profile.name}` ? `custom:${name}` : settings.activeProfile });
+    });
+    const remove = document.createElement('button');
+    remove.className = 'custom-profile-delete';
+    remove.type = 'button';
+    remove.textContent = '×';
+    remove.addEventListener('click', async () => {
+      const nextProfiles = cloneCustomProfiles(settings.customProfiles || []);
+      nextProfiles.splice(index, 1);
+      await saveStoredSettings({ customProfiles: nextProfiles, activeProfile: settings.activeProfile === `custom:${profile.name}` ? 'none' : settings.activeProfile });
+    });
+    wrap.append(button, remove);
+    host.appendChild(wrap);
+  });
+  setChoiceValue('activeProfile', settings.activeProfile || DEFAULT_SETTINGS.activeProfile);
+  const helper = document.querySelector('[data-role="profile-helper"]');
+  if (helper instanceof HTMLElement) helper.hidden = !customProfiles.length;
+  const exportButton = document.querySelector('[data-role="profile-export"]');
+  if (exportButton instanceof HTMLElement) exportButton.hidden = !getActiveCustomProfile(settings);
+  const saveButton = document.querySelector('[data-role="profile-save-changes"]');
+  if (saveButton instanceof HTMLElement) saveButton.hidden = !(settings.activeProfile && settings.activeProfile !== 'none');
+}
+
+function syncAuxiliarySections(settings = window.__ytrAiSettings || {}) {
+  document.querySelectorAll('[data-role="beta-only"]').forEach((node) => {
+    if (node instanceof HTMLElement) node.hidden = !settings.betaEnabled;
+  });
+  document.querySelectorAll('[data-role="developer-only"]').forEach((node) => {
+    if (node instanceof HTMLElement) node.hidden = !settings.developerEnabled;
+  });
+}
+
+function downloadText(filename, content, type = 'text/plain') {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function parseImportedSettingsText(text) {
+  try {
+    const data = JSON.parse(text);
+    if (data?.settings) return data.settings;
+    if (data?.profile) return { customProfiles: [data.profile], activeProfile: `custom:${data.profile.name || 'Imported'}` };
+    return data && typeof data === 'object' ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 function clampTemperature(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return DEFAULT_SETTINGS.aiVideoChatTemperature;
@@ -786,6 +976,7 @@ function clampInteger(value, fallback, min, max) {
 }
 
 function getSliderBounds(key) {
+  if (key === 'defaultQuality') return { min: 0, max: 9, step: 1, fallback: 0, decimals: 0 };
   if (key === 'aiVideoChatTemperature') return { min: 0, max: 2, step: 0.05, fallback: DEFAULT_SETTINGS.aiVideoChatTemperature, decimals: 2 };
   if (key === 'aiVideoChatMaxWebSnippets') return { min: 2, max: 12, step: 1, fallback: DEFAULT_SETTINGS.aiVideoChatMaxWebSnippets, decimals: 0 };
   if (key === 'aiVideoChatMaxYouTubeLinks') return { min: 2, max: 12, step: 1, fallback: DEFAULT_SETTINGS.aiVideoChatMaxYouTubeLinks, decimals: 0 };
@@ -794,6 +985,11 @@ function getSliderBounds(key) {
 }
 
 function clampSliderValue(key, value) {
+  if (key === 'defaultQuality') {
+    const order = ['auto', '144', '240', '360', '480', '720', '1080', '1440', '2160', '4320'];
+    const normalized = String(value).trim().toLowerCase().replace(/p$/, '');
+    if (order.includes(normalized)) return order.indexOf(normalized);
+  }
   const bounds = getSliderBounds(key);
   const numeric = Number(String(value).replace(',', '.'));
   const base = Number.isFinite(numeric) ? numeric : bounds.fallback;
@@ -803,6 +999,10 @@ function clampSliderValue(key, value) {
 }
 
 function formatSliderValue(key, value) {
+  if (key === 'defaultQuality') {
+    const order = ['Auto', '144p', '240p', '360p', '480p', '720p', '1080p', '1440p', '2160p', '4320p'];
+    return order[clampSliderValue(key, value)] || 'Auto';
+  }
   const bounds = getSliderBounds(key);
   const clamped = clampSliderValue(key, value);
   if (bounds.decimals === 0) return String(Math.round(clamped));
@@ -943,7 +1143,12 @@ function syncCustomModelSuggestions(provider) {
 function fillModelChoices(provider, selectedModel) {
   const modelGroup = document.querySelector('[data-choice-group="aiVideoChatModel"]');
   if (!(modelGroup instanceof HTMLElement)) return;
-  const presets = MODEL_PRESETS_BY_PROVIDER[provider] || MODEL_PRESETS_BY_PROVIDER.openrouter;
+  const allPresets = MODEL_PRESETS_BY_PROVIDER[provider] || MODEL_PRESETS_BY_PROVIDER.openrouter;
+  const customPreset = allPresets.find(([id]) => id === 'custom');
+  const presets = [
+    ...allPresets.filter(([id]) => id !== 'custom').slice(0, 5),
+    ...(customPreset ? [customPreset] : []),
+  ];
   modelGroup.replaceChildren();
   presets.forEach(([id, label]) => {
     const button = document.createElement('button');
@@ -1065,6 +1270,8 @@ function syncAiSettingsForm(settings = {}, options = {}) {
   setChoiceValue('aiVideoChatAdultMode', merged.aiVideoChatAdultMode || DEFAULT_SETTINGS.aiVideoChatAdultMode);
   setChoiceValue('aiVideoChatReasoningDepth', merged.aiVideoChatReasoningDepth || DEFAULT_SETTINGS.aiVideoChatReasoningDepth);
   setChoiceValue('activeProfile', merged.activeProfile || DEFAULT_SETTINGS.activeProfile);
+  renderProfileChoices(merged);
+  syncAuxiliarySections(merged);
 
   document.querySelectorAll('[data-setting]').forEach((field) => {
     const key = field.dataset.setting;
@@ -1089,6 +1296,7 @@ function syncAiSettingsForm(settings = {}, options = {}) {
 
   const temperature = clampTemperature(merged.aiVideoChatTemperature);
   syncSliderControl('aiVideoChatTemperature', temperature);
+  syncSliderControl('defaultQuality', merged.defaultQuality || DEFAULT_SETTINGS.defaultQuality);
   syncSliderControl('aiVideoChatMaxWebSnippets', merged.aiVideoChatMaxWebSnippets);
   syncSliderControl('aiVideoChatMaxYouTubeLinks', merged.aiVideoChatMaxYouTubeLinks);
   syncSliderControl('aiVideoChatMaxTokens', merged.aiVideoChatMaxTokens);
@@ -1122,6 +1330,9 @@ function collectAiSettingsFormPatch() {
         patch[key] = clampInteger(field.value, DEFAULT_SETTINGS.aiVideoChatMaxYouTubeLinks, 2, 12);
       } else if (key === 'aiVideoChatMaxTokens') {
         patch[key] = clampInteger(field.value, DEFAULT_SETTINGS.aiVideoChatMaxTokens, 300, 1600);
+      } else if (key === 'defaultQuality') {
+        const order = ['auto', '144', '240', '360', '480', '720', '1080', '1440', '2160', '4320'];
+        patch[key] = order[clampSliderValue(key, field.value)] || 'auto';
       } else {
         patch[key] = field.value;
       }
@@ -1346,9 +1557,46 @@ function bindAiSettingsForm() {
   document.querySelectorAll('[data-choice-group="activeProfile"] [data-value]').forEach((button) => {
     button.addEventListener('click', (event) => {
       const target = event.currentTarget;
-      setChoiceValue('activeProfile', target.dataset.value || DEFAULT_SETTINGS.activeProfile);
-      scheduleAutoSave();
+      void applyProfile(target.dataset.value || DEFAULT_SETTINGS.activeProfile);
     });
+  });
+  document.querySelector('[data-role="profile-add"]')?.addEventListener('click', () => {
+    const row = document.querySelector('[data-role="profile-add-row"]');
+    if (row instanceof HTMLElement) row.hidden = false;
+  });
+  document.querySelector('[data-role="profile-add-cancel"]')?.addEventListener('click', () => {
+    const row = document.querySelector('[data-role="profile-add-row"]');
+    if (row instanceof HTMLElement) row.hidden = true;
+  });
+  document.querySelector('[data-role="profile-save-current"]')?.addEventListener('click', async () => {
+    const input = document.querySelector('[data-role="profile-name-input"]');
+    const name = input instanceof HTMLInputElement ? input.value.trim() : '';
+    if (!name) return;
+    const current = { ...DEFAULT_SETTINGS, ...(window.__ytrAiSettings || await loadStoredSettings()) };
+    const profile = { name, settings: extractProfileSettings(current) };
+    const nextProfiles = cloneCustomProfiles([...(current.customProfiles || []), profile]);
+    await saveStoredSettings({ customProfiles: nextProfiles, activeProfile: `custom:${name}` });
+    if (input instanceof HTMLInputElement) input.value = '';
+    const row = document.querySelector('[data-role="profile-add-row"]');
+    if (row instanceof HTMLElement) row.hidden = true;
+  });
+  document.querySelector('[data-role="profile-export"]')?.addEventListener('click', () => {
+    const profile = getActiveCustomProfile();
+    if (!profile) return;
+    downloadText(`youtube-rewind-profile-${profile.name}.json`, JSON.stringify({ type: 'youtube-rewind-profile', version: 1, profile }, null, 2), 'application/json');
+  });
+  document.querySelector('[data-role="profile-save-changes"]')?.addEventListener('click', async () => {
+    const current = { ...DEFAULT_SETTINGS, ...(window.__ytrAiSettings || await loadStoredSettings()) };
+    let name = String(current.activeProfile || '').startsWith('custom:') ? current.activeProfile.slice(7) : String(current.activeProfile || 'Custom');
+    const nextProfiles = cloneCustomProfiles(current.customProfiles || []);
+    const idx = nextProfiles.findIndex((profile) => profile.name === name);
+    if (idx >= 0) {
+      nextProfiles[idx] = { ...nextProfiles[idx], settings: extractProfileSettings(current) };
+    } else {
+      name = name.charAt(0).toUpperCase() + name.slice(1);
+      nextProfiles.push({ name, settings: extractProfileSettings(current) });
+    }
+    await saveStoredSettings({ customProfiles: nextProfiles, activeProfile: `custom:${name}` });
   });
   document.querySelector('[data-setting="aiVideoChatCustomSystemPrompt"]')?.addEventListener('input', (event) => {
     syncAutoTextarea(event.currentTarget);
@@ -1501,6 +1749,87 @@ function bindAiSettingsForm() {
     await saveStoredSettings({ ...collectAiSettingsFormPatch(), aiVideoChatSavedPrompts: nextPrompts });
     syncAiSettingsForm({ ...current, ...collectAiSettingsFormPatch(), aiVideoChatSavedPrompts: nextPrompts });
     showSettingsStatus(t('promptDeleted'));
+  });
+  document.querySelector('[data-role="export-json"]')?.addEventListener('click', async () => {
+    const current = await loadStoredSettings();
+    downloadText('youtube-rewind-settings.json', JSON.stringify({ type: 'youtube-rewind-settings', version: 1, settings: current }, null, 2), 'application/json');
+  });
+  document.querySelector('[data-role="export-txt"]')?.addEventListener('click', async () => {
+    const current = await loadStoredSettings();
+    downloadText('youtube-rewind-settings.txt', JSON.stringify({ type: 'youtube-rewind-settings', version: 1, settings: current }, null, 2));
+  });
+  document.querySelector('[data-role="copy-settings"]')?.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(JSON.stringify({ type: 'youtube-rewind-settings', version: 1, settings: await loadStoredSettings() }, null, 2));
+    showSettingsStatus(t('saved'));
+  });
+  document.querySelector('[data-role="paste-settings"]')?.addEventListener('click', async () => {
+    const parsed = parseImportedSettingsText(await navigator.clipboard.readText());
+    if (!parsed) return showSettingsStatus(t('saveError'), 'error');
+    await saveStoredSettings(parsed);
+    showSettingsStatus(t('saved'));
+  });
+  document.querySelector('[data-role="import-file"]')?.addEventListener('click', () => {
+    document.querySelector('[data-role="settings-file-input"]')?.click();
+  });
+  document.querySelector('[data-role="settings-file-input"]')?.addEventListener('change', async (event) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    const parsed = parseImportedSettingsText(await file.text());
+    if (!parsed) return showSettingsStatus(t('saveError'), 'error');
+    await saveStoredSettings(parsed);
+    showSettingsStatus(t('saved'));
+  });
+  document.querySelector('[data-role="profile-import-file"]')?.addEventListener('click', () => {
+    document.querySelector('[data-role="profile-file-input"]')?.click();
+  });
+  document.querySelector('[data-role="profile-file-input"]')?.addEventListener('change', async (event) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    const parsed = parseImportedSettingsText(await file.text());
+    const profile = parsed?.customProfiles?.[0] || parsed?.profile;
+    if (!profile) return showSettingsStatus(t('saveError'), 'error');
+    const current = { ...DEFAULT_SETTINGS, ...(await loadStoredSettings()) };
+    const name = window.prompt(t('profileNamePlaceholder'), profile.name || file.name.replace(/\.[^.]+$/, ''))?.trim();
+    if (!name) return;
+    const nextProfile = { name, settings: extractProfileSettings(profile.settings || parsed) };
+    await saveStoredSettings({ customProfiles: cloneCustomProfiles([...(current.customProfiles || []), nextProfile]), activeProfile: `custom:${name}` });
+  });
+  document.querySelector('[data-role="copy-debug"]')?.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(JSON.stringify({ version: runtimeApi?.getManifest?.().version, userAgent: navigator.userAgent, settings: await loadStoredSettings() }, null, 2));
+    showSettingsStatus(t('saved'));
+  });
+  const getLogsText = async () => {
+    const stored = await (browserApi || chromeApi).storage.local.get('ytr_extension_logs').catch(() => ({}));
+    return JSON.stringify(stored?.ytr_extension_logs || [], null, 2);
+  };
+  document.querySelector('[data-role="open-logs"]')?.addEventListener('click', async () => {
+    const viewer = document.querySelector('[data-role="developer-log-viewer"]');
+    if (viewer instanceof HTMLTextAreaElement) {
+      viewer.value = await getLogsText();
+      viewer.hidden = false;
+    }
+  });
+  document.querySelector('[data-role="copy-logs"]')?.addEventListener('click', async () => navigator.clipboard.writeText(await getLogsText()));
+  document.querySelector('[data-role="save-logs"]')?.addEventListener('click', async () => downloadText(`youtube-rewind-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`, await getLogsText()));
+  document.querySelector('[data-role="clear-logs"]')?.addEventListener('click', async () => {
+    await (browserApi || chromeApi).storage.local.remove('ytr_extension_logs');
+    const viewer = document.querySelector('[data-role="developer-log-viewer"]');
+    if (viewer instanceof HTMLTextAreaElement) viewer.value = '';
+  });
+  document.querySelector('[data-role="clear-cache"]')?.addEventListener('click', async () => {
+    await (browserApi || chromeApi).storage.local.remove('ytr_update_cache');
+    showSettingsStatus(t('saved'));
+  });
+  document.querySelector('[data-role="reset-watch"]')?.addEventListener('click', async () => {
+    await (browserApi || chromeApi).storage.local.remove(['ytr_watch_time_by_day', 'ytr_watch_block_dismissed']);
+    showSettingsStatus(t('saved'));
+  });
+  document.querySelector('[data-role="reload-extension"]')?.addEventListener('click', () => runtimeApi?.reload?.());
+  document.querySelector('[data-role="reset-settings"]')?.addEventListener('click', async () => {
+    if (!window.confirm('Reset settings?')) return;
+    await saveStoredSettings(DEFAULT_SETTINGS);
   });
 }
 

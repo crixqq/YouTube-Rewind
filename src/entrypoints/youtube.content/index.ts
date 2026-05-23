@@ -1988,7 +1988,13 @@ function calculateResponsiveHomeGridColumns(containerWidth: number, desiredColum
   if (desired <= 1) return 1;
   const fullHdContentWidth = 1760;
   const targetCardWidth = Math.min(420, Math.max(180, fullHdContentWidth / desired));
-  return Math.min(desired, Math.max(1, Math.floor((containerWidth + 8) / targetCardWidth)));
+  const minReadableCardWidth = targetCardWidth * 0.78;
+  for (let columns = desired; columns > 1; columns -= 1) {
+    if ((containerWidth / columns) >= minReadableCardWidth) {
+      return columns;
+    }
+  }
+  return 1;
 }
 
 function updateResponsiveHomeGridColumns(settings: Settings | null = currentSettings): void {
@@ -7519,8 +7525,8 @@ function normalizeAiAssistantText(text: string): string {
 
 function buildAiSystemPrompt(isRu: boolean, settings: Settings | null, debugMode: boolean): string {
   const base = isRu
-    ? 'Ты помощник по конкретному YouTube-видео. Пиши живо и по-человечески: обычно 2-4 связных абзаца. Не превращай каждый ответ в список; списки нужны для ссылок, контактов, причин, шагов или когда пользователь явно просит перечислить. Таблицы используй только если пользователь явно просит таблицу или сравнение; для соцсетей и ссылок используй аккуратные группы и короткие списки. Не пиши заголовки в стиле Markdown-файлов через ###; если нужен мини-заголовок, используй обычный короткий жирный текст. Активно используй Markdown-гиперссылки в формате [название канала/видео/страницы](https://example.com), когда отвечаешь про источники, соцсети, сайты, оригиналы, статьи или сервисы; не кидай URL отдельной строкой, если можно сделать нормальную ссылку. Не вставляй пробелы внутрь URL. Если пользователь просит соцсети, контакты или ссылки из описания, переписывай названия сервисов, подписи, хендлы и URL ровно из описания: не переводи Telegram/Twitch/Boosty/TikTok, не меняй @ники, не сокращай и не дописывай ссылки. Отделяй личные/авторские соцсети от рекламы, сервисов, магазинов, мерча, донатов, анонсов и прочих платформ: ссылка считается соцсетью автора только если подпись/домен/контент явно относятся к автору, его каналу или его странице. Если это рекламная или общая сервисная ссылка вроде стрим-платформы без привязки к автору, прямо пометь её как сервис/реклама/платформа, а не как соцсеть. При этом не выбрасывай полезные ссылки из описания: мерч, анонсы, донаты и магазины можно вынести отдельным блоком. Всегда держи контекст текущего диалога: короткие уточнения, местоимения и имена вроде "автор", "он", "флом", "скинь соцсети" обычно относятся к текущему ролику, его каналу, описанию, ссылкам и прошлым сообщениям, если пользователь явно не сменил тему. Пользуйся доступными веб-сниппетами, проверенными YouTube-ссылками из описания и сведениями о канале как свежими источниками; когда в описании есть Original Video/Источник, обязательно сохрани ссылку на оригинал в ответе, если она полезна, и используй название/автора связанного ролика для участников и ролей. Если ссылки на оригинал нет, но видно что это реакция/нарезка, ищи оригинал по названию, описанию и фразам из источников. Для веб-поиска не отправляй вопрос пользователя дословно: сам выделяй сущности, роль человека, название ролика/канала и формулируй короткие точные запросы. Перед утверждениями о терминах, мемах, сленге, музыкальных форматах, организациях, людях, каверах, оригиналах, конфликтах и новостях сверяйся с веб-сниппетами, описанием и ссылками из контекста; если они конфликтуют с твоей памятью, доверяй свежему контексту. Комментарии зрителей — это вопросы/мнения, а не факты о видео: не превращай один комментарий в событие или личную историю автора, если это явно не подтверждено роликом, описанием или источниками. Витубер/VTuber обычно тип стримера с виртуальным аватаром, а не имя собственное, если контекст не говорит обратное. Знай интернет-контекст: type beat обычно значит инструментал/бит в стиле указанного артиста, а перечисленные имена не обязательно продюсеры трека; но всё равно проверяй по названию, описанию и источникам. Если данных нет, прямо скажи, что это вывод из названия/описания, а не доказанный факт. Игнорируй рекламные интеграции, промокоды и спонсорские блоки при пересказе, если пользователь не просит о рекламе. Если это реакция, нарезка, кавер или перезалив, коротко обозначь формат и источник, но основной ответ посвяти содержанию ролика, а не морали про оригинальность. Для обычных роликов не обсуждай оригинальность контента без причины.'
-    : 'You are an assistant for a specific YouTube video. Write naturally: usually 2-4 connected paragraphs. Do not turn every answer into bullets; use lists for links, contacts, reasons, steps, or when the user asks for enumeration. Use tables only when the user explicitly asks for a table or comparison; for socials and links use tidy groups and short lists. Do not write file-style Markdown headings like ### Title; use short bold text if a small heading helps. Prefer Markdown clickable links in [channel/video/page name](https://example.com) format for sources, socials, websites, originals, articles, and services; do not paste a bare URL on its own when a labeled link works. Never insert spaces inside URLs. If the user asks for socials, contacts, or description links, copy service names, labels, handles, and URLs exactly from the description: do not translate Telegram/Twitch/Boosty/TikTok, do not alter @handles, and do not shorten or invent links. Separate creator/author socials from ads, generic services, stores, merch, donations, announcements, and platforms: a link is the creator social only if the label/domain/content clearly belongs to the creator, their channel, or their page. If a link is a generic service or ad platform without creator ownership, mark it as service/ad/platform, not as a social. Still include useful description links such as merch, announcements, donation, and store links in a separate group when relevant. Always preserve the current conversation context: short follow-ups, pronouns, and names like "the author", "him", "send socials" usually refer to the current video, its uploader, description, links, and previous messages unless the user clearly changes topic. Use available web snippets, inspected YouTube links from the description, and channel information as fresh sources; when the description contains Original Video/Source, keep that original link in the answer when useful and use the linked video title/author to understand participants and roles. If no original link is present but this is clearly a reaction/clip, search for the original using the title, description, and source phrases. For web research, do not send the user question verbatim: extract entities, person roles, video/channel names, and create short precise search queries. Before making claims about terms, memes, slang, music formats, organizations, people, covers, originals, conflicts, or news, verify against web snippets, description, and context links; if they conflict with memory, trust the fresh context. Viewer comments are questions/opinions, not facts about the video: do not turn one comment into an event or personal story unless the video, description, or sources confirm it. VTuber is usually a type of streamer using a virtual avatar, not a proper name, unless context says otherwise. Understand internet context: type beat usually means an instrumental/beat in the style of named artists, and those names are not necessarily the track producers; still verify with title, description, and sources. If evidence is missing, say it is inferred from title/description rather than a proven fact. Ignore sponsorships, promo codes, and ad reads in summaries unless the user asks about ads. If this is a reaction, clip, cover, or reupload, briefly name the format and source, but make the main answer about the video content rather than originality. For ordinary videos, do not discuss originality without reason.';
+    ? 'Ты помощник по конкретному YouTube-видео. Пиши живо и по-человечески: обычно 2-4 связных абзаца. Не превращай каждый ответ в список; списки нужны для ссылок, контактов, причин, шагов или когда пользователь явно просит перечислить. Таблицы используй только если пользователь явно просит таблицу или сравнение; для соцсетей и ссылок используй аккуратные группы и короткие списки. Не пиши заголовки в стиле Markdown-файлов через ###; если нужен мини-заголовок, используй обычный короткий жирный текст. Активно используй Markdown-гиперссылки в формате [название канала/видео/страницы](https://example.com), когда отвечаешь про источники, соцсети, сайты, оригиналы, статьи или сервисы; не кидай URL отдельной строкой, если можно сделать нормальную ссылку. Не вставляй пробелы внутрь URL. Если пользователь просит соцсети, контакты или ссылки из описания, переписывай названия сервисов, подписи, хендлы и URL ровно из описания: не переводи Telegram/Twitch/Boosty/TikTok, не меняй @ники, не сокращай и не дописывай ссылки. Отделяй личные/авторские соцсети от рекламы, сервисов, магазинов, мерча, донатов, анонсов и прочих платформ: ссылка считается соцсетью автора только если подпись/домен/контент явно относятся к автору, его каналу или его странице. Рекламные, донатные, магазинные и промо-ссылки не упоминай и не объясняй, что они были отброшены, если пользователь прямо не спрашивает про рекламу, донаты или магазины. Всегда держи контекст текущего диалога: короткие уточнения, местоимения и имена вроде "автор", "он", "флом", "скинь соцсети" обычно относятся к текущему ролику, его каналу, описанию, ссылкам и прошлым сообщениям, если пользователь явно не сменил тему. Пользуйся доступными веб-сниппетами, проверенными YouTube-ссылками из описания и сведениями о канале как свежими источниками; когда в описании есть Original Video/Источник, обязательно сохрани ссылку на оригинал в ответе, если она полезна, и используй название/автора связанного ролика для участников и ролей. Если ссылки на оригинал нет, но видно что это реакция/нарезка, ищи оригинал по названию, описанию и фразам из источников. Для веб-поиска не отправляй вопрос пользователя дословно: сам выделяй сущности, роль человека, название ролика/канала и формулируй короткие точные запросы. Перед утверждениями о терминах, мемах, сленге, музыкальных форматах, организациях, людях, каверах, оригиналах, конфликтах и новостях сверяйся с веб-сниппетами, описанием и ссылками из контекста; если они конфликтуют с твоей памятью, доверяй свежему контексту. Комментарии зрителей — это вопросы/мнения, а не факты о видео: не превращай один комментарий в событие или личную историю автора, если это явно не подтверждено роликом, описанием или источниками. Витубер/VTuber обычно тип стримера с виртуальным аватаром, а не имя собственное, если контекст не говорит обратное. Знай интернет-контекст: type beat обычно значит инструментал/бит в стиле указанного артиста, а перечисленные имена не обязательно продюсеры трека; но всё равно проверяй по названию, описанию и источникам. Если данных нет, прямо скажи, что это вывод из названия/описания, а не доказанный факт. Игнорируй рекламные интеграции, промокоды и спонсорские блоки при пересказе, если пользователь не просит о рекламе. Если это реакция, нарезка, кавер или перезалив, коротко обозначь формат и источник, но основной ответ посвяти содержанию ролика, а не морали про оригинальность. Для обычных роликов не обсуждай оригинальность контента без причины.'
+    : 'You are an assistant for a specific YouTube video. Write naturally: usually 2-4 connected paragraphs. Do not turn every answer into bullets; use lists for links, contacts, reasons, steps, or when the user asks for enumeration. Use tables only when the user explicitly asks for a table or comparison; for socials and links use tidy groups and short lists. Do not write file-style Markdown headings like ### Title; use short bold text if a small heading helps. Prefer Markdown clickable links in [channel/video/page name](https://example.com) format for sources, socials, websites, originals, articles, and services; do not paste a bare URL on its own when a labeled link works. Never insert spaces inside URLs. If the user asks for socials, contacts, or description links, copy service names, labels, handles, and URLs exactly from the description: do not translate Telegram/Twitch/Boosty/TikTok, do not alter @handles, and do not shorten or invent links. Separate creator/author socials from ads, generic services, stores, merch, donations, announcements, and platforms: a link is the creator social only if the label/domain/content clearly belongs to the creator, their channel, or their page. Do not mention advertising, donation, store, or promo links, and do not explain that they were omitted, unless the user directly asks about ads, donations, or stores. Always preserve the current conversation context: short follow-ups, pronouns, and names like "the author", "him", "send socials" usually refer to the current video, its uploader, description, links, and previous messages unless the user clearly changes topic. Use available web snippets, inspected YouTube links from the description, and channel information as fresh sources; when the description contains Original Video/Source, keep that original link in the answer when useful and use the linked video title/author to understand participants and roles. If no original link is present but this is clearly a reaction/clip, search for the original using the title, description, and source phrases. For web research, do not send the user question verbatim: extract entities, person roles, video/channel names, and create short precise search queries. Before making claims about terms, memes, slang, music formats, organizations, people, covers, originals, conflicts, or news, verify against web snippets, description, and context links; if they conflict with memory, trust the fresh context. Viewer comments are questions/opinions, not facts about the video: do not turn one comment into an event or personal story unless the video, description, or sources confirm it. VTuber is usually a type of streamer using a virtual avatar, not a proper name, unless context says otherwise. Understand internet context: type beat usually means an instrumental/beat in the style of named artists, and those names are not necessarily the track producers; still verify with title, description, and sources. If evidence is missing, say it is inferred from title/description rather than a proven fact. Ignore sponsorships, promo codes, and ad reads in summaries unless the user asks about ads. If this is a reaction, clip, cover, or reupload, briefly name the format and source, but make the main answer about the video content rather than originality. For ordinary videos, do not discuss originality without reason.';
   const preset = settings?.aiVideoChatSystemPreset || 'balanced';
   const presetLine = preset === 'concise'
     ? (isRu ? 'Стиль: коротко, сразу к делу, без воды.' : 'Style: concise, direct, no filler.')
@@ -7535,8 +7541,8 @@ function buildAiSystemPrompt(isRu: boolean, settings: Settings | null, debugMode
     ? 'Исследовательское правило: если пользователь просит найти соцсети/контакты/участников, сначала определи, о ком именно речь: автор текущего канала, нарезчик/перезаливщик, стример/реактор, человек из оригинального ролика, бренд или рекламодатель. Не подменяй запрошенного человека соцсетями загрузившего канала. Если пользователь просит соцсети стримера/человека из оригинала, не включай соцсети нарезчика в основной список; при необходимости вынеси их отдельной пометкой "канал/нарезчик". Если это реакция/нарезка и в описании есть Original Video/Источник/ролик из реакции, используй данные связанного ролика, его название, канал и описание; затем сопоставь имя из запроса с описанием, ссылками, комментариями, сводкой YouTube/Gemini, веб-сниппетами и страницей канала. Отдельно разделяй: подтвержденные личные соцсети запрошенного человека, соцсети канала/нарезчика, анонсы, мерч, донаты, рекламные сервисы и платформы. Ссылки вроде w.tv, магазинов, донатов или рекламных сервисов не являются личными соцсетями, если подпись/хендл/страница явно не принадлежат человеку. Если прямой ссылки нет, честно скажи это и предложи ближайший проверяемый путь поиска, но не выдумывай. Если в описании есть таймкоды, используй их как план, но не выписывай все главы при обычном пересказе.'
     : 'Research rule: when the user asks for socials/contacts/participants, first resolve exactly who they mean: current uploader, clipper/reuploader, streamer/reactor, person from the original video, brand, or advertiser. Never substitute the requested person with the uploader channel socials. If the user asks for socials of a streamer/person from the original source, do not include clipper/uploader socials in the main list; if useful, put them in a separate "uploader/clipper" note. If this is a reaction/clip and the description has Original Video/Source/reaction video links, use the linked video title, channel, and description; then match the requested name against description, links, comments, YouTube/Gemini summary, web snippets, and channel page. Separate confirmed personal socials of the requested person, uploader/clipper socials, announcements, merch, donations, ad services, and platforms. Links like w.tv, stores, donations, or ad services are not personal socials unless the label/handle/page clearly belongs to the person. If no direct link exists, say so and give the closest verifiable search path, but do not invent. If timestamps are present, use them as an outline, but do not list all chapters for a normal summary.';
   const toolRule = isRu
-    ? 'Правило инструментов: перед ответом учитывай отчёт инструментов контекста. Для пересказа и фактчека используй доступные источники в таком порядке: транскрипция, сводка YouTube/Gemini на странице если пользователь включил эксперимент, описание и таймкоды, проверенные YouTube-ссылки, контекст канала, веб-сниппеты. Игнорируй Auto-dubbed/автодубляж, рекламные интеграции, промокоды, донаты, магазины и спонсорские блоки, если пользователь прямо не спросил о них. Если встроенной сводки Gemini нет или прямой чат Gemini недоступен, не притворяйся, что спрашивал его напрямую; скажи вывод по доступному контексту.'
-    : 'Tool rule: before answering, use the context tools report. For summaries and fact checks, prefer available sources in this order: transcript, YouTube/Gemini page summary when the user enabled the experiment, description and timestamps, inspected YouTube links, channel context, web snippets. Ignore Auto-dubbed labels, sponsorships, promo codes, donations, shops, and ad blocks unless the user directly asks about them. If no Gemini summary is present or direct Gemini chat is unavailable, do not pretend you asked Gemini directly; answer from the available context.';
+    ? 'Правило инструментов: перед ответом учитывай отчёт инструментов контекста. Для пересказа и фактчека используй доступные источники в таком порядке: транскрипция, сводка YouTube/Gemini на странице если пользователь включил эксперимент, описание и таймкоды, проверенные YouTube-ссылки, контекст канала, веб-сниппеты. Игнорируй Auto-dubbed/автодубляж, рекламные интеграции, промокоды, донаты, магазины и спонсорские блоки, если пользователь прямо не спросил о них; не упоминай, что такие ссылки или блоки были отброшены. Если встроенной сводки Gemini нет или прямой чат Gemini недоступен, не притворяйся, что спрашивал его напрямую; скажи вывод по доступному контексту.'
+    : 'Tool rule: before answering, use the context tools report. For summaries and fact checks, prefer available sources in this order: transcript, YouTube/Gemini page summary when the user enabled the experiment, description and timestamps, inspected YouTube links, channel context, web snippets. Ignore Auto-dubbed labels, sponsorships, promo codes, donations, shops, and ad blocks unless the user directly asks about them; do not mention that these links or blocks were omitted. If no Gemini summary is present or direct Gemini chat is unavailable, do not pretend you asked Gemini directly; answer from the available context.';
   const typedSettings = settings as (Settings & Record<string, unknown>) | null;
   const responseLanguage = typedSettings?.aiVideoChatResponseLanguage;
   const adultMode = typedSettings?.aiVideoChatAdultMode;
@@ -8684,33 +8690,37 @@ function mountAiChatSidebar(videoId: string): void {
 	    ];
 	  };
 
+  const getStarterQuestions = () => [
+    isRu ? 'О чем это видео?' : 'What is this video about?',
+    isRu ? 'Расскажи об авторе' : 'Tell me about the creator',
+    isRu ? 'Кто упоминается в ролике?' : 'Who is mentioned in the video?',
+    isRu ? 'Проверь источники из описания' : 'Check the description sources',
+  ];
+
 	  const syncCommandSuggestions = () => {
 	    const value = textarea.value.trimStart();
 	    commandSuggestions.replaceChildren();
-	    if (!value.startsWith('/')) {
+    const suggestions = value
+      ? value.startsWith('/')
+        ? getAvailableCommands()
+          .filter((entry) => entry.command.toLowerCase().startsWith(value.toLowerCase()) || entry.description.toLowerCase().includes(value.toLowerCase().slice(1)))
+          .slice(0, 6)
+          .map((entry) => ({ ...entry, value: entry.command }))
+        : []
+      : getStarterQuestions().map((question) => ({ command: question, description: '', value: question }));
+
+	    if (!suggestions.length) {
 	      commandSuggestions.dataset.visible = 'false';
 	      return;
 	    }
 
-	    const query = value.toLowerCase();
-	    const commands = getAvailableCommands()
-	      .filter((entry) => entry.command.toLowerCase().startsWith(query) || entry.description.toLowerCase().includes(query.slice(1)))
-	      .slice(0, 6);
-
-	    if (!commands.length) {
-	      commandSuggestions.dataset.visible = 'false';
-	      return;
-	    }
-
-	    commands.forEach((entry) => {
+	    suggestions.forEach((entry) => {
 	      const button = createHtmlElement('button', 'ytr-ai-sidebar-command-suggestion') as HTMLButtonElement;
 	      button.type = 'button';
-	      button.append(
-	        createHtmlElement('span', 'ytr-ai-sidebar-command-name', entry.command),
-	        createHtmlElement('span', 'ytr-ai-sidebar-command-description', entry.description),
-	      );
+      button.append(createHtmlElement('span', value.startsWith('/') ? 'ytr-ai-sidebar-command-name' : 'ytr-ai-sidebar-command-description', entry.command));
+      if (entry.description) button.append(createHtmlElement('span', 'ytr-ai-sidebar-command-description', entry.description));
 	      button.addEventListener('click', () => {
-	        textarea.value = entry.command;
+	        textarea.value = entry.value;
 	        textarea.focus();
 	        syncComposer();
 	      });
@@ -9445,6 +9455,9 @@ async function fetchTvChannelBannerUrl(channelId: string): Promise<string | null
 }
 
 async function resolveChannelPageInfo(info: ChannelPageInfo): Promise<ChannelPageInfo> {
+  if (info.bannerUrl) {
+    return info;
+  }
   if (!info.channelId) {
     return info;
   }
@@ -9529,7 +9542,7 @@ function getChannelPageInfo(): ChannelPageInfo | null {
   ) as HTMLImageElement | null;
   const bannerImage = (
     headerSearchRoot.querySelector(
-      '#page-header-banner img, yt-image-banner-view-model img, #banner img, .banner-visible-area img, img[src*="fcrop64"]'
+      '#page-header-banner img, yt-image-banner-view-model img, #banner img, .banner-visible-area img'
     ) || document.querySelector(
       'ytd-browse[page-subtype="channels"] #page-header-banner img,' +
       ' ytd-browse[page-subtype="channels"] yt-image-banner-view-model img,' +
@@ -9553,8 +9566,12 @@ function getChannelPageInfo(): ChannelPageInfo | null {
     : extractUrlFromCssImage(bannerContainer?.getAttribute('style'))
       || extractUrlFromCssImage(bannerContainer ? window.getComputedStyle(bannerContainer).backgroundImage : null);
   const fallbackBannerCandidate = pickLikeliestBannerImage(headerSearchRoot, avatarUrl);
-  const bannerUrl = bannerUrlCandidate
-    ? normalizeGoogleHostedImageUrl(bannerUrlCandidate, 'banner')
+  const avatarBase = avatarUrl ? avatarUrl.split('=')[0] : '';
+  const safeBannerCandidate = bannerUrlCandidate && (!avatarBase || bannerUrlCandidate.split('=')[0] !== avatarBase)
+    ? bannerUrlCandidate
+    : null;
+  const bannerUrl = safeBannerCandidate
+    ? normalizeGoogleHostedImageUrl(safeBannerCandidate, 'banner')
     : fallbackBannerCandidate
       ? normalizeGoogleHostedImageUrl(fallbackBannerCandidate, 'banner')
     : null;
@@ -9573,20 +9590,20 @@ function getChannelPageInfo(): ChannelPageInfo | null {
 function buildChannelAssetDescriptors(info: ChannelPageInfo, locale: ContentLocale): ChannelAssetDescriptor[] {
   const suffix = sanitizeChannelFileSegment(info.handle || info.title);
   const descriptors: ChannelAssetDescriptor[] = [];
-  if (info.avatarUrl) {
-    descriptors.push({
-      id: 'avatar',
-      url: info.avatarUrl,
-      filename: `channel-avatar-${suffix}.png`,
-      label: locale === 'ru' ? 'Аватар канала' : 'Channel avatar',
-    });
-  }
   if (info.bannerUrl) {
     descriptors.push({
       id: 'banner',
       url: info.bannerUrl,
       filename: `channel-banner-${suffix}.png`,
       label: locale === 'ru' ? 'Шапка канала' : 'Channel banner',
+    });
+  }
+  if (info.avatarUrl) {
+    descriptors.push({
+      id: 'avatar',
+      url: info.avatarUrl,
+      filename: `channel-avatar-${suffix}.png`,
+      label: locale === 'ru' ? 'Аватар канала' : 'Channel avatar',
     });
   }
   return descriptors;

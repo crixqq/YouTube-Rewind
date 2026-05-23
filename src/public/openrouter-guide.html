@@ -789,6 +789,54 @@
         gap: 6px;
       }
 
+      .custom-profile-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .custom-profile-delete {
+        width: 24px;
+        height: 24px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--md-on-surface-variant);
+        cursor: pointer;
+      }
+
+      .profile-helper {
+        flex-basis: 100%;
+        color: var(--md-on-surface-variant);
+        font-size: 12px;
+      }
+
+      .developer-tools {
+        display: grid;
+        gap: 10px;
+        padding: 8px 16px 14px;
+      }
+
+      .data-group-label {
+        margin-top: 8px;
+        color: var(--md-on-surface-variant);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .developer-log-viewer {
+        width: 100%;
+        min-height: 160px;
+        resize: vertical;
+      }
+
+      .action-danger {
+        color: var(--md-error);
+        border-color: var(--md-error);
+      }
+
       .choice,
       .action {
         appearance: none;
@@ -1371,7 +1419,7 @@
           </h2>
           <div class="section-content">
             <div class="setting-row">
-              <div class="choice-group" data-choice-group="activeProfile">
+              <div class="choice-group" data-choice-group="activeProfile" data-role="profile-choices">
                 <button class="choice" type="button" data-value="default" data-i18n="profileDefault">Default</button>
                 <button class="choice" type="button" data-value="none" data-i18n="profileCustom">Custom</button>
                 <button class="choice" type="button" data-value="focus" data-i18n="profileFocus">Focus</button>
@@ -1379,8 +1427,25 @@
                 <button class="choice" type="button" data-value="clean" data-i18n="profileClean">Clean</button>
               </div>
             </div>
+            <div class="setting-row profile-add-row" data-role="profile-add-row" hidden>
+              <div class="field">
+                <label for="profile-name" data-i18n="profileNamePlaceholder">Profile name</label>
+                <input id="profile-name" data-role="profile-name-input" type="text" placeholder="Profile name">
+              </div>
+              <div class="actions">
+                <button class="action" type="button" data-role="profile-save-current" data-i18n="profileSaveCurrent">Save current</button>
+                <button class="action" type="button" data-role="profile-import-file" data-i18n="profileFromFile">From file</button>
+                <button class="action" type="button" data-role="profile-add-cancel">×</button>
+              </div>
+            </div>
             <div class="setting-row">
-              <a class="action action-wide" href="./popup.html?view=page" target="_blank" rel="noopener" data-i18n="openFullSettings">Open full settings</a>
+              <div class="actions" data-role="profile-actions">
+                <button class="action" type="button" data-role="profile-add">+</button>
+                <button class="action" type="button" data-role="profile-export" data-i18n="profileExport" hidden>Export profile</button>
+                <button class="action" type="button" data-role="profile-save-changes" data-i18n="profileSaveChanges" hidden>Save to profile</button>
+              </div>
+              <input data-role="profile-file-input" type="file" accept=".json,.txt" hidden>
+              <div class="profile-helper" data-role="profile-helper" data-i18n="profileRenameHelper" hidden>Double-click a custom profile name to rename it.</div>
             </div>
           </div>
         </section>
@@ -1639,6 +1704,22 @@
                 <input class="toggle-input" data-setting="betaEnabled" type="checkbox">
               </span>
             </label>
+            <div class="setting-row slider-setting-row" data-role="beta-only">
+              <div class="ytr-slider-row" data-slider-control="defaultQuality" data-min="0" data-max="9" data-step="1">
+                <div class="ytr-slider-header">
+                  <label class="ytr-slider-label" for="default-quality-range" data-i18n="settingDefaultQuality">Default quality</label>
+                  <input id="default-quality" class="ytr-slider-value" data-setting="defaultQuality" data-slider-input="defaultQuality" type="text">
+                </div>
+                <div class="ytr-slider-track">
+                  <svg class="ytr-slider-svg" viewBox="0 0 300 24" preserveAspectRatio="none" aria-hidden="true">
+                    <path data-slider-wave fill="none" stroke="var(--md-primary)" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <line data-slider-inactive x1="0" y1="12" x2="300" y2="12" stroke="var(--md-surface-container-highest)" stroke-width="4" stroke-linecap="round"></line>
+                  </svg>
+                  <span class="ytr-slider-thumb"></span>
+                  <input id="default-quality-range" class="ytr-slider-range" data-slider-range="defaultQuality" type="range" min="0" max="9" step="1">
+                </div>
+              </div>
+            </div>
             <label class="toggle-row">
               <span class="toggle-copy">
                 <span class="toggle-title" data-i18n="settingDisableAvatarLive">Disable live redirect on avatars</span>
@@ -1646,6 +1727,15 @@
               <span class="toggle-track">
                 <span class="toggle-thumb"><svg class="toggle-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
                 <input class="toggle-input" data-setting="disableAvatarLiveRedirect" type="checkbox">
+              </span>
+            </label>
+            <label class="toggle-row">
+              <span class="toggle-copy">
+                <span class="toggle-title" data-i18n="useYouTubeSummaryTitle">Use YouTube/Gemini summary</span>
+              </span>
+              <span class="toggle-track">
+                <span class="toggle-thumb"><svg class="toggle-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                <input class="toggle-input" data-setting="aiVideoChatUseYouTubeSummary" type="checkbox">
               </span>
             </label>
             <label class="toggle-row">
@@ -1684,6 +1774,36 @@
                 <input class="toggle-input" data-setting="extensionLogEnabled" type="checkbox">
               </span>
             </label>
+            <div class="developer-tools" data-role="developer-only">
+              <div class="data-group-label" data-i18n="exportLabel">Export</div>
+              <div class="actions">
+                <button class="action" type="button" data-role="export-json">JSON</button>
+                <button class="action" type="button" data-role="export-txt">TXT</button>
+                <button class="action" type="button" data-role="copy-settings">Copy</button>
+              </div>
+              <div class="data-group-label" data-i18n="importLabel">Import</div>
+              <div class="actions">
+                <button class="action" type="button" data-role="import-file">File</button>
+                <button class="action" type="button" data-role="paste-settings">Paste</button>
+              </div>
+              <div class="data-group-label" data-i18n="developerDiagnostics">Diagnostics</div>
+              <div class="actions">
+                <button class="action" type="button" data-role="copy-debug" data-i18n="developerCopyDebug">Copy debug snapshot</button>
+                <button class="action" type="button" data-role="open-logs" data-i18n="developerOpenLogs">Open logs</button>
+                <button class="action" type="button" data-role="copy-logs" data-i18n="developerCopyLogs">Copy logs</button>
+                <button class="action" type="button" data-role="save-logs" data-i18n="developerSaveLogs">Save logs</button>
+                <button class="action" type="button" data-role="clear-logs" data-i18n="developerClearLogs">Clear logs</button>
+                <button class="action" type="button" data-role="clear-cache" data-i18n="developerClearUpdateCache">Clear update cache</button>
+                <button class="action" type="button" data-role="reset-watch" data-i18n="developerResetWatchTime">Reset watch timer</button>
+              </div>
+              <textarea class="developer-log-viewer" data-role="developer-log-viewer" readonly hidden></textarea>
+              <div class="data-group-label" data-i18n="developerMaintenance">Maintenance</div>
+              <div class="actions">
+                <button class="action" type="button" data-role="reload-extension" data-i18n="developerReloadExtension">Reload extension</button>
+                <button class="action action-danger" type="button" data-role="reset-settings">Reset</button>
+              </div>
+              <input data-role="settings-file-input" type="file" accept=".json,.txt" hidden>
+            </div>
           </div>
         </section>
 

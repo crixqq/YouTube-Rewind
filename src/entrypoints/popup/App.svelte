@@ -77,6 +77,7 @@
   } as const satisfies Record<Settings['aiVideoChatProvider'], string>;
   const AI_CHAT_SYSTEM_PRESET_IDS = ['balanced', 'concise', 'deep', 'custom'] as const;
   type ResolvedThemeMode = Exclude<Settings['interfaceThemeMode'], 'auto'>;
+  let aiProviderGuideOpen = $state(false);
 
   let settings = $state<Settings>({ ...DEFAULT_SETTINGS });
   let loaded = $state(false);
@@ -578,6 +579,23 @@
     return `How to get a ${label} key`;
   }
 
+  function getAiProviderGuideHtml(provider: Settings['aiVideoChatProvider'] = settings.aiVideoChatProvider): string {
+    const guides: Record<Settings['aiVideoChatProvider'], string> = {
+      openrouter: `<p><b>1.</b> Open <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener">openrouter.ai/settings/keys</a> and sign in.</p><p><b>2.</b> Click <b>Create key</b>, name it, create it, and copy the full value. It usually starts with <code>sk-or-v1-</code>.</p><p><b>3.</b> Paste it into API key. Pick a free preset or paste the exact model id into Custom.</p>`,
+      openai: `<p><b>1.</b> Open <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a>.</p><p><b>2.</b> Create a secret key, copy it once, and paste it into API key.</p><p><b>3.</b> Make sure billing and model access are enabled on the account.</p>`,
+      anthropic: `<p><b>1.</b> Open <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a>.</p><p><b>2.</b> Create a key, copy it fully, and paste it into API key.</p><p><b>3.</b> Check credits, region, and selected Claude model access if requests fail.</p>`,
+      perplexity: `<p><b>1.</b> Open <a href="https://www.perplexity.ai/settings/api" target="_blank" rel="noopener">perplexity.ai/settings/api</a>.</p><p><b>2.</b> Create an API key, copy it, and paste it into API key.</p><p><b>3.</b> Pick a Sonar model for search-heavy answers.</p>`,
+    };
+    return guides[provider] || guides.openrouter;
+  }
+
+  function getVisibleAiModelPresets(provider: Settings['aiVideoChatProvider'] = settings.aiVideoChatProvider) {
+    const presets = [...(AI_CHAT_MODEL_PRESETS_BY_PROVIDER[provider] || AI_CHAT_MODEL_PRESETS)];
+    const custom = presets.find((preset) => preset.id === 'custom');
+    const regular = presets.filter((preset) => preset.id !== 'custom').slice(0, 5);
+    return custom ? [...regular, custom] : regular;
+  }
+
   function getAiModelIconSrc(modelId: string, provider: Settings['aiVideoChatProvider'] = settings.aiVideoChatProvider): string {
     const normalized = modelId.toLowerCase();
     let domain = '';
@@ -599,8 +617,8 @@
     const candidates = [...AI_CHAT_MODEL_PRESETS, ...presets]
       .filter((preset) => preset.id !== 'custom')
       .filter((preset, index, array) => array.findIndex((entry) => entry.id === preset.id) === index);
-    if (!needle) return candidates.slice(0, 8);
-    return candidates.filter((preset) => preset.id.toLowerCase().includes(needle) || preset.label.toLowerCase().includes(needle)).slice(0, 8);
+    if (!needle) return candidates.slice(0, 5);
+    return candidates.filter((preset) => preset.id.toLowerCase().includes(needle) || preset.label.toLowerCase().includes(needle)).slice(0, 5);
   }
 
   function getEffectiveAiChatModel(source: Pick<Settings, 'aiVideoChatModel' | 'aiVideoChatCustomModel'> = settings): string {
@@ -3016,14 +3034,14 @@
               value={getAiProviderApiKey(settings.aiVideoChatProvider)}
               onchange={(event) => updateAiProviderApiKey((event.currentTarget as HTMLInputElement).value)}
             />
-            <button type="button" class="inline-help-link ai-key-guide-inline" onclick={openAiSettingsPage}>
+            <button type="button" class="inline-help-link ai-key-guide-inline" onclick={() => { aiProviderGuideOpen = true; }}>
               {getAiProviderGuideTitle(settings.aiVideoChatProvider)}
             </button>
             <div class="profile-helper ai-privacy-notice">{t('aiVideoChatPrivacyNotice')}</div>
 
             <div class="sub-label">{t('settingAiVideoChatModel')}</div>
             <div class="effect-picker ai-model-picker">
-              {#each (AI_CHAT_MODEL_PRESETS_BY_PROVIDER[settings.aiVideoChatProvider] || AI_CHAT_MODEL_PRESETS) as preset (preset.id)}
+              {#each getVisibleAiModelPresets(settings.aiVideoChatProvider) as preset (preset.id)}
                 <button
                   class="effect-option provider-effect-option ai-model-option"
                   class:active={settings.aiVideoChatModel === preset.id}
@@ -3226,6 +3244,39 @@
       </footer>
 
   </div>
+  {#if aiProviderGuideOpen}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="sheet-backdrop" onclick={(event) => { if (event.target === event.currentTarget) aiProviderGuideOpen = false; }}>
+      <div class="sheet-card provider-guide-card" role="dialog" aria-modal="true">
+        <div class="sheet-header">
+          <div class="sheet-title-wrap">
+            <div class="sheet-kicker">{t('settingAiVideoChatApiKey')}</div>
+            <h2 class="sheet-title">{getAiProviderGuideTitle(settings.aiVideoChatProvider)}</h2>
+          </div>
+          <button class="sheet-close" onclick={() => { aiProviderGuideOpen = false; }} aria-label="Close">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="sheet-content provider-guide-content">
+          {@html getAiProviderGuideHtml(settings.aiVideoChatProvider)}
+          <div class="effect-picker provider-guide-jumps">
+            {#each AI_CHAT_PROVIDER_PRESETS as preset (preset.id)}
+              <button
+                class="effect-option provider-effect-option"
+                class:active={settings.aiVideoChatProvider === preset.id}
+                onclick={() => updateAiProvider(preset.id as Settings['aiVideoChatProvider'])}
+              >
+                <img class="provider-icon-img" src={AI_CHAT_PROVIDER_ICON_SRC[preset.id]} alt="" loading="lazy" decoding="async" />
+                <span class="effect-option-label">{preset.label}</span>
+              </button>
+            {/each}
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
   {#if activeSheet}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="sheet-backdrop" onclick={(event) => { if (event.target === event.currentTarget) clearSheetState(); }}>
@@ -4145,7 +4196,8 @@
 
   .ai-settings-link {
     min-height: 40px;
-    padding: 0 18px;
+    min-width: 148px;
+    padding: 0 24px;
     border-radius: var(--md-shape-full);
     font-size: 13px;
     font-weight: 800;
@@ -4595,6 +4647,31 @@
 
   .interface-theme-reset {
     min-height: 44px;
+    min-width: 150px;
+    padding-inline: 22px;
+  }
+
+  .provider-guide-card {
+    max-width: 560px;
+  }
+
+  .provider-guide-content {
+    color: var(--md-on-surface-variant);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .provider-guide-content :global(a) {
+    color: var(--md-primary);
+    font-weight: 700;
+  }
+
+  .provider-guide-content :global(code) {
+    color: var(--md-primary);
+  }
+
+  .provider-guide-jumps {
+    padding-top: 10px;
   }
 
   .data-group {

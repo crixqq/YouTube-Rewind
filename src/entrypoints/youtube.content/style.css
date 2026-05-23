@@ -4084,7 +4084,12 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
 .ytr-ai-sidebar-command-suggestions {
   display: none;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
   padding: 0 12px 8px;
 }
 
@@ -4098,6 +4103,7 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
   align-items: center;
   gap: 6px;
   min-height: 30px;
+  flex: 0 0 auto;
   max-width: 100%;
   padding: 0 10px;
   border: 0;
@@ -4255,16 +4261,16 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
 
 .ytr-playback-rate-bubble {
   position: absolute;
-  top: 52px;
+  top: 82px;
   left: 50%;
-  transform: translateX(-50%) translateY(-4px);
-  min-width: 72px;
-  padding: 10px 16px;
+  transform: translateX(-50%);
+  min-width: 86px;
+  padding: 10px 18px;
   border: 0;
   border-radius: 2px;
-  background: rgba(49, 49, 49, 0.92);
+  background: rgba(0, 0, 0, 0.78);
   color: #fff;
-  font: 500 18px/1.15 'Roboto', 'Arial', sans-serif;
+  font: 400 18px/1.2 'Roboto', 'Arial', sans-serif;
   text-align: center;
   letter-spacing: 0;
   box-shadow: none;
@@ -4277,7 +4283,7 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
 
 .ytr-playback-rate-bubble[data-visible="true"] {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  transform: translateX(-50%);
 }
 
 .ytr-ai-chat-panel {
