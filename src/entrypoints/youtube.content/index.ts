@@ -265,7 +265,7 @@ const GOOGLE_ROUNDED_ICON_SVGS = {
   queryStats: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M19.88 18.47c.48-.77.75-1.67.69-2.66c-.13-2.15-1.84-3.97-3.97-4.2a4.5 4.5 0 0 0-5.02 4.47c0 2.49 2.01 4.5 4.49 4.5c.88 0 1.7-.26 2.39-.7l2.41 2.41c.39.39 1.03.39 1.42 0c.39-.39.39-1.03 0-1.42l-2.41-2.4zm-3.8.11a2.5 2.5 0 0 1 0-5a2.5 2.5 0 0 1 0 5zm-.36-8.5c-.74.02-1.45.18-2.1.45l-.55-.83l-3.08 5.01a1 1 0 0 1-1.61.13l-2.12-2.47l-3.06 4.9c-.31.49-.97.62-1.44.28c-.42-.31-.54-.89-.26-1.34l3.78-6.05c.36-.57 1.17-.63 1.61-.12L9 12.5l3.18-5.17a.996.996 0 0 1 1.68-.03l1.86 2.78zm2.59.5c-.64-.28-1.33-.45-2.05-.49L20.8 2.9c.31-.49.97-.61 1.43-.27c.43.31.54.9.26 1.34l-4.18 6.61z"/></svg>',
   insights: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M21 8c-1.45 0-2.26 1.44-1.93 2.51l-3.55 3.56c-.3-.09-.74-.09-1.04 0l-2.55-2.55C12.27 10.45 11.46 9 10 9c-1.45 0-2.27 1.44-1.93 2.52l-4.56 4.55C2.44 15.74 1 16.55 1 18c0 1.1.9 2 2 2c1.45 0 2.26-1.44 1.93-2.51l4.55-4.56c.3.09.74.09 1.04 0l2.55 2.55C12.73 16.55 13.54 18 15 18c1.45 0 2.27-1.44 1.93-2.52l3.56-3.55c1.07.33 2.51-.48 2.51-1.93c0-1.1-.9-2-2-2z"/><path d="M15 9l.94-2.07L18 6l-2.06-.93L15 3l-.92 2.07L12 6l2.08.93zM3.5 11L4 9l2-.5L4 8l-.5-2L3 8l-2 .5L3 9z"/></svg>',
   send: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960"><path d="M120-160v-240l320-80-320-80v-240l760 320-760 320Zm80-117 474-203-474-203v85l242 59-242 61v201Zm0 0v-406 406Z"/></svg>',
-  stopCircle: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960"><path d="M360-320h240q17 0 28.5-11.5T640-360v-240q0-17-11.5-28.5T600-640H360q-17 0-28.5 11.5T320-600v240q0 17 11.5 28.5T360-320Zm120 240q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z"/></svg>',
+  stop: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960"><path d="M320-320v-320h320v320H320Z"/></svg>',
   refresh: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960"><path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z"/></svg>',
   contentCopy: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>',
   settings: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h80l14-106q31-8 57.5-23.5T639-327l99 41 40-68-86-65q5-14 6.5-29.5T700-480q0-16-1.5-31.5T692-541l86-65-40-68-99 42q-22-23-48.5-38.5T534-694l-14-106h-80l-14 106q-31 8-57.5 23.5T321-633l-99-41-40 68 86 64q-5 15-6.5 30T260-480q0 16 1.5 31.5T268-419l-86 65 40 68 99-42q22 23 48.5 38.5T426-266l14 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></svg>',
@@ -2244,10 +2244,17 @@ function formatPlaybackRateBubbleLabel(rate: number): string {
 
 function showNativePlaybackRateBezel(label: string): boolean {
   const host = getPlaybackBubbleHost();
-  const bezel = host?.querySelector('.ytp-bezel') as HTMLElement | null;
-  const text = bezel?.querySelector('.ytp-bezel-text') as HTMLElement | null;
-  const wrapper = bezel?.querySelector('.ytp-bezel-text-wrapper') as HTMLElement | null;
-  if (!bezel || !text) return false;
+  if (!host) return false;
+
+  const wrapper = host.querySelector('.ytp-bezel-text-wrapper') as HTMLElement | null;
+  const text = (wrapper?.querySelector('.ytp-bezel-text') || host.querySelector('.ytp-bezel .ytp-bezel-text')) as HTMLElement | null;
+  const iconBezel = host.querySelector('.ytp-bezel[role="status"], .ytp-bezel') as HTMLElement | null;
+  const sharedContainer = wrapper && iconBezel && wrapper.parentElement === iconBezel.parentElement
+    ? wrapper.parentElement
+    : wrapper?.parentElement || iconBezel?.parentElement || iconBezel;
+  const container = sharedContainer instanceof HTMLElement ? sharedContainer : null;
+  if (!container || !text) return false;
+  const hideIconBezel = !!iconBezel && iconBezel !== container && !iconBezel.contains(text);
 
   playbackRateBubbleEl?.remove();
   playbackRateBubbleEl = null;
@@ -2256,20 +2263,52 @@ function showNativePlaybackRateBezel(label: string): boolean {
     clearTimeout(playbackRateBubbleHideTimer);
   }
 
-  text.textContent = label;
-  bezel.setAttribute('aria-label', `${label} playback speed`);
-  bezel.dataset.ytrPlaybackRateBezel = 'true';
-  bezel.style.display = 'block';
-  text.style.display = '';
-  if (wrapper) wrapper.style.display = '';
+  const previousIconDisplay = iconBezel?.dataset.ytrPreviousDisplay ?? iconBezel?.style.display ?? '';
+  const previousIconVisibility = iconBezel?.dataset.ytrPreviousVisibility ?? iconBezel?.style.visibility ?? '';
+  const previousAriaLabel = iconBezel?.dataset.ytrPreviousAriaLabel ?? iconBezel?.getAttribute('aria-label') ?? '';
 
-  bezel.classList.remove('ytp-bezel-text-hide');
-  void bezel.offsetWidth;
+  text.textContent = label;
+  container.dataset.ytrPlaybackRateBezel = 'true';
+  container.style.display = 'block';
+  container.style.visibility = 'visible';
+  text.style.display = '';
+  if (wrapper) {
+    wrapper.style.display = '';
+    wrapper.style.visibility = 'visible';
+  }
+  if (iconBezel) {
+    iconBezel.setAttribute('aria-label', `${label} playback speed`);
+    iconBezel.dataset.ytrPreviousAriaLabel = previousAriaLabel;
+    iconBezel.classList.remove('ytp-bezel-text-hide');
+    if (hideIconBezel) {
+      iconBezel.dataset.ytrPreviousDisplay = previousIconDisplay;
+      iconBezel.dataset.ytrPreviousVisibility = previousIconVisibility;
+      iconBezel.style.display = 'none';
+      iconBezel.style.visibility = 'hidden';
+    }
+  }
+
+  container.classList.remove('ytp-bezel-text-hide');
+  void container.offsetWidth;
 
   playbackRateBubbleHideTimer = window.setTimeout(() => {
-    if (bezel.dataset.ytrPlaybackRateBezel === 'true' && text.textContent === label) {
-      bezel.style.display = 'none';
-      delete bezel.dataset.ytrPlaybackRateBezel;
+    if (container.dataset.ytrPlaybackRateBezel === 'true' && text.textContent === label) {
+      container.style.display = 'none';
+      delete container.dataset.ytrPlaybackRateBezel;
+      if (iconBezel) {
+        if (hideIconBezel) {
+          iconBezel.style.display = iconBezel.dataset.ytrPreviousDisplay || '';
+          iconBezel.style.visibility = iconBezel.dataset.ytrPreviousVisibility || '';
+        }
+        if (iconBezel.dataset.ytrPreviousAriaLabel) {
+          iconBezel.setAttribute('aria-label', iconBezel.dataset.ytrPreviousAriaLabel);
+        } else {
+          iconBezel.removeAttribute('aria-label');
+        }
+        delete iconBezel.dataset.ytrPreviousDisplay;
+        delete iconBezel.dataset.ytrPreviousVisibility;
+        delete iconBezel.dataset.ytrPreviousAriaLabel;
+      }
     }
     playbackRateBubbleHideTimer = null;
   }, 900);
@@ -8503,11 +8542,14 @@ function mountAiChatSidebar(videoId: string): void {
   const setSendButtonMode = (mode: 'send' | 'stop') => {
     if (sendButton.dataset.mode === mode) return;
     sendButton.dataset.mode = mode;
+    if (mode === 'send') {
+      delete sendButton.dataset.stopping;
+    }
     sendButton.setAttribute('aria-label', mode === 'stop'
       ? (isRu ? 'Остановить ответ' : 'Stop response')
       : (isRu ? 'Отправить сообщение' : 'Send message'));
     sendButton.replaceChildren(createSvgIcon(
-      mode === 'stop' ? GOOGLE_ROUNDED_ICON_SVGS.stopCircle : GOOGLE_ROUNDED_ICON_SVGS.send,
+      mode === 'stop' ? GOOGLE_ROUNDED_ICON_SVGS.stop : GOOGLE_ROUNDED_ICON_SVGS.send,
       'ytr-ai-sidebar-send-icon',
     ));
   };
@@ -8523,7 +8565,7 @@ function mountAiChatSidebar(videoId: string): void {
   });
   composer.append(textarea, sendButton);
   messages.appendChild(status);
-	  body.append(messages, scrollToBottomButton, commandSuggestions, composer);
+	  body.append(commandSuggestions, messages, scrollToBottomButton, composer);
   card.append(header, body);
   sidebarHost.appendChild(card);
   host.prepend(sidebarHost);
@@ -8550,6 +8592,9 @@ function mountAiChatSidebar(videoId: string): void {
   let debugContextMode = false;
   let streamPort: browser.runtime.Port | null = null;
   let stopRequested = false;
+  let activeAiRequestId = 0;
+  let stoppedAiRequestId = 0;
+  let stopFallbackTimer: number | null = null;
 
   const disconnectStreamPort = () => {
     try {
@@ -8564,8 +8609,9 @@ function mountAiChatSidebar(videoId: string): void {
     return error;
   };
 
-  const isAiStopError = (error: unknown) => (
+  const isAiStopError = (error: unknown, requestId = activeAiRequestId) => (
     stopRequested
+    || stoppedAiRequestId === requestId
     || (error instanceof Error && error.name === 'AbortError')
   );
 
@@ -8737,6 +8783,7 @@ function mountAiChatSidebar(videoId: string): void {
     modelId: string,
     payloadMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
     onDelta: (accumulatedText: string) => void,
+    requestId: number,
   ): Promise<{ text: string; model: string; stopped?: boolean }> => {
     disconnectStreamPort();
 
@@ -8766,6 +8813,14 @@ function mountAiChatSidebar(videoId: string): void {
         if (!message || typeof message !== 'object') return;
 
         if (message.type === 'delta') {
+          if (stopRequested || stoppedAiRequestId === requestId) {
+            finish({
+              text: accumulatedText.trim(),
+              model: resolvedModel,
+              stopped: true,
+            });
+            return;
+          }
           accumulatedText += message.text || '';
           onDelta(accumulatedText);
           return;
@@ -8775,6 +8830,7 @@ function mountAiChatSidebar(videoId: string): void {
           finish({
             text: accumulatedText.trim(),
             model: message.model || resolvedModel,
+            stopped: stopRequested || stoppedAiRequestId === requestId,
           });
           return;
         }
@@ -8791,7 +8847,7 @@ function mountAiChatSidebar(videoId: string): void {
 
       streamPort.onDisconnect.addListener(() => {
         if (resolved) return;
-        if (stopRequested) {
+        if (stopRequested || stoppedAiRequestId === requestId) {
           finish({
             text: accumulatedText.trim(),
             model: resolvedModel,
@@ -8803,7 +8859,7 @@ function mountAiChatSidebar(videoId: string): void {
         fail(runtimeError || (isRu ? 'Соединение со стримом оборвалось.' : 'The streaming connection was closed.'));
       });
 
-      if (stopRequested) {
+      if (stopRequested || stoppedAiRequestId === requestId) {
         finish({ text: accumulatedText.trim(), model: resolvedModel, stopped: true });
         return;
       }
@@ -8875,22 +8931,28 @@ function mountAiChatSidebar(videoId: string): void {
     isRu ? 'Проверь источники из описания' : 'Check the description sources',
   ];
 
+  const hasAssistantChatMessage = () => !!messages.querySelector('.ytr-ai-sidebar-message-assistant');
+
 		  const syncCommandSuggestions = () => {
+    const hasAssistantMessage = hasAssistantChatMessage();
     if (sending) {
       commandSuggestions.replaceChildren();
       commandSuggestions.dataset.visible = 'false';
+      commandSuggestions.dataset.reserved = hasAssistantMessage ? 'false' : 'true';
       return;
     }
 		    const value = textarea.value.trimStart();
 		    commandSuggestions.replaceChildren();
-    const suggestions = value
-      ? value.startsWith('/')
-        ? getAvailableCommands()
-          .filter((entry) => entry.command.toLowerCase().startsWith(value.toLowerCase()) || entry.description.toLowerCase().includes(value.toLowerCase().slice(1)))
-          .slice(0, 6)
-          .map((entry) => ({ ...entry, value: entry.command }))
-        : []
-      : getStarterQuestions().map((question) => ({ command: question, description: '', value: question }));
+    const isCommandQuery = value.startsWith('/');
+    const suggestions = isCommandQuery
+      ? getAvailableCommands()
+        .filter((entry) => entry.command.toLowerCase().startsWith(value.toLowerCase()) || entry.description.toLowerCase().includes(value.toLowerCase().slice(1)))
+        .slice(0, 6)
+        .map((entry) => ({ ...entry, value: entry.command }))
+      : !value && !hasAssistantMessage
+        ? getStarterQuestions().map((question) => ({ command: question, description: '', value: question }))
+        : [];
+    commandSuggestions.dataset.reserved = (!hasAssistantMessage || isCommandQuery) ? 'true' : 'false';
 
 	    if (!suggestions.length) {
 	      commandSuggestions.dataset.visible = 'false';
@@ -8915,23 +8977,50 @@ function mountAiChatSidebar(videoId: string): void {
 	  const syncComposer = () => {
 		    const hasModel = !!getEffectiveAiChatModel(currentSettings);
     setSendButtonMode(sending ? 'stop' : 'send');
+    if (!sending) {
+      delete sendButton.dataset.stopping;
+    }
     sendButton.disabled = sending
-      ? stopRequested
+      ? false
       : !textarea.value.trim() || !contextReady || !hasApiKey || !hasModel;
 		    textarea.disabled = sending || !hasApiKey || !hasModel;
 		    syncCommandSuggestions();
 		  };
 
-  const stopAssistantReply = () => {
-    if (!sending || stopRequested) return;
-    stopRequested = true;
+  const clearStopFallbackTimer = () => {
+    if (stopFallbackTimer !== null) {
+      window.clearTimeout(stopFallbackTimer);
+      stopFallbackTimer = null;
+    }
+  };
+
+  const resetStoppedRequestUi = (requestId: number) => {
+    if (activeAiRequestId !== requestId) return;
+    clearStopFallbackTimer();
+    sending = false;
+    stopRequested = false;
     disconnectStreamPort();
-    setStatus(isRu ? 'Останавливаю ответ…' : 'Stopping response…');
+    setStatus(isRu ? 'Ответ остановлен.' : 'Response stopped.', 'ok');
     syncComposer();
   };
 
-  const assertAssistantNotStopped = () => {
-    if (stopRequested) throw createAiStopError();
+  const stopAssistantReply = () => {
+    if (!sending || stopRequested) return;
+    const requestId = activeAiRequestId;
+    stopRequested = true;
+    stoppedAiRequestId = requestId;
+    sendButton.dataset.stopping = 'true';
+    disconnectStreamPort();
+    setStatus(isRu ? 'Останавливаю ответ…' : 'Stopping response…');
+    syncComposer();
+    clearStopFallbackTimer();
+    stopFallbackTimer = window.setTimeout(() => {
+      resetStoppedRequestUi(requestId);
+    }, 450);
+  };
+
+  const assertAssistantNotStopped = (requestId = activeAiRequestId) => {
+    if (stopRequested || stoppedAiRequestId === requestId) throw createAiStopError();
   };
 
   const initializeAssistant = () => {
@@ -9024,11 +9113,26 @@ function mountAiChatSidebar(videoId: string): void {
       return;
     }
 
+    const requestId = activeAiRequestId + 1;
+    activeAiRequestId = requestId;
+    stoppedAiRequestId = 0;
+    clearStopFallbackTimer();
+
     sending = true;
     stopRequested = false;
     lastUserPrompt = prompt;
     if (retryBubble) removeAssistantActionRowsForBubble(retryBubble);
     syncComposer();
+
+    const finishRequestState = () => {
+      if (activeAiRequestId !== requestId) return;
+      clearStopFallbackTimer();
+      sending = false;
+      stopRequested = false;
+      stoppedAiRequestId = 0;
+      disconnectStreamPort();
+      syncComposer();
+    };
     let assistantHistoryIndex = -1;
     if (!isRetry) {
       appendMessage('user', prompt);
@@ -9058,36 +9162,36 @@ function mountAiChatSidebar(videoId: string): void {
 
 	    let relatedVideosContext = '';
 	    if (shouldInspectDescriptionLinks(prompt, metadata, false, isRu)) {
-      assertAssistantNotStopped();
+      assertAssistantNotStopped(requestId);
 	      setStatus(isRu ? 'Собираю похожие видео…' : 'Scanning related videos…');
 	      relatedVideosContext = buildAiRelatedVideosContext(isRu);
 	    }
 
 	    let linkedYouTubeContext = '';
 	    if (shouldInspectDescriptionLinks(prompt, metadata, false, isRu)) {
-      assertAssistantNotStopped();
+      assertAssistantNotStopped(requestId);
 	      setStatus(isRu ? 'Проверяю ссылки из описания…' : 'Checking description links…');
 	      linkedYouTubeContext = await fetchLinkedYouTubeContext(metadata, prompt, isRu, false);
-      assertAssistantNotStopped();
+      assertAssistantNotStopped(requestId);
 	    }
 
 	    let channelContext = '';
 	    if (shouldFetchAiChannelContext(prompt, isRu)) {
-      assertAssistantNotStopped();
+      assertAssistantNotStopped(requestId);
 	      setStatus(isRu ? 'Проверяю страницу канала…' : 'Checking channel page…');
 	      channelContext = await fetchCurrentChannelContext(prompt, isRu);
-      assertAssistantNotStopped();
+      assertAssistantNotStopped(requestId);
 	    }
 
 	    let webResearch = { text: '', usedWeb: false };
 	    if (shouldFetchAiWebResearch(prompt, false, isRu)) {
-      assertAssistantNotStopped();
+      assertAssistantNotStopped(requestId);
 	      const topic = buildAiStatusTopic(prompt, isRu);
 	      setStatus(topic
 	        ? (isRu ? `Ищу в интернете: ${topic}…` : `Searching the web: ${topic}…`)
 	        : (isRu ? 'Проверяю сущности и термины в интернете…' : 'Verifying names and terms on the web…'));
 	      webResearch = await fetchAiWebResearch(prompt, isRu);
-      assertAssistantNotStopped();
+      assertAssistantNotStopped(requestId);
 	    }
 
     const contextMessage = buildAiVideoContextMessage(videoId, null, isRu, prompt);
@@ -9145,7 +9249,7 @@ function mountAiChatSidebar(videoId: string): void {
       let stoppedByUser = false;
 
 	      for (const [attemptIndex, attemptModel] of modelAttempts.entries()) {
-        assertAssistantNotStopped();
+        assertAssistantNotStopped(requestId);
 	        if (attemptIndex > 0) {
 	          assistantText = '';
 	          renderStreamingBubble(assistantBubble, assistantText, true);
@@ -9163,7 +9267,7 @@ function mountAiChatSidebar(videoId: string): void {
             assistantText = nextText;
             renderStreamingBubble(assistantBubble, assistantText, true);
             setStatus(isRu ? 'Печатаю ответ…' : 'Writing the answer…');
-          })
+          }, requestId)
             : await browser.runtime.sendMessage({
               type: 'ytr_ai_chat',
               provider,
@@ -9177,7 +9281,7 @@ function mountAiChatSidebar(videoId: string): void {
 
 	          let candidateText = normalizeAiAssistantText(streamedResponse.text);
 	          let candidateModel = streamedResponse.model || attemptModel;
-          if (streamedResponse.stopped || stopRequested) {
+          if (streamedResponse.stopped || stopRequested || stoppedAiRequestId === requestId) {
             stoppedByUser = true;
             if (candidateText) {
               resolvedAssistantText = candidateText;
@@ -9196,7 +9300,7 @@ function mountAiChatSidebar(videoId: string): void {
                 messages: payloadMessages,
                 temperature: chatTemperature,
 	              }) as OpenRouterChatResponse | undefined;
-              assertAssistantNotStopped();
+              assertAssistantNotStopped(requestId);
 
 	            if (directResponse?.text) {
               candidateText = normalizeAiAssistantText(directResponse.text);
@@ -9219,7 +9323,7 @@ function mountAiChatSidebar(videoId: string): void {
               : 'The model returned malformed text.';
           }
 	        } catch (streamError) {
-          if (isAiStopError(streamError)) {
+          if (isAiStopError(streamError, requestId)) {
             stoppedByUser = true;
             break;
           }
@@ -9232,7 +9336,7 @@ function mountAiChatSidebar(videoId: string): void {
             messages: payloadMessages,
 	            temperature: chatTemperature,
 	          }) as OpenRouterChatResponse | undefined;
-          assertAssistantNotStopped();
+          assertAssistantNotStopped(requestId);
 
 	          if (directResponse?.text) {
             const candidateText = normalizeAiAssistantText(directResponse.text);
@@ -9249,7 +9353,7 @@ function mountAiChatSidebar(videoId: string): void {
 	      }
 
 	      if (!resolvedAssistantText) {
-        if (stoppedByUser || stopRequested) throw createAiStopError();
+        if (stoppedByUser || stopRequested || stoppedAiRequestId === requestId) throw createAiStopError();
 	        throw new Error(lastModelError || (isRu ? 'Не удалось получить ответ от OpenRouter.' : 'Could not get a response from OpenRouter.'));
 	      }
 
@@ -9264,18 +9368,22 @@ function mountAiChatSidebar(videoId: string): void {
       }
 	      setStatus(stoppedByUser ? (isRu ? 'Ответ остановлен.' : 'Response stopped.') : '', 'ok');
 	    } catch (streamError) {
-      if (isAiStopError(streamError)) {
+      if (isAiStopError(streamError, requestId)) {
+        if (activeAiRequestId !== requestId) return;
+        const partialText = normalizeAiAssistantText(assistantText);
         if (isRetry && previousVariantState) {
           previousVariantState.index = previousVariantIndex;
           renderAssistantVariant(assistantBubble, previousVariantState);
+        } else if (partialText) {
+          assistantText = partialText;
+          renderStreamingBubble(assistantBubble, assistantText, false);
+          assistantHistoryIndex = history.push({ role: 'assistant', content: assistantText }) - 1;
+          appendAssistantActions(assistantBubble, assistantText, prompt, assistantHistoryIndex);
         } else {
           assistantBubble.remove();
         }
 	        setStatus(isRu ? 'Ответ остановлен.' : 'Response stopped.', 'ok');
-	        sending = false;
-	        stopRequested = false;
-        disconnectStreamPort();
-	        syncComposer();
+        finishRequestState();
 	        return;
       }
 	      if (isRetry && previousVariantState) {
@@ -9295,10 +9403,7 @@ function mountAiChatSidebar(videoId: string): void {
       setStatus(isRu ? 'Ошибка модели' : 'Model error', 'error');
     }
 
-	    sending = false;
-    stopRequested = false;
-    disconnectStreamPort();
-	    syncComposer();
+    finishRequestState();
 	  };
 
   const handleTextareaKeydown = (event: KeyboardEvent) => {
