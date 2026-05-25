@@ -3008,7 +3008,7 @@
           </div>
         </SettingsSection>
 
-        <SettingsSection title={t('sectionAssistant')} icon={ICON.web_asset} hidden={!sectionVisible(['sectionAssistant', 'settingAiVideoChatEnabled', 'settingAiVideoChatProvider', 'settingAiVideoChatApiKey', 'settingAiVideoChatModel', 'aiVideoChatGuide'])}>
+        <SettingsSection title={t('sectionAssistant')} icon={ICON.web_asset} hidden={!sectionVisible(['sectionAssistant', 'settingAiVideoChatEnabled', 'settingAiVideoChatProvider', 'settingAiVideoChatApiKey', 'settingAiVideoChatModel', 'settingAiVideoChatUseYouTubeSummary', 'aiVideoChatGuide'])}>
           <Toggle label={t('settingAiVideoChatEnabled')} checked={settings.aiVideoChatEnabled} onchange={(v) => void applySettingsPatch({ aiVideoChatEnabled: v })} />
           {#if settings.aiVideoChatEnabled}
             <div class="sub-label">{t('settingAiVideoChatProvider')}</div>
@@ -3038,6 +3038,7 @@
               {getAiProviderGuideTitle(settings.aiVideoChatProvider)}
             </button>
             <div class="profile-helper ai-privacy-notice">{t('aiVideoChatPrivacyNotice')}</div>
+            <Toggle label={t('settingAiVideoChatUseYouTubeSummary')} checked={settings.aiVideoChatUseYouTubeSummary} onchange={(v) => void applySettingsPatch({ aiVideoChatUseYouTubeSummary: v })} />
 
             <div class="sub-label">{t('settingAiVideoChatModel')}</div>
             <div class="effect-picker ai-model-picker">
@@ -3076,7 +3077,7 @@
           {/if}
         </SettingsSection>
 
-        <SettingsSection title={t('sectionBeta')} icon={ICON.info} hidden={!sectionVisible(['sectionBeta', 'settingBetaEnabled', 'settingDefaultQuality', 'settingDisableAvatarLive', 'settingBetaStableDescriptionColors', 'settingAiVideoChatUseYouTubeSummary'])}>
+        <SettingsSection title={t('sectionBeta')} icon={ICON.info} hidden={!sectionVisible(['sectionBeta', 'settingBetaEnabled', 'settingDefaultQuality', 'settingDisableAvatarLive', 'settingBetaStableDescriptionColors'])}>
           <Toggle label={t('settingBetaEnabled')} checked={settings.betaEnabled} onchange={toggleBetaFeatures} />
           {#if settings.betaEnabled}
             <Slider
@@ -3090,7 +3091,6 @@
             />
             <Toggle label={t('settingDisableAvatarLive')} checked={settings.disableAvatarLiveRedirect} onchange={(v) => void applySettingsPatch({ disableAvatarLiveRedirect: v })} />
             <Toggle label={t('settingBetaStableDescriptionColors')} checked={settings.betaStableDescriptionColors} onchange={(v) => void applySettingsPatch({ betaStableDescriptionColors: v })} />
-            <Toggle label={t('settingAiVideoChatUseYouTubeSummary')} checked={settings.aiVideoChatUseYouTubeSummary} onchange={(v) => void applySettingsPatch({ aiVideoChatUseYouTubeSummary: v })} />
           {/if}
 
           {#if betaConfirmOpen}

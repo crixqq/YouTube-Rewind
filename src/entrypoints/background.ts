@@ -445,6 +445,38 @@ function buildAcronymSearchQueries(
   return queries;
 }
 
+function cleanSearchEntity(value: string): string {
+  return value
+    .replace(/\([^)]*(?:official|официальн|clip|клип|video|видео|lyrics|текст|audio|аудио)[^)]*\)/gi, ' ')
+    .replace(/\[[^\]]*(?:official|официальн|clip|клип|video|видео|lyrics|текст|audio|аудио)[^\]]*\]/gi, ' ')
+    .replace(/\b(?:official|официальный|официальное|clip|клип|video|видео|lyrics|текст|audio|аудио|HD|4K|MV)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractLikelySearchEntities(title: string, channel: string): string[] {
+  const candidates = [
+    channel,
+    title.split(/\s+[—–-]\s+|\s+\|\s+|:/)[0] || '',
+    ...Array.from(title.matchAll(/["'«“]([^"'»”]{2,80})["'»”]/g)).map((match) => match[1] || ''),
+  ];
+  const generic = /^(?:official|клип|video|видео|песня|song|music|музыка|channel|канал|records?|label|tv|live|премьера)$/i;
+  const seen = new Set<string>();
+  const entities: string[] = [];
+
+  for (const candidate of candidates) {
+    const cleaned = cleanSearchEntity(candidate);
+    if (!cleaned || cleaned.length < 2 || cleaned.length > 80 || generic.test(cleaned)) continue;
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entities.push(cleaned);
+    if (entities.length >= 4) break;
+  }
+
+  return entities;
+}
+
 function buildEnrichmentQueries(
   title: string,
   channel: string,
@@ -458,6 +490,7 @@ function buildEnrichmentQueries(
   const normalizedDescription = description.replace(/["'`]+/g, ' ').replace(/\s+/g, ' ').trim();
   const quotedTerms = extractQuotedSearchTerms(`${title}\n${prompt}\n${description}`).slice(0, 4);
   const acronymQueries = buildAcronymSearchQueries(title, channel, prompt, description, links);
+  const likelyEntities = extractLikelySearchEntities(normalizedTitle, normalizedChannel);
   const sourceLinkQueries = links
     .filter((link) => /youtube-video|external|music/i.test(link.kind || '') || /оригинал|original|source|источник|cover|кавер/i.test(`${link.text || ''} ${link.url || ''}`))
     .map((link) => `${link.text || ''} ${link.url || ''}`.replace(/\s+/g, ' ').trim())
@@ -465,6 +498,8 @@ function buildEnrichmentQueries(
     .slice(0, 3);
   const socialIntent = /соц|ссылк|контакт|тг|телеграм|telegram|twitch|boosty|vk|instagram|tiktok|social|contact|links/i.test(normalizedPrompt);
   const reactionIntent = /реакц|reaction|reacts|смотрит|original|оригинал|source|источник/i.test(`${normalizedTitle} ${normalizedDescription} ${normalizedPrompt}`);
+  const identityIntent = /кто|что за|исполнитель|артист|музыкант|рэпер|певец|групп|проект|artist|performer|musician|rapper|singer|band|group|who is/i.test(`${normalizedPrompt} ${normalizedTitle}`);
+  const musicIntent = /клип|official video|music video|песня|трек|song|single|album|альбом|исполнитель|артист|rapper|рэпер|band|групп/i.test(`${normalizedTitle} ${normalizedDescription} ${normalizedPrompt}`);
   const genericPromptWords = new Set([
     'дай', 'скинь', 'ссылки', 'соцсети', 'соц', 'сет', 'автора', 'автор', 'кто', 'что', 'как', 'где',
     'почему', 'ролик', 'видос', 'видео', 'про', 'это', 'мне', 'его', 'ее', 'её', 'их', 'the', 'what',
@@ -483,6 +518,14 @@ function buildEnrichmentQueries(
       `${term} официальный канал`,
     ]).slice(0, 4)
     : [];
+  const identityQueries = (identityIntent || musicIntent)
+    ? likelyEntities.flatMap((entity) => [
+      `${entity} кто это`,
+      `${entity} исполнитель группа музыкант`,
+      `${entity} musician rapper singer band`,
+      `${entity} official biography`,
+    ]).slice(0, 6)
+    : likelyEntities.slice(0, 2);
   const originalQueries = reactionIntent
     ? [
       `${normalizedTitle} оригинал видео`,
@@ -497,6 +540,7 @@ function buildEnrichmentQueries(
   return [
     ...quotedTerms,
     ...acronymQueries,
+    ...identityQueries,
     ...socialQueries,
     ...originalQueries,
     intentQuery,
@@ -510,7 +554,7 @@ function buildEnrichmentQueries(
     .map((query) => query.trim())
     .filter(Boolean)
     .filter((query, index, list) => list.indexOf(query) === index)
-    .slice(0, 8);
+    .slice(0, 10);
 }
 
 function flattenDuckDuckGoTopics(topics: unknown[]): Array<{ Text?: string; FirstURL?: string }> {
