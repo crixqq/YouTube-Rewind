@@ -2087,8 +2087,13 @@ let playbackRateBubbleKeepAliveTimer: number | null = null;
 let playbackRateBubbleEl: HTMLElement | null = null;
 let playbackRateBubbleVisibleUntil = 0;
 let playbackRateBubbleShowToken = 0;
+let playbackRateBubbleSustainTimer: number | null = null;
+let playbackRateBubbleSustainUntil = 0;
+let playbackRateBubbleSustainRate: number | null = null;
 const PLAYBACK_RATE_BUBBLE_HIDE_DELAY_MS = 2400;
 const PLAYBACK_RATE_BUBBLE_KEEP_ALIVE_MS = 50;
+const PLAYBACK_RATE_BUBBLE_SUSTAIN_MS = 360;
+const PLAYBACK_RATE_BUBBLE_SUSTAIN_TICK_MS = 80;
 
 function isPlaybackNativeHoldActive(): boolean {
   return playbackPointerHoldActive || playbackKeyboardHoldActive;
@@ -2396,6 +2401,31 @@ function showPlaybackRateBubble(rate: number): void {
   }, PLAYBACK_RATE_BUBBLE_HIDE_DELAY_MS);
 }
 
+function sustainPlaybackRateBubble(rate: number): void {
+  const nextRate = clampPlaybackRate(rate);
+  if (nextRate === null) return;
+
+  playbackRateBubbleSustainRate = nextRate;
+  playbackRateBubbleSustainUntil = Date.now() + PLAYBACK_RATE_BUBBLE_SUSTAIN_MS;
+  showPlaybackRateBubble(nextRate);
+
+  if (playbackRateBubbleSustainTimer !== null) return;
+
+  playbackRateBubbleSustainTimer = window.setInterval(() => {
+    const activeRate = playbackRateBubbleSustainRate;
+    if (activeRate === null || Date.now() > playbackRateBubbleSustainUntil) {
+      if (playbackRateBubbleSustainTimer !== null) {
+        clearInterval(playbackRateBubbleSustainTimer);
+        playbackRateBubbleSustainTimer = null;
+      }
+      playbackRateBubbleSustainRate = null;
+      return;
+    }
+
+    showPlaybackRateBubble(activeRate);
+  }, PLAYBACK_RATE_BUBBLE_SUSTAIN_TICK_MS);
+}
+
 function getPlaybackRateMenuItem(target: EventTarget | null): HTMLElement | null {
   if (!(target instanceof Element)) return null;
   return target.closest('.ytp-menuitem[role="menuitemradio"], .ytp-panel-menu .ytp-menuitem[role="menuitemradio"]') as HTMLElement | null;
@@ -2573,12 +2603,13 @@ function handlePlaybackCtrlWheel(event: WheelEvent): void {
   const nextRate = clampPlaybackRate(Math.round((currentRate + direction * 0.1) * 10) / 10);
   if (nextRate === null) return;
   if (Math.abs(nextRate - currentRate) < 0.001) {
-    showPlaybackRateBubble(currentRate);
+    sustainPlaybackRateBubble(currentRate);
     return;
   }
 
+  sustainPlaybackRateBubble(nextRate);
   commitPagePlaybackOverride(nextRate, video);
-  showPlaybackRateBubble(nextRate);
+  sustainPlaybackRateBubble(nextRate);
 }
 
 function setupPlaybackSpeed(s: Settings): void {
