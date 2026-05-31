@@ -1613,19 +1613,87 @@ const WATCH_ACTION_HIDE_SETTINGS_MAP: Record<RelocatedWatchAction, keyof Setting
 
 let watchMoreActionsMenuListenersSetup = false;
 let watchMoreActionsMenuSyncTimers: number[] = [];
+const MORE_ACTIONS_BUTTON_KEYWORDS = [
+  'more actions',
+  'больше действий',
+  'другие действия',
+  'ещё',
+  'ещë',
+  'más acciones',
+  'mehr aktionen',
+  'plus d’actions',
+  "plus d'actions",
+  'azioni',
+  'ações',
+  '更多操作',
+  'その他の操作',
+  '추가 작업',
+  'çok daha fazla',
+];
 
 function isWatchActionHiddenBySettings(action: RelocatedWatchAction, settings: Settings | null = currentSettings): boolean {
   if (!settings) return false;
   return !!settings[WATCH_ACTION_HIDE_SETTINGS_MAP[action]];
 }
 
-function getWatchMoreActionsButtonShape(): HTMLElement | null {
-  const candidate = document.querySelector(
-    'ytd-watch-metadata #actions ytd-menu-renderer yt-button-shape,' +
-    ' ytd-watch-metadata #actions ytd-menu-renderer #button-shape,' +
-    ' ytd-watch-metadata #actions ytd-menu-renderer button'
+function isWatchLikeDislikeControl(node: Element | null): boolean {
+  if (!(node instanceof Element)) return false;
+  return !!node.closest(
+    'segmented-like-dislike-button-view-model,' +
+    ' segmented-like-button-view-model,' +
+    ' segmented-dislike-button-view-model,' +
+    ' like-button-view-model,' +
+    ' dislike-button-view-model,' +
+    ' #segmented-like-button,' +
+    ' #segmented-dislike-button,' +
+    ' #like-button,' +
+    ' #dislike-button'
   );
-  return candidate instanceof HTMLElement ? candidate : null;
+}
+
+function getElementAccessibleLabel(node: Element | null): string {
+  if (!(node instanceof Element)) return '';
+  const self = node.getAttribute('aria-label') || node.getAttribute('title') || '';
+  if (self.trim()) return self.trim();
+  const button = node.querySelector('button');
+  if (!(button instanceof HTMLButtonElement)) return '';
+  return (button.getAttribute('aria-label') || button.getAttribute('title') || button.textContent || '').trim();
+}
+
+function getWatchMoreActionsButtonShape(): HTMLElement | null {
+  const menuRenderers = Array.from(
+    document.querySelectorAll('ytd-watch-metadata #actions ytd-menu-renderer')
+  ) as HTMLElement[];
+
+  let fallback: HTMLElement | null = null;
+  for (const renderer of menuRenderers) {
+    const button = renderer.querySelector('button');
+    if (!(button instanceof HTMLButtonElement)) continue;
+    if (isWatchLikeDislikeControl(button)) continue;
+
+    const shape = (button.closest('yt-button-shape, #button-shape') as HTMLElement | null) || button;
+    if (isWatchLikeDislikeControl(shape)) continue;
+
+    const label = [
+      getElementAccessibleLabel(shape),
+      getElementAccessibleLabel(button),
+      getElementAccessibleLabel(renderer),
+    ].join(' ').trim().toLowerCase();
+
+    if (MORE_ACTIONS_BUTTON_KEYWORDS.some((keyword) => label.includes(keyword))) {
+      return shape;
+    }
+
+    const hasPopupSignal = button.getAttribute('aria-haspopup') === 'true'
+      || button.getAttribute('aria-haspopup') === 'menu'
+      || button.hasAttribute('aria-expanded');
+
+    if (hasPopupSignal) {
+      fallback = shape;
+    }
+  }
+
+  return fallback;
 }
 
 function getWatchMoreActionsButtonHost(): HTMLElement | null {
@@ -2322,7 +2390,9 @@ let playbackSpeedMenuSelectionTimer: number | null = null;
 let playbackPointerHoldActive = false;
 let playbackPointerHoldStartRate: number | null = null;
 let playbackKeyboardHoldActive = false;
+let playbackKeyboardHoldPending = false;
 let playbackKeyboardHoldStartRate: number | null = null;
+let playbackKeyboardHoldTimer: number | null = null;
 let playbackTemporaryBoostUntil = 0;
 let autoSkipAdsSetup = false;
 let lastAutoSkipAdsClickAt = 0;
@@ -2335,6 +2405,7 @@ let lastConfiguredPlaybackRate: number | null = null;
 let playbackRateShortcutSelectionTimer: number | null = null;
 let playbackRateManualIntentUntil = 0;
 const PLAYBACK_RATE_BUBBLE_HIDE_DELAY_MS = 2200;
+const PLAYBACK_SPACE_HOLD_ARM_DELAY_MS = 280;
 
 function isPlaybackNativeHoldActive(): boolean {
   return playbackPointerHoldActive || playbackKeyboardHoldActive;
@@ -2654,6 +2725,16 @@ function handlePlaybackRateMenuSelection(event: Event): void {
 
 function handlePlaybackMediaLifecycle(): void {
   bindPlaybackSpeedVideo(getMainVideoElement());
+  if (!playbackPointerHoldActive && !playbackKeyboardHoldActive) {
+    const desiredRate = getDesiredPlaybackRate();
+    const currentRate = clampPlaybackRate(getMainVideoElement()?.playbackRate);
+    if (desiredRate !== null
+      && currentRate !== null
+      && Math.abs(currentRate - 2) < 0.01
+      && Math.abs(desiredRate - 2) > 0.01) {
+      playbackTemporaryBoostUntil = 0;
+    }
+  }
   schedulePlaybackSpeedApply([0, 120, 520]);
 }
 
@@ -2717,16 +2798,38 @@ function isPlaybackTextEntryTarget(target: EventTarget | null): boolean {
 function handlePlaybackKeyboardDown(event: KeyboardEvent): void {
   if (event.code !== 'Space') return;
   if (!isWatchPlaybackPage() || isPlaybackTextEntryTarget(event.target)) return;
-  if (playbackKeyboardHoldActive) return;
+  if (playbackKeyboardHoldActive || playbackKeyboardHoldPending) return;
 
-  playbackKeyboardHoldActive = true;
+  playbackKeyboardHoldPending = true;
   playbackKeyboardHoldStartRate = clampPlaybackRate(getMainVideoElement()?.playbackRate);
+  if (playbackKeyboardHoldTimer !== null) {
+    clearTimeout(playbackKeyboardHoldTimer);
+  }
+  playbackKeyboardHoldTimer = window.setTimeout(() => {
+    playbackKeyboardHoldTimer = null;
+    if (!playbackKeyboardHoldPending) return;
+    playbackKeyboardHoldActive = true;
+  }, PLAYBACK_SPACE_HOLD_ARM_DELAY_MS);
 }
 
 function handlePlaybackKeyboardRelease(event?: KeyboardEvent): void {
   if (event && event.code !== 'Space') return;
-  if (!playbackKeyboardHoldActive) return;
+  if (playbackKeyboardHoldTimer !== null) {
+    clearTimeout(playbackKeyboardHoldTimer);
+    playbackKeyboardHoldTimer = null;
+  }
 
+  if (playbackKeyboardHoldPending && !playbackKeyboardHoldActive) {
+    playbackKeyboardHoldPending = false;
+    playbackKeyboardHoldStartRate = null;
+    return;
+  }
+  if (!playbackKeyboardHoldActive) {
+    playbackKeyboardHoldPending = false;
+    return;
+  }
+
+  playbackKeyboardHoldPending = false;
   playbackKeyboardHoldActive = false;
   finishPlaybackNativeHold(playbackKeyboardHoldStartRate);
   playbackKeyboardHoldStartRate = null;
@@ -5947,11 +6050,19 @@ function setupDownloadThumbnailButton(s: Settings): void {
     }
 
     const moreBtn = getWatchMoreActionsButtonShape();
-    const insertTarget = moreBtn?.parentElement || document.querySelector('ytd-watch-metadata #actions-inner, ytd-watch-metadata #actions, #top-level-buttons-computed');
+    const moreButtonHost = getWatchMoreActionsButtonHost();
+    const insertTarget = moreButtonHost?.parentElement
+      || document.querySelector('ytd-watch-metadata #actions-inner, ytd-watch-metadata #actions');
     if (!insertTarget) return;
     const nativeActionAnchor = moreBtn instanceof Element
       ? moreBtn
-      : insertTarget.querySelector('button, #button-shape, yt-button-shape');
+      : insertTarget.querySelector(
+        'ytd-menu-renderer yt-button-shape,' +
+        ' ytd-menu-renderer #button-shape,' +
+        ' ytd-menu-renderer button,' +
+        ' button[aria-haspopup="true"],' +
+        ' button[aria-haspopup="menu"]'
+      );
 
     const isRu = getContentLocale() === 'ru';
     let screenshotWrapper = document.querySelector('.ytr-screenshot-btn-wrap') as HTMLDivElement | null;
@@ -5985,11 +6096,11 @@ function setupDownloadThumbnailButton(s: Settings): void {
     }
 
     const insertAfterMore = (node: HTMLElement) => {
-      if (moreBtn?.parentElement) {
-        if (moreBtn.nextSibling) {
-          moreBtn.parentElement.insertBefore(node, moreBtn.nextSibling);
+      if (moreButtonHost?.parentElement) {
+        if (moreButtonHost.nextSibling) {
+          moreButtonHost.parentElement.insertBefore(node, moreButtonHost.nextSibling);
         } else {
-          moreBtn.parentElement.appendChild(node);
+          moreButtonHost.parentElement.appendChild(node);
         }
       } else {
         insertTarget.appendChild(node);
