@@ -729,11 +729,19 @@ function logExtensionEvent(
 }
 
 function needsWatchPageEnhancements(settings: Settings): boolean {
+  const hasHiddenWatchActions = settings.hideShareButton
+    || settings.hideDownloadButton
+    || settings.hideClipButton
+    || settings.hideThanksButton
+    || settings.hideSaveButton
+    || settings.hideAskButton;
+
   return settings.playbackSpeed > 0
     || settings.autoSkipAds
     || getEffectiveDefaultQuality(settings) !== 'auto'
     || settings.downloadThumbnailButton
     || settings.betaVideoFrameScreenshot
+    || hasHiddenWatchActions
     || isAiVideoChatEnabled(settings);
 }
 
@@ -2554,8 +2562,15 @@ function createNativePlaybackRateToast(host: HTMLElement, label: string): HTMLEl
   wrapper.style.display = 'block';
   wrapper.style.visibility = 'visible';
   wrapper.style.opacity = '1';
+  wrapper.style.transition = 'none';
+  wrapper.style.animation = 'none';
   wrapper.style.pointerEvents = 'none';
   wrapper.style.zIndex = '2147483000';
+  const text = wrapper.querySelector('.ytp-bezel-text') as HTMLElement | null;
+  if (text) {
+    text.style.transition = 'none';
+    text.style.animation = 'none';
+  }
 
   return wrapper;
 }
