@@ -2083,11 +2083,8 @@ let lastAutoSkipAdsClickAt = 0;
 let autoSkipAdsInFlight = false;
 let playbackSpeedInitialApplyUntil = 0;
 let playbackRateBubbleHideTimer: number | null = null;
-let playbackRateBubbleKeepAliveTimer: number | null = null;
 let playbackRateBubbleEl: HTMLElement | null = null;
-let playbackRateBubbleVisibleUntil = 0;
 const PLAYBACK_RATE_BUBBLE_HIDE_DELAY_MS = 1800;
-const PLAYBACK_RATE_BUBBLE_KEEP_ALIVE_MS = 140;
 
 function isPlaybackNativeHoldActive(): boolean {
   return playbackPointerHoldActive || playbackKeyboardHoldActive;
@@ -2246,6 +2243,32 @@ function formatPlaybackRateBubbleLabel(rate: number): string {
   return `${rate.toFixed(1).replace(/\.0$/, '')}x`;
 }
 
+function hideNativePlaybackRateBezel(
+  container: HTMLElement,
+  iconBezel: HTMLElement | null,
+  hideIconBezel: boolean,
+): void {
+  if (container.dataset.ytrPlaybackRateBezel !== 'true') return;
+
+  container.style.display = 'none';
+  delete container.dataset.ytrPlaybackRateBezel;
+
+  if (!iconBezel) return;
+
+  if (hideIconBezel) {
+    iconBezel.style.display = iconBezel.dataset.ytrPreviousDisplay || '';
+    iconBezel.style.visibility = iconBezel.dataset.ytrPreviousVisibility || '';
+  }
+  if (iconBezel.dataset.ytrPreviousAriaLabel) {
+    iconBezel.setAttribute('aria-label', iconBezel.dataset.ytrPreviousAriaLabel);
+  } else {
+    iconBezel.removeAttribute('aria-label');
+  }
+  delete iconBezel.dataset.ytrPreviousDisplay;
+  delete iconBezel.dataset.ytrPreviousVisibility;
+  delete iconBezel.dataset.ytrPreviousAriaLabel;
+}
+
 function showNativePlaybackRateBezel(label: string): boolean {
   const host = getPlaybackBubbleHost();
   if (!host) return false;
@@ -2265,38 +2288,31 @@ function showNativePlaybackRateBezel(label: string): boolean {
 
   if (playbackRateBubbleHideTimer !== null) {
     clearTimeout(playbackRateBubbleHideTimer);
+    playbackRateBubbleHideTimer = null;
   }
-  if (playbackRateBubbleKeepAliveTimer !== null) {
-    clearInterval(playbackRateBubbleKeepAliveTimer);
-    playbackRateBubbleKeepAliveTimer = null;
-  }
-  playbackRateBubbleVisibleUntil = Date.now() + PLAYBACK_RATE_BUBBLE_HIDE_DELAY_MS;
+
+  // Fully tear down the previous speed bezel before showing the next one.
+  hideNativePlaybackRateBezel(container, iconBezel, hideIconBezel);
 
   const previousIconDisplay = iconBezel?.dataset.ytrPreviousDisplay ?? iconBezel?.style.display ?? '';
   const previousIconVisibility = iconBezel?.dataset.ytrPreviousVisibility ?? iconBezel?.style.visibility ?? '';
   const previousAriaLabel = iconBezel?.dataset.ytrPreviousAriaLabel ?? iconBezel?.getAttribute('aria-label') ?? '';
 
-  const keepVisible = () => {
-    container.style.display = 'block';
-    container.style.visibility = 'visible';
-    text.style.display = '';
-    if (wrapper) {
-      wrapper.style.display = '';
-      wrapper.style.visibility = 'visible';
-    }
-    if (iconBezel && hideIconBezel) {
-      iconBezel.style.display = 'none';
-      iconBezel.style.visibility = 'hidden';
-    }
-  };
-
   text.textContent = label;
   container.dataset.ytrPlaybackRateBezel = 'true';
-  keepVisible();
+  container.style.display = 'block';
+  container.style.visibility = 'visible';
+  container.style.opacity = '1';
+  text.style.display = '';
+  if (wrapper) {
+    wrapper.style.display = 'block';
+    wrapper.style.visibility = 'visible';
+    wrapper.style.opacity = '1';
+  }
   if (iconBezel) {
     iconBezel.setAttribute('aria-label', `${label} playback speed`);
     iconBezel.dataset.ytrPreviousAriaLabel = previousAriaLabel;
-    iconBezel.classList.remove('ytp-bezel-text-hide');
+    iconBezel.classList.remove('ytp-bezel-text-hide', 'ytp-bezel-hide');
     if (hideIconBezel) {
       iconBezel.dataset.ytrPreviousDisplay = previousIconDisplay;
       iconBezel.dataset.ytrPreviousVisibility = previousIconVisibility;
@@ -2305,43 +2321,20 @@ function showNativePlaybackRateBezel(label: string): boolean {
     }
   }
 
-  container.classList.remove('ytp-bezel-text-hide');
+  // Restart native bezel animation so each speed step feels like a new volume-style toast.
+  container.classList.add('ytp-bezel-text-hide');
+  if (wrapper) {
+    wrapper.classList.add('ytp-bezel-text-hide');
+  }
+  void container.offsetWidth;
+  container.classList.remove('ytp-bezel-text-hide', 'ytp-bezel-hide');
+  if (wrapper) {
+    wrapper.classList.remove('ytp-bezel-text-hide', 'ytp-bezel-hide');
+  }
   void container.offsetWidth;
 
-  playbackRateBubbleKeepAliveTimer = window.setInterval(() => {
-    if (Date.now() > playbackRateBubbleVisibleUntil || container.dataset.ytrPlaybackRateBezel !== 'true' || text.textContent !== label) {
-      if (playbackRateBubbleKeepAliveTimer !== null) {
-        clearInterval(playbackRateBubbleKeepAliveTimer);
-        playbackRateBubbleKeepAliveTimer = null;
-      }
-      return;
-    }
-    keepVisible();
-  }, PLAYBACK_RATE_BUBBLE_KEEP_ALIVE_MS);
-
   playbackRateBubbleHideTimer = window.setTimeout(() => {
-    if (container.dataset.ytrPlaybackRateBezel === 'true' && text.textContent === label) {
-      if (playbackRateBubbleKeepAliveTimer !== null) {
-        clearInterval(playbackRateBubbleKeepAliveTimer);
-        playbackRateBubbleKeepAliveTimer = null;
-      }
-      container.style.display = 'none';
-      delete container.dataset.ytrPlaybackRateBezel;
-      if (iconBezel) {
-        if (hideIconBezel) {
-          iconBezel.style.display = iconBezel.dataset.ytrPreviousDisplay || '';
-          iconBezel.style.visibility = iconBezel.dataset.ytrPreviousVisibility || '';
-        }
-        if (iconBezel.dataset.ytrPreviousAriaLabel) {
-          iconBezel.setAttribute('aria-label', iconBezel.dataset.ytrPreviousAriaLabel);
-        } else {
-          iconBezel.removeAttribute('aria-label');
-        }
-        delete iconBezel.dataset.ytrPreviousDisplay;
-        delete iconBezel.dataset.ytrPreviousVisibility;
-        delete iconBezel.dataset.ytrPreviousAriaLabel;
-      }
-    }
+    hideNativePlaybackRateBezel(container, iconBezel, hideIconBezel);
     playbackRateBubbleHideTimer = null;
   }, PLAYBACK_RATE_BUBBLE_HIDE_DELAY_MS);
 
@@ -2372,11 +2365,6 @@ function showPlaybackRateBubble(rate: number): void {
   if (playbackRateBubbleHideTimer !== null) {
     clearTimeout(playbackRateBubbleHideTimer);
   }
-  if (playbackRateBubbleKeepAliveTimer !== null) {
-    clearInterval(playbackRateBubbleKeepAliveTimer);
-    playbackRateBubbleKeepAliveTimer = null;
-  }
-  playbackRateBubbleVisibleUntil = Date.now() + PLAYBACK_RATE_BUBBLE_HIDE_DELAY_MS;
 
   playbackRateBubbleHideTimer = window.setTimeout(() => {
     if (playbackRateBubbleEl) {
