@@ -2242,7 +2242,6 @@ let playbackRateApplyingUntil = 0;
 let pagePlaybackOverride: number | null = null;
 let playbackSpeedPageKey = '';
 let playbackSpeedMenuSelectionTimer: number | null = null;
-let playbackSpeedMenuIntentUntil = 0;
 let playbackPointerHoldActive = false;
 let playbackPointerHoldStartRate: number | null = null;
 let playbackKeyboardHoldActive = false;
@@ -2256,6 +2255,8 @@ let playbackRateBubbleHideTimer: number | null = null;
 let playbackRateBubbleEl: HTMLElement | null = null;
 let playbackRateNativeToastEl: HTMLElement | null = null;
 let lastConfiguredPlaybackRate: number | null = null;
+let playbackRateShortcutSelectionTimer: number | null = null;
+let playbackRateManualIntentUntil = 0;
 const PLAYBACK_RATE_BUBBLE_HIDE_DELAY_MS = 2200;
 
 function isPlaybackNativeHoldActive(): boolean {
@@ -2355,8 +2356,6 @@ function handleObservedPlaybackRateChange(event: Event): void {
   const now = Date.now();
   if (now <= playbackRateApplyingUntil) return;
 
-  if (now <= playbackSpeedMenuIntentUntil) return;
-
   const desiredRate = getDesiredPlaybackRate();
   const pageOverrideRate = clampPlaybackRate(pagePlaybackOverride);
   const holdStartRate = clampPlaybackRate(playbackPointerHoldStartRate ?? playbackKeyboardHoldStartRate);
@@ -2376,30 +2375,42 @@ function handleObservedPlaybackRateChange(event: Event): void {
     return;
   }
 
+  if (isAdShowing()) return;
+
+  const hasManualIntent = hasRecentPlaybackRateManualIntent(now);
+
   if (pageOverrideRate !== null) {
-    if (Math.abs(nextRate - pageOverrideRate) > 0.01 && !isAdShowing()) {
+    if (Math.abs(nextRate - pageOverrideRate) > 0.01 && hasManualIntent) {
+      commitPagePlaybackOverride(nextRate, video);
+      showPlaybackRateBubble(nextRate);
+    } else if (Math.abs(nextRate - pageOverrideRate) > 0.01) {
+      schedulePlaybackSpeedRestore(120);
+    }
+    return;
+  }
+
+  if (desiredRate === null) {
+    if (hasManualIntent) {
       commitPagePlaybackOverride(nextRate, video);
       showPlaybackRateBubble(nextRate);
     }
     return;
   }
 
-  if (desiredRate !== null && Math.abs(nextRate - desiredRate) < 0.01) return;
+  if (Math.abs(nextRate - desiredRate) < 0.01) return;
 
-  if (desiredRate !== null && now <= playbackSpeedInitialApplyUntil) {
-    schedulePlaybackSpeedRestore(120);
-    return;
-  }
-
-  if (!isAdShowing()) {
+  if (hasManualIntent) {
     commitPagePlaybackOverride(nextRate, video);
     showPlaybackRateBubble(nextRate);
     return;
   }
 
-  if (desiredRate !== null) {
-    schedulePlaybackSpeedRestore(140);
+  if (now <= playbackSpeedInitialApplyUntil) {
+    schedulePlaybackSpeedRestore(120);
+    return;
   }
+
+  schedulePlaybackSpeedRestore(120);
 }
 
 function commitPagePlaybackOverride(rate: number, video: HTMLVideoElement | null = getMainVideoElement()): void {
@@ -2429,6 +2440,14 @@ function getPlaybackBubbleHost(): HTMLElement | null {
 
 function formatPlaybackRateBubbleLabel(rate: number): string {
   return `${rate.toFixed(1).replace(/\.0$/, '')}x`;
+}
+
+function markPlaybackRateManualIntent(durationMs = 1400): void {
+  playbackRateManualIntentUntil = Date.now() + durationMs;
+}
+
+function hasRecentPlaybackRateManualIntent(now = Date.now()): boolean {
+  return now <= playbackRateManualIntentUntil;
 }
 
 function clearPlaybackRateBubbleHideTimer(): void {
@@ -2528,7 +2547,7 @@ function getPlaybackRateMenuItem(target: EventTarget | null): HTMLElement | null
 
 function handlePlaybackRateMenuIntent(event: Event): void {
   if (!getPlaybackRateMenuItem(event.target)) return;
-  playbackSpeedMenuIntentUntil = Date.now() + 1400;
+  markPlaybackRateManualIntent();
 }
 
 function handlePlaybackRateMenuSelection(event: Event): void {
@@ -2543,6 +2562,7 @@ function handlePlaybackRateMenuSelection(event: Event): void {
     const video = getMainVideoElement();
     const nextRate = clampPlaybackRate(video?.playbackRate);
     if (nextRate === null) return;
+    markPlaybackRateManualIntent();
     commitPagePlaybackOverride(nextRate, video);
     showPlaybackRateBubble(nextRate);
   }, 140);
@@ -2702,8 +2722,38 @@ function handlePlaybackCtrlWheel(event: WheelEvent): void {
     return;
   }
 
+  markPlaybackRateManualIntent();
   commitPagePlaybackOverride(nextRate, video);
   showPlaybackRateBubble(nextRate);
+}
+
+function isPlaybackSpeedShortcutEvent(event: KeyboardEvent): boolean {
+  if (event.altKey || event.ctrlKey || event.metaKey) return false;
+  if (event.key === '>' || event.key === '<') return true;
+  if (!event.shiftKey) return false;
+  return event.code === 'Period' || event.code === 'Comma';
+}
+
+function handlePlaybackRateShortcutSelection(event: KeyboardEvent): void {
+  if (!isWatchPlaybackPage()) return;
+  if (isPlaybackTextEntryTarget(event.target)) return;
+  if (!isPlaybackSpeedShortcutEvent(event)) return;
+
+  markPlaybackRateManualIntent(1700);
+
+  if (playbackRateShortcutSelectionTimer !== null) {
+    clearTimeout(playbackRateShortcutSelectionTimer);
+  }
+
+  playbackRateShortcutSelectionTimer = window.setTimeout(() => {
+    playbackRateShortcutSelectionTimer = null;
+    const video = getMainVideoElement();
+    const nextRate = clampPlaybackRate(video?.playbackRate);
+    if (nextRate === null) return;
+    if (isPlaybackNativeHoldActive()) return;
+    commitPagePlaybackOverride(nextRate, video);
+    showPlaybackRateBubble(nextRate);
+  }, 130);
 }
 
 function setupPlaybackSpeed(s: Settings): void {
@@ -2743,6 +2793,7 @@ function setupPlaybackSpeed(s: Settings): void {
     document.addEventListener('pointercancel', handlePlaybackPointerRelease, true);
     document.addEventListener('keydown', handlePlaybackKeyboardDown, true);
     document.addEventListener('keyup', handlePlaybackKeyboardRelease, true);
+    document.addEventListener('keydown', handlePlaybackRateShortcutSelection, true);
     window.addEventListener('blur', () => handlePlaybackKeyboardRelease());
     document.addEventListener('wheel', handlePlaybackCtrlWheel, { capture: true, passive: false });
   }
@@ -5812,8 +5863,7 @@ function setupDownloadThumbnailButton(s: Settings): void {
     }
 
     const moreBtn = getWatchMoreActionsButtonShape();
-    const moreButtonHost = getWatchMoreActionsButtonHost();
-    const insertTarget = moreButtonHost?.parentElement || document.querySelector('ytd-watch-metadata #actions-inner, ytd-watch-metadata #actions, #top-level-buttons-computed');
+    const insertTarget = moreBtn?.parentElement || document.querySelector('ytd-watch-metadata #actions-inner, ytd-watch-metadata #actions, #top-level-buttons-computed');
     if (!insertTarget) return;
     const nativeActionAnchor = moreBtn instanceof Element
       ? moreBtn
@@ -5850,9 +5900,13 @@ function setupDownloadThumbnailButton(s: Settings): void {
       statsWrapper = null;
     }
 
-    const insertBeforeMore = (node: HTMLElement) => {
-      if (moreButtonHost?.parentElement) {
-        moreButtonHost.parentElement.insertBefore(node, moreButtonHost);
+    const insertAfterMore = (node: HTMLElement) => {
+      if (moreBtn?.parentElement) {
+        if (moreBtn.nextSibling) {
+          moreBtn.parentElement.insertBefore(node, moreBtn.nextSibling);
+        } else {
+          moreBtn.parentElement.appendChild(node);
+        }
       } else {
         insertTarget.appendChild(node);
       }
@@ -5866,7 +5920,7 @@ function setupDownloadThumbnailButton(s: Settings): void {
           anchor.parentElement.appendChild(node);
         }
       } else {
-        insertBeforeMore(node);
+        insertAfterMore(node);
       }
     };
 
@@ -5887,7 +5941,7 @@ function setupDownloadThumbnailButton(s: Settings): void {
       if (downloadWrapper?.parentElement) {
         downloadWrapper.parentElement.insertBefore(screenshotWrapper, downloadWrapper);
       } else {
-        insertBeforeMore(screenshotWrapper);
+        insertAfterMore(screenshotWrapper);
       }
     }
 
@@ -5902,7 +5956,7 @@ function setupDownloadThumbnailButton(s: Settings): void {
       } else if (screenshotWrapper?.parentElement) {
         insertAfterNode(statsWrapper, screenshotWrapper);
       } else {
-        insertBeforeMore(statsWrapper);
+        insertAfterMore(statsWrapper);
       }
     }
 
@@ -6118,15 +6172,8 @@ function setupDownloadThumbnailButton(s: Settings): void {
       } else if (statsWrapper?.parentElement) {
         statsWrapper.parentElement.insertBefore(downloadWrapper, statsWrapper);
       } else {
-        insertBeforeMore(downloadWrapper);
+        insertAfterMore(downloadWrapper);
       }
-    }
-
-    const orderedUtilityWrappers = [screenshotWrapper, downloadWrapper, statsWrapper].filter((node): node is HTMLElement => !!node);
-    orderedUtilityWrappers.forEach((wrapper) => insertBeforeMore(wrapper));
-
-    if (moreButtonHost?.parentElement) {
-      moreButtonHost.parentElement.appendChild(moreButtonHost);
     }
 
     scheduleRelocatedWatchActionsMenuSync();
