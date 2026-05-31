@@ -5996,12 +5996,6 @@ function collectClassNames(value: string | null | undefined): string[] {
 function getNativeActionButtonTemplate(anchor: Element | null): { wrapperClassName: string; buttonClassName: string } {
   const host = anchor?.parentElement?.closest('.yt-flexible-actions-view-model-wiz__action, ytd-button-renderer, button-view-model, ytd-menu-renderer') as HTMLElement | null;
   const button = (anchor instanceof HTMLButtonElement ? anchor : anchor?.querySelector('button')) as HTMLButtonElement | null;
-  if (isWatchLikeDislikeControl(anchor) || isWatchLikeDislikeControl(host) || isWatchLikeDislikeControl(button)) {
-    return {
-      wrapperClassName: '',
-      buttonClassName: '',
-    };
-  }
   return {
     wrapperClassName: host?.className?.trim() || '',
     buttonClassName: button?.className?.trim() || '',
@@ -6095,18 +6089,9 @@ function setupDownloadThumbnailButton(s: Settings): void {
   const screenshotEnabled = !!s.betaVideoFrameScreenshot;
   const downloadEnabled = !!s.downloadThumbnailButton;
   const statsEnabled = !!s.showChannelStatsLinks;
-  const relocatedActionsEnabled = hasRelocatedWatchActionsEnabled(s);
   const isWatchPage = window.location.pathname === '/watch';
 
-  if (!isWatchPage) {
-    document.querySelectorAll('.ytr-download-btn, .ytr-screenshot-btn-wrap, .ytr-video-stats-btn-wrap').forEach((el) => el.remove());
-    downloadBtnInjected = false;
-    return;
-  }
-
-  ensureRelocatedWatchActionsMenuListeners();
-
-  if (!downloadEnabled && !screenshotEnabled && !statsEnabled && !relocatedActionsEnabled) {
+  if (!isWatchPage || (!downloadEnabled && !screenshotEnabled && !statsEnabled)) {
     document.querySelectorAll('.ytr-download-btn, .ytr-screenshot-btn-wrap, .ytr-video-stats-btn-wrap').forEach((el) => el.remove());
     downloadBtnInjected = false;
     return;
@@ -6116,33 +6101,20 @@ function setupDownloadThumbnailButton(s: Settings): void {
     const downloadEnabled = !!currentSettings?.downloadThumbnailButton;
     const screenshotEnabledNow = !!currentSettings?.betaVideoFrameScreenshot;
     const statsEnabledNow = !!currentSettings?.showChannelStatsLinks;
-    const relocatedActionsEnabledNow = hasRelocatedWatchActionsEnabled(currentSettings);
-    if (!downloadEnabled && !screenshotEnabledNow && !statsEnabledNow && !relocatedActionsEnabledNow) {
-      scheduleRelocatedWatchActionsMenuSync();
-      return;
-    }
+    if (!downloadEnabled && !screenshotEnabledNow && !statsEnabledNow) return;
 
     const videoId = new URLSearchParams(window.location.search).get('v');
     if (!videoId) {
       document.querySelectorAll('.ytr-download-btn, .ytr-screenshot-btn-wrap, .ytr-video-stats-btn-wrap').forEach((el) => el.remove());
-      scheduleRelocatedWatchActionsMenuSync();
       return;
     }
 
-    const moreBtn = getWatchMoreActionsButtonShape();
-    const moreButtonHost = getWatchMoreActionsButtonHost();
-    const insertTarget = moreButtonHost?.parentElement
-      || document.querySelector('ytd-watch-metadata #actions-inner, ytd-watch-metadata #actions');
+    const moreBtn = document.querySelector('ytd-watch-metadata ytd-menu-renderer yt-button-shape.ytd-menu-renderer, ytd-watch-metadata ytd-menu-renderer #button-shape');
+    const insertTarget = moreBtn?.parentElement || document.querySelector('ytd-watch-metadata #actions-inner, ytd-watch-metadata #actions, #top-level-buttons-computed');
     if (!insertTarget) return;
     const nativeActionAnchor = moreBtn instanceof Element
       ? moreBtn
-      : insertTarget.querySelector(
-        'ytd-menu-renderer yt-button-shape,' +
-        ' ytd-menu-renderer #button-shape,' +
-        ' ytd-menu-renderer button,' +
-        ' button[aria-haspopup="true"],' +
-        ' button[aria-haspopup="menu"]'
-      );
+      : insertTarget.querySelector('button, #button-shape, yt-button-shape');
 
     const isRu = getContentLocale() === 'ru';
     let screenshotWrapper = document.querySelector('.ytr-screenshot-btn-wrap') as HTMLDivElement | null;
@@ -6176,11 +6148,11 @@ function setupDownloadThumbnailButton(s: Settings): void {
     }
 
     const insertAfterMore = (node: HTMLElement) => {
-      if (moreButtonHost?.parentElement) {
-        if (moreButtonHost.nextSibling) {
-          moreButtonHost.parentElement.insertBefore(node, moreButtonHost.nextSibling);
+      if (moreBtn?.parentElement) {
+        if (moreBtn.nextSibling) {
+          moreBtn.parentElement.insertBefore(node, moreBtn.nextSibling);
         } else {
-          moreButtonHost.parentElement.appendChild(node);
+          moreBtn.parentElement.appendChild(node);
         }
       } else {
         insertTarget.appendChild(node);
@@ -6450,8 +6422,6 @@ function setupDownloadThumbnailButton(s: Settings): void {
         insertAfterMore(downloadWrapper);
       }
     }
-
-    scheduleRelocatedWatchActionsMenuSync();
   };
 
   if (!downloadNavListenerAdded) {
