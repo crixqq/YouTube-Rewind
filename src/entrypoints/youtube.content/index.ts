@@ -1643,6 +1643,43 @@ function extractWatchActionLabel(source: HTMLElement): string {
   return text || source.getAttribute('data-ytr-action') || 'Action';
 }
 
+function resolveWatchActionHost(candidate: HTMLElement): HTMLElement {
+  const host = candidate.closest(
+    'yt-button-view-model,' +
+    ' button-view-model,' +
+    ' ytd-button-renderer,' +
+    ' ytd-download-button-renderer'
+  );
+  return host instanceof HTMLElement ? host : candidate;
+}
+
+function findWatchActionSourceByKeywords(action: RelocatedWatchAction): HTMLElement | null {
+  const keywords = ACTION_BUTTON_KEYWORDS[action] || [];
+  if (!keywords.length) return null;
+
+  const candidates = document.querySelectorAll(
+    'ytd-watch-metadata yt-button-view-model,' +
+    ' ytd-watch-metadata button-view-model,' +
+    ' ytd-watch-metadata ytd-button-renderer,' +
+    ' ytd-watch-metadata ytd-download-button-renderer,' +
+    ' ytd-watch-metadata button'
+  );
+
+  for (const candidate of candidates) {
+    if (!(candidate instanceof HTMLElement)) continue;
+    const host = resolveWatchActionHost(candidate);
+    if (!host.closest('ytd-watch-metadata')) continue;
+    if (host.closest('.ytr-relocated-action-menu-item, ytd-menu-popup-renderer')) continue;
+    const label = extractWatchActionLabel(host).toLowerCase();
+    if (!label) continue;
+    if (!keywords.some((keyword) => label.includes(keyword))) continue;
+    host.setAttribute('data-ytr-action', action);
+    return host;
+  }
+
+  return null;
+}
+
 function findWatchActionSource(action: RelocatedWatchAction): HTMLElement | null {
   const candidates = document.querySelectorAll(`[data-ytr-action="${action}"]`);
   for (const candidate of candidates) {
@@ -1651,7 +1688,8 @@ function findWatchActionSource(action: RelocatedWatchAction): HTMLElement | null
     if (candidate.closest('.ytr-relocated-action-menu-item')) continue;
     return candidate;
   }
-  return null;
+
+  return findWatchActionSourceByKeywords(action);
 }
 
 function getVisibleWatchMoreActionsMenuList(): HTMLElement | null {
@@ -1724,26 +1762,57 @@ function createRelocatedWatchActionMenuItem(action: RelocatedWatchAction, source
   return item;
 }
 
+function updateRelocatedWatchActionsMenuSizing(list: HTMLElement): void {
+  const popup = list.closest('ytd-menu-popup-renderer') as HTMLElement | null;
+  if (!popup) return;
+
+  const relocatedItems = Array.from(list.querySelectorAll('.ytr-relocated-action-menu-item')) as HTMLElement[];
+  if (!relocatedItems.length) {
+    popup.classList.remove('ytr-relocated-actions-popup');
+    popup.style.removeProperty('--ytr-relocated-menu-min-width');
+    popup.style.removeProperty('--ytr-relocated-menu-item-count');
+    return;
+  }
+
+  const allItems = Array.from(list.children).filter((node): node is HTMLElement => node instanceof HTMLElement);
+  let widestItem = 0;
+  allItems.forEach((item) => {
+    widestItem = Math.max(widestItem, Math.ceil(Math.max(item.scrollWidth, item.getBoundingClientRect().width)));
+  });
+
+  const minWidth = Math.min(460, Math.max(240, widestItem + 32));
+  popup.classList.add('ytr-relocated-actions-popup');
+  popup.style.setProperty('--ytr-relocated-menu-min-width', `${minWidth}px`);
+  popup.style.setProperty('--ytr-relocated-menu-item-count', String(Math.max(allItems.length, 1)));
+}
+
 function syncRelocatedWatchActionsMenuItems(): void {
   if (window.location.pathname !== '/watch') return;
+  if (needsActionTags()) {
+    tagActionButtons();
+  }
   const list = getVisibleWatchMoreActionsMenuList();
   if (!list) return;
 
   list.querySelectorAll('.ytr-relocated-action-menu-item').forEach((node) => node.remove());
 
   const fragment = document.createDocumentFragment();
+  let addedItems = 0;
   RELOCATED_WATCH_ACTIONS.forEach((action) => {
     if (!isWatchActionHiddenBySettings(action)) return;
     const source = findWatchActionSource(action);
     if (!source) return;
     fragment.appendChild(createRelocatedWatchActionMenuItem(action, source));
+    addedItems += 1;
   });
 
-  if (!fragment.childNodes.length) return;
-  list.appendChild(fragment);
+  if (addedItems > 0) {
+    list.appendChild(fragment);
+  }
+  updateRelocatedWatchActionsMenuSizing(list);
 }
 
-function scheduleRelocatedWatchActionsMenuSync(delays: number[] = [40, 160, 380]): void {
+function scheduleRelocatedWatchActionsMenuSync(delays: number[] = [40, 160, 380, 760, 1400]): void {
   watchMoreActionsMenuSyncTimers.forEach((timer) => clearTimeout(timer));
   watchMoreActionsMenuSyncTimers = delays.map((delay) => window.setTimeout(syncRelocatedWatchActionsMenuItems, delay));
 }

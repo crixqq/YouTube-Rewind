@@ -2502,6 +2502,16 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
   box-sizing: border-box;
 }
 
+ytd-menu-popup-renderer.ytr-relocated-actions-popup {
+  min-width: var(--ytr-relocated-menu-min-width, 240px) !important;
+  max-height: min(86vh, calc(var(--ytr-relocated-menu-item-count, 8) * 48px + 24px)) !important;
+}
+
+ytd-menu-popup-renderer.ytr-relocated-actions-popup :is(tp-yt-paper-listbox, #items) {
+  min-width: var(--ytr-relocated-menu-min-width, 240px) !important;
+  max-height: inherit !important;
+}
+
 .ytr-relocated-action-menu-item:hover {
   background: var(--yt-spec-badge-chip-background, rgba(255, 255, 255, 0.12));
 }
