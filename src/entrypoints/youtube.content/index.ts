@@ -1613,6 +1613,7 @@ const WATCH_ACTION_HIDE_SETTINGS_MAP: Record<RelocatedWatchAction, keyof Setting
 
 let watchMoreActionsMenuListenersSetup = false;
 let watchMoreActionsMenuSyncTimers: number[] = [];
+let watchMoreActionsPopupObserver: MutationObserver | null = null;
 const MORE_ACTIONS_BUTTON_KEYWORDS = [
   'more actions',
   'больше действий',
@@ -1634,6 +1635,10 @@ const MORE_ACTIONS_BUTTON_KEYWORDS = [
 function isWatchActionHiddenBySettings(action: RelocatedWatchAction, settings: Settings | null = currentSettings): boolean {
   if (!settings) return false;
   return !!settings[WATCH_ACTION_HIDE_SETTINGS_MAP[action]];
+}
+
+function hasRelocatedWatchActionsEnabled(settings: Settings | null = currentSettings): boolean {
+  return RELOCATED_WATCH_ACTIONS.some((action) => isWatchActionHiddenBySettings(action, settings));
 }
 
 function isWatchLikeDislikeControl(node: Element | null): boolean {
@@ -1661,23 +1666,29 @@ function getElementAccessibleLabel(node: Element | null): string {
 }
 
 function getWatchMoreActionsButtonShape(): HTMLElement | null {
-  const menuRenderers = Array.from(
-    document.querySelectorAll('ytd-watch-metadata #actions ytd-menu-renderer')
+  const candidates = Array.from(
+    document.querySelectorAll(
+      'ytd-watch-metadata #actions ytd-menu-renderer button,' +
+      ' ytd-watch-metadata #actions ytd-menu-renderer yt-button-shape,' +
+      ' ytd-watch-metadata #actions ytd-menu-renderer #button-shape'
+    )
   ) as HTMLElement[];
 
   let fallback: HTMLElement | null = null;
-  for (const renderer of menuRenderers) {
-    const button = renderer.querySelector('button');
+  for (const candidate of candidates) {
+    const button = (candidate instanceof HTMLButtonElement
+      ? candidate
+      : candidate.querySelector('button')) as HTMLButtonElement | null;
     if (!(button instanceof HTMLButtonElement)) continue;
-    if (isWatchLikeDislikeControl(button)) continue;
+    if (isWatchLikeDislikeControl(button) || isWatchLikeDislikeControl(candidate)) continue;
 
-    const shape = (button.closest('yt-button-shape, #button-shape') as HTMLElement | null) || button;
+    const shape = (button.closest('yt-button-shape, #button-shape') as HTMLElement | null) || candidate;
     if (isWatchLikeDislikeControl(shape)) continue;
 
     const label = [
       getElementAccessibleLabel(shape),
       getElementAccessibleLabel(button),
-      getElementAccessibleLabel(renderer),
+      getElementAccessibleLabel(candidate.closest('ytd-menu-renderer')),
     ].join(' ').trim().toLowerCase();
 
     if (MORE_ACTIONS_BUTTON_KEYWORDS.some((keyword) => label.includes(keyword))) {
@@ -1686,7 +1697,9 @@ function getWatchMoreActionsButtonShape(): HTMLElement | null {
 
     const hasPopupSignal = button.getAttribute('aria-haspopup') === 'true'
       || button.getAttribute('aria-haspopup') === 'menu'
-      || button.hasAttribute('aria-expanded');
+      || button.hasAttribute('aria-expanded')
+      || shape.getAttribute('aria-haspopup') === 'true'
+      || shape.getAttribute('aria-haspopup') === 'menu';
 
     if (hasPopupSignal) {
       fallback = shape;
@@ -1851,12 +1864,12 @@ function updateRelocatedWatchActionsMenuSizing(list: HTMLElement): void {
   }
 
   const allItems = Array.from(list.children).filter((node): node is HTMLElement => node instanceof HTMLElement);
-  let widestItem = 0;
-  allItems.forEach((item) => {
-    widestItem = Math.max(widestItem, Math.ceil(Math.max(item.scrollWidth, item.getBoundingClientRect().width)));
-  });
-
-  const minWidth = Math.min(460, Math.max(240, widestItem + 32));
+  const maxLabelLength = allItems.reduce((max, item) => {
+    const label = (item.textContent || '').replace(/\s+/g, ' ').trim();
+    return Math.max(max, label.length);
+  }, 0);
+  const estimatedWidth = 156 + maxLabelLength * 6.4;
+  const minWidth = Math.max(220, Math.min(340, Math.round(estimatedWidth)));
   popup.classList.add('ytr-relocated-actions-popup');
   popup.style.setProperty('--ytr-relocated-menu-min-width', `${minWidth}px`);
   popup.style.setProperty('--ytr-relocated-menu-item-count', String(Math.max(allItems.length, 1)));
@@ -1893,16 +1906,77 @@ function scheduleRelocatedWatchActionsMenuSync(delays: number[] = [40, 160, 380,
   watchMoreActionsMenuSyncTimers = delays.map((delay) => window.setTimeout(syncRelocatedWatchActionsMenuItems, delay));
 }
 
+function requestRelocatedWatchActionsMenuSync(): void {
+  if (window.location.pathname !== '/watch') return;
+  if (!hasRelocatedWatchActionsEnabled()) return;
+  scheduleRelocatedWatchActionsMenuSync([20, 90, 220, 420, 820]);
+}
+
 function ensureRelocatedWatchActionsMenuListeners(): void {
   if (watchMoreActionsMenuListenersSetup) return;
   watchMoreActionsMenuListenersSetup = true;
 
-  document.addEventListener('click', (event) => {
-    if (!(event.target instanceof Element)) return;
+  const isMoreActionsTrigger = (target: EventTarget | null): boolean => {
+    if (!(target instanceof Element)) return false;
     const moreButtonHost = getWatchMoreActionsButtonHost();
-    if (!moreButtonHost || !moreButtonHost.contains(event.target)) return;
-    scheduleRelocatedWatchActionsMenuSync();
+    return !!moreButtonHost && moreButtonHost.contains(target);
+  };
+
+  document.addEventListener('click', (event) => {
+    if (!isMoreActionsTrigger(event.target)) return;
+    requestRelocatedWatchActionsMenuSync();
   }, true);
+
+  document.addEventListener('pointerdown', (event) => {
+    if (!isMoreActionsTrigger(event.target)) return;
+    requestRelocatedWatchActionsMenuSync();
+  }, true);
+
+  document.addEventListener('keydown', (event) => {
+    if (!(event instanceof KeyboardEvent)) return;
+    if (event.code !== 'Enter' && event.code !== 'Space') return;
+    if (!isMoreActionsTrigger(event.target)) return;
+    requestRelocatedWatchActionsMenuSync();
+  }, true);
+
+  if (!watchMoreActionsPopupObserver && document.body) {
+    watchMoreActionsPopupObserver = new MutationObserver((mutations) => {
+      if (window.location.pathname !== '/watch') return;
+      if (!hasRelocatedWatchActionsEnabled()) return;
+
+      let shouldSync = false;
+      for (const mutation of mutations) {
+        if (mutation.type === 'attributes') {
+          if (!(mutation.target instanceof Element)) continue;
+          if (!mutation.target.closest('ytd-menu-popup-renderer, ytd-popup-container')) continue;
+          shouldSync = true;
+          break;
+        }
+
+        const nodes = [...mutation.addedNodes, ...mutation.removedNodes];
+        if (!nodes.length) continue;
+        const hasPopupNode = nodes.some((node) => {
+          if (!(node instanceof Element)) return false;
+          return node.matches('ytd-menu-popup-renderer, ytd-popup-container')
+            || !!node.querySelector('ytd-menu-popup-renderer, ytd-popup-container');
+        });
+        if (!hasPopupNode) continue;
+        shouldSync = true;
+        break;
+      }
+
+      if (shouldSync) {
+        requestRelocatedWatchActionsMenuSync();
+      }
+    });
+
+    watchMoreActionsPopupObserver.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['style', 'hidden', 'aria-hidden', 'class'],
+    });
+  }
 }
 
 function tagActionButtons(): void {
@@ -5922,6 +5996,12 @@ function collectClassNames(value: string | null | undefined): string[] {
 function getNativeActionButtonTemplate(anchor: Element | null): { wrapperClassName: string; buttonClassName: string } {
   const host = anchor?.parentElement?.closest('.yt-flexible-actions-view-model-wiz__action, ytd-button-renderer, button-view-model, ytd-menu-renderer') as HTMLElement | null;
   const button = (anchor instanceof HTMLButtonElement ? anchor : anchor?.querySelector('button')) as HTMLButtonElement | null;
+  if (isWatchLikeDislikeControl(anchor) || isWatchLikeDislikeControl(host) || isWatchLikeDislikeControl(button)) {
+    return {
+      wrapperClassName: '',
+      buttonClassName: '',
+    };
+  }
   return {
     wrapperClassName: host?.className?.trim() || '',
     buttonClassName: button?.className?.trim() || '',
@@ -6015,7 +6095,7 @@ function setupDownloadThumbnailButton(s: Settings): void {
   const screenshotEnabled = !!s.betaVideoFrameScreenshot;
   const downloadEnabled = !!s.downloadThumbnailButton;
   const statsEnabled = !!s.showChannelStatsLinks;
-  const relocatedActionsEnabled = RELOCATED_WATCH_ACTIONS.some((action) => isWatchActionHiddenBySettings(action, s));
+  const relocatedActionsEnabled = hasRelocatedWatchActionsEnabled(s);
   const isWatchPage = window.location.pathname === '/watch';
 
   if (!isWatchPage) {
@@ -6036,7 +6116,7 @@ function setupDownloadThumbnailButton(s: Settings): void {
     const downloadEnabled = !!currentSettings?.downloadThumbnailButton;
     const screenshotEnabledNow = !!currentSettings?.betaVideoFrameScreenshot;
     const statsEnabledNow = !!currentSettings?.showChannelStatsLinks;
-    const relocatedActionsEnabledNow = RELOCATED_WATCH_ACTIONS.some((action) => isWatchActionHiddenBySettings(action, currentSettings));
+    const relocatedActionsEnabledNow = hasRelocatedWatchActionsEnabled(currentSettings);
     if (!downloadEnabled && !screenshotEnabledNow && !statsEnabledNow && !relocatedActionsEnabledNow) {
       scheduleRelocatedWatchActionsMenuSync();
       return;
