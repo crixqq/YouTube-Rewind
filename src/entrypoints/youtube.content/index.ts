@@ -1590,6 +1590,176 @@ const ACTION_BUTTON_KEYWORDS: Record<string, string[]> = {
   save: ['save', 'сохранить', 'guardar', 'salvar', 'enregistrer', 'speichern', 'kaydet', '保存', '저장', 'зберегти', 'playlist'],
 };
 
+type RelocatedWatchAction = 'share' | 'download' | 'clip' | 'thanks' | 'save' | 'ask';
+
+const RELOCATED_WATCH_ACTIONS: RelocatedWatchAction[] = ['share', 'download', 'clip', 'thanks', 'save', 'ask'];
+
+const WATCH_ACTION_HIDE_SETTINGS_MAP: Record<RelocatedWatchAction, keyof Settings> = {
+  share: 'hideShareButton',
+  download: 'hideDownloadButton',
+  clip: 'hideClipButton',
+  thanks: 'hideThanksButton',
+  save: 'hideSaveButton',
+  ask: 'hideAskButton',
+};
+
+let watchMoreActionsMenuListenersSetup = false;
+let watchMoreActionsMenuSyncTimers: number[] = [];
+
+function isWatchActionHiddenBySettings(action: RelocatedWatchAction, settings: Settings | null = currentSettings): boolean {
+  if (!settings) return false;
+  return !!settings[WATCH_ACTION_HIDE_SETTINGS_MAP[action]];
+}
+
+function getWatchMoreActionsButtonShape(): HTMLElement | null {
+  const candidate = document.querySelector(
+    'ytd-watch-metadata #actions ytd-menu-renderer yt-button-shape,' +
+    ' ytd-watch-metadata #actions ytd-menu-renderer #button-shape,' +
+    ' ytd-watch-metadata #actions ytd-menu-renderer button'
+  );
+  return candidate instanceof HTMLElement ? candidate : null;
+}
+
+function getWatchMoreActionsButtonHost(): HTMLElement | null {
+  const moreShape = getWatchMoreActionsButtonShape();
+  if (!moreShape) return null;
+  return moreShape.closest(
+    '.yt-flexible-actions-view-model-wiz__action,' +
+    ' ytd-button-renderer,' +
+    ' button-view-model,' +
+    ' ytd-menu-renderer,' +
+    ' yt-button-view-model'
+  ) as HTMLElement | null;
+}
+
+function extractWatchActionLabel(source: HTMLElement): string {
+  const directButton = source.querySelector('button') as HTMLButtonElement | null;
+  const labelFromAria = source.getAttribute('aria-label')
+    || directButton?.getAttribute('aria-label')
+    || directButton?.getAttribute('title');
+  if (labelFromAria?.trim()) return labelFromAria.trim();
+
+  const text = (source.textContent || '').replace(/\s+/g, ' ').trim();
+  return text || source.getAttribute('data-ytr-action') || 'Action';
+}
+
+function findWatchActionSource(action: RelocatedWatchAction): HTMLElement | null {
+  const candidates = document.querySelectorAll(`[data-ytr-action="${action}"]`);
+  for (const candidate of candidates) {
+    if (!(candidate instanceof HTMLElement)) continue;
+    if (!candidate.closest('ytd-watch-metadata')) continue;
+    if (candidate.closest('.ytr-relocated-action-menu-item')) continue;
+    return candidate;
+  }
+  return null;
+}
+
+function getVisibleWatchMoreActionsMenuList(): HTMLElement | null {
+  const candidates = Array.from(
+    document.querySelectorAll('ytd-menu-popup-renderer tp-yt-paper-listbox, ytd-menu-popup-renderer #items')
+  ) as HTMLElement[];
+  if (!candidates.length) return null;
+
+  const localeKeywords = ['report', 'remove ads', 'пожаловаться', 'убрать рекламу', 'denunciar', 'melden'];
+  let fallback: HTMLElement | null = null;
+  for (const candidate of candidates) {
+    const popup = candidate.closest('ytd-menu-popup-renderer') as HTMLElement | null;
+    if (!popup) continue;
+    const style = window.getComputedStyle(popup);
+    if (style.display === 'none' || style.visibility === 'hidden') continue;
+    const rect = popup.getBoundingClientRect();
+    if (rect.width < 10 || rect.height < 10) continue;
+    fallback = candidate;
+    const text = (popup.textContent || '').toLowerCase();
+    if (localeKeywords.some((keyword) => text.includes(keyword))) {
+      return candidate;
+    }
+  }
+  return fallback;
+}
+
+function closeWatchMoreActionsMenu(): void {
+  const escapeEvent = new KeyboardEvent('keydown', {
+    key: 'Escape',
+    code: 'Escape',
+    bubbles: true,
+    cancelable: true,
+  });
+  document.dispatchEvent(escapeEvent);
+}
+
+function createRelocatedWatchActionMenuItem(action: RelocatedWatchAction, source: HTMLElement): HTMLButtonElement {
+  const item = createHtmlElement('button', 'ytr-relocated-action-menu-item') as HTMLButtonElement;
+  item.type = 'button';
+  item.dataset.ytrRelocatedAction = action;
+  item.setAttribute('role', 'menuitem');
+  item.tabIndex = 0;
+
+  const iconWrap = createHtmlElement('span', 'ytr-relocated-action-menu-item-icon');
+  const sourceIconSvg = source.querySelector('svg');
+  if (sourceIconSvg instanceof SVGElement) {
+    const iconSvg = sourceIconSvg.cloneNode(true) as SVGElement;
+    iconSvg.removeAttribute('width');
+    iconSvg.removeAttribute('height');
+    iconSvg.setAttribute('focusable', 'false');
+    iconWrap.appendChild(iconSvg);
+  } else {
+    iconWrap.appendChild(createMaterialSymbolIcon('more_horiz', 'ytr-relocated-action-fallback-icon'));
+  }
+
+  const labelText = extractWatchActionLabel(source);
+  const label = createHtmlElement('span', 'ytr-relocated-action-menu-item-label', labelText);
+  item.append(iconWrap, label);
+
+  item.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const target = resolveClickableButtonCandidate(source);
+    if (target) {
+      dispatchElementActivation(target);
+    }
+    closeWatchMoreActionsMenu();
+  });
+
+  return item;
+}
+
+function syncRelocatedWatchActionsMenuItems(): void {
+  if (window.location.pathname !== '/watch') return;
+  const list = getVisibleWatchMoreActionsMenuList();
+  if (!list) return;
+
+  list.querySelectorAll('.ytr-relocated-action-menu-item').forEach((node) => node.remove());
+
+  const fragment = document.createDocumentFragment();
+  RELOCATED_WATCH_ACTIONS.forEach((action) => {
+    if (!isWatchActionHiddenBySettings(action)) return;
+    const source = findWatchActionSource(action);
+    if (!source) return;
+    fragment.appendChild(createRelocatedWatchActionMenuItem(action, source));
+  });
+
+  if (!fragment.childNodes.length) return;
+  list.appendChild(fragment);
+}
+
+function scheduleRelocatedWatchActionsMenuSync(delays: number[] = [40, 160, 380]): void {
+  watchMoreActionsMenuSyncTimers.forEach((timer) => clearTimeout(timer));
+  watchMoreActionsMenuSyncTimers = delays.map((delay) => window.setTimeout(syncRelocatedWatchActionsMenuItems, delay));
+}
+
+function ensureRelocatedWatchActionsMenuListeners(): void {
+  if (watchMoreActionsMenuListenersSetup) return;
+  watchMoreActionsMenuListenersSetup = true;
+
+  document.addEventListener('click', (event) => {
+    if (!(event.target instanceof Element)) return;
+    const moreButtonHost = getWatchMoreActionsButtonHost();
+    if (!moreButtonHost || !moreButtonHost.contains(event.target)) return;
+    scheduleRelocatedWatchActionsMenuSync();
+  }, true);
+}
+
 function tagActionButtons(): void {
   if (!needsActionTags()) return;
   const containers = document.querySelectorAll('#top-level-buttons-computed, #flexible-item-buttons, ytd-menu-renderer.ytd-watch-metadata');
@@ -2084,7 +2254,9 @@ let autoSkipAdsInFlight = false;
 let playbackSpeedInitialApplyUntil = 0;
 let playbackRateBubbleHideTimer: number | null = null;
 let playbackRateBubbleEl: HTMLElement | null = null;
-const PLAYBACK_RATE_BUBBLE_HIDE_DELAY_MS = 1800;
+let playbackRateNativeToastEl: HTMLElement | null = null;
+let lastConfiguredPlaybackRate: number | null = null;
+const PLAYBACK_RATE_BUBBLE_HIDE_DELAY_MS = 2200;
 
 function isPlaybackNativeHoldActive(): boolean {
   return playbackPointerHoldActive || playbackKeyboardHoldActive;
@@ -2186,6 +2358,7 @@ function handleObservedPlaybackRateChange(event: Event): void {
   if (now <= playbackSpeedMenuIntentUntil) return;
 
   const desiredRate = getDesiredPlaybackRate();
+  const pageOverrideRate = clampPlaybackRate(pagePlaybackOverride);
   const holdStartRate = clampPlaybackRate(playbackPointerHoldStartRate ?? playbackKeyboardHoldStartRate);
   const looksLikeYoutubeHoldBoost = isPlaybackNativeHoldActive()
     && Math.abs(nextRate - 2) < 0.01
@@ -2203,14 +2376,29 @@ function handleObservedPlaybackRateChange(event: Event): void {
     return;
   }
 
-  if (desiredRate !== null && Math.abs(nextRate - desiredRate) > 0.01) {
-    if (pagePlaybackOverride !== null) {
-      schedulePlaybackSpeedRestore(120);
-      return;
+  if (pageOverrideRate !== null) {
+    if (Math.abs(nextRate - pageOverrideRate) > 0.01 && !isAdShowing()) {
+      commitPagePlaybackOverride(nextRate, video);
+      showPlaybackRateBubble(nextRate);
     }
-    if (now <= playbackSpeedInitialApplyUntil) {
-      schedulePlaybackSpeedRestore(120);
-    }
+    return;
+  }
+
+  if (desiredRate !== null && Math.abs(nextRate - desiredRate) < 0.01) return;
+
+  if (desiredRate !== null && now <= playbackSpeedInitialApplyUntil) {
+    schedulePlaybackSpeedRestore(120);
+    return;
+  }
+
+  if (!isAdShowing()) {
+    commitPagePlaybackOverride(nextRate, video);
+    showPlaybackRateBubble(nextRate);
+    return;
+  }
+
+  if (desiredRate !== null) {
+    schedulePlaybackSpeedRestore(140);
   }
 }
 
@@ -2243,98 +2431,58 @@ function formatPlaybackRateBubbleLabel(rate: number): string {
   return `${rate.toFixed(1).replace(/\.0$/, '')}x`;
 }
 
-function hideNativePlaybackRateBezel(
-  container: HTMLElement,
-  iconBezel: HTMLElement | null,
-  hideIconBezel: boolean,
-): void {
-  if (container.dataset.ytrPlaybackRateBezel !== 'true') return;
-
-  container.style.display = 'none';
-  delete container.dataset.ytrPlaybackRateBezel;
-
-  if (!iconBezel) return;
-
-  if (hideIconBezel) {
-    iconBezel.style.display = iconBezel.dataset.ytrPreviousDisplay || '';
-    iconBezel.style.visibility = iconBezel.dataset.ytrPreviousVisibility || '';
+function clearPlaybackRateBubbleHideTimer(): void {
+  if (playbackRateBubbleHideTimer !== null) {
+    clearTimeout(playbackRateBubbleHideTimer);
+    playbackRateBubbleHideTimer = null;
   }
-  if (iconBezel.dataset.ytrPreviousAriaLabel) {
-    iconBezel.setAttribute('aria-label', iconBezel.dataset.ytrPreviousAriaLabel);
+}
+
+function removePlaybackRateBubbles(): void {
+  clearPlaybackRateBubbleHideTimer();
+  playbackRateNativeToastEl?.remove();
+  playbackRateNativeToastEl = null;
+  playbackRateBubbleEl?.remove();
+  playbackRateBubbleEl = null;
+}
+
+function createNativePlaybackRateToast(host: HTMLElement, label: string): HTMLElement {
+  const template = host.querySelector('.ytp-bezel-text-wrapper') as HTMLElement | null;
+  const wrapper = template ? template.cloneNode(true) as HTMLElement : createHtmlElement('div', 'ytp-bezel-text-wrapper');
+
+  const existingText = wrapper.querySelector('.ytp-bezel-text') as HTMLElement | null;
+  if (existingText) {
+    existingText.textContent = label;
   } else {
-    iconBezel.removeAttribute('aria-label');
+    wrapper.replaceChildren(createHtmlElement('div', 'ytp-bezel-text', label));
   }
-  delete iconBezel.dataset.ytrPreviousDisplay;
-  delete iconBezel.dataset.ytrPreviousVisibility;
-  delete iconBezel.dataset.ytrPreviousAriaLabel;
+
+  wrapper.classList.remove('ytp-bezel-text-hide', 'ytp-bezel-hide');
+  wrapper.querySelectorAll('.ytp-bezel-text-hide, .ytp-bezel-hide').forEach((el) => {
+    el.classList.remove('ytp-bezel-text-hide', 'ytp-bezel-hide');
+  });
+  wrapper.removeAttribute('hidden');
+  wrapper.dataset.ytrPlaybackRateToast = 'true';
+  wrapper.style.display = 'block';
+  wrapper.style.visibility = 'visible';
+  wrapper.style.opacity = '1';
+  wrapper.style.pointerEvents = 'none';
+  wrapper.style.zIndex = '2147483000';
+
+  return wrapper;
 }
 
 function showNativePlaybackRateBezel(label: string): boolean {
   const host = getPlaybackBubbleHost();
   if (!host) return false;
 
-  const wrapper = host.querySelector('.ytp-bezel-text-wrapper') as HTMLElement | null;
-  const text = (wrapper?.querySelector('.ytp-bezel-text') || host.querySelector('.ytp-bezel .ytp-bezel-text')) as HTMLElement | null;
-  const iconBezel = host.querySelector('.ytp-bezel[role="status"], .ytp-bezel') as HTMLElement | null;
-  const sharedContainer = wrapper && iconBezel && wrapper.parentElement === iconBezel.parentElement
-    ? wrapper.parentElement
-    : wrapper?.parentElement || iconBezel?.parentElement || iconBezel;
-  const container = sharedContainer instanceof HTMLElement ? sharedContainer : null;
-  if (!container || !text) return false;
-  const hideIconBezel = !!iconBezel && iconBezel !== container && !iconBezel.contains(text);
-
-  playbackRateBubbleEl?.remove();
-  playbackRateBubbleEl = null;
-
-  if (playbackRateBubbleHideTimer !== null) {
-    clearTimeout(playbackRateBubbleHideTimer);
-    playbackRateBubbleHideTimer = null;
-  }
-
-  // Fully tear down the previous speed bezel before showing the next one.
-  hideNativePlaybackRateBezel(container, iconBezel, hideIconBezel);
-
-  const previousIconDisplay = iconBezel?.dataset.ytrPreviousDisplay ?? iconBezel?.style.display ?? '';
-  const previousIconVisibility = iconBezel?.dataset.ytrPreviousVisibility ?? iconBezel?.style.visibility ?? '';
-  const previousAriaLabel = iconBezel?.dataset.ytrPreviousAriaLabel ?? iconBezel?.getAttribute('aria-label') ?? '';
-
-  text.textContent = label;
-  container.dataset.ytrPlaybackRateBezel = 'true';
-  container.style.display = 'block';
-  container.style.visibility = 'visible';
-  container.style.opacity = '1';
-  text.style.display = '';
-  if (wrapper) {
-    wrapper.style.display = 'block';
-    wrapper.style.visibility = 'visible';
-    wrapper.style.opacity = '1';
-  }
-  if (iconBezel) {
-    iconBezel.setAttribute('aria-label', `${label} playback speed`);
-    iconBezel.dataset.ytrPreviousAriaLabel = previousAriaLabel;
-    iconBezel.classList.remove('ytp-bezel-text-hide', 'ytp-bezel-hide');
-    if (hideIconBezel) {
-      iconBezel.dataset.ytrPreviousDisplay = previousIconDisplay;
-      iconBezel.dataset.ytrPreviousVisibility = previousIconVisibility;
-      iconBezel.style.display = 'none';
-      iconBezel.style.visibility = 'hidden';
-    }
-  }
-
-  // Restart native bezel animation so each speed step feels like a new volume-style toast.
-  container.classList.add('ytp-bezel-text-hide');
-  if (wrapper) {
-    wrapper.classList.add('ytp-bezel-text-hide');
-  }
-  void container.offsetWidth;
-  container.classList.remove('ytp-bezel-text-hide', 'ytp-bezel-hide');
-  if (wrapper) {
-    wrapper.classList.remove('ytp-bezel-text-hide', 'ytp-bezel-hide');
-  }
-  void container.offsetWidth;
+  removePlaybackRateBubbles();
+  playbackRateNativeToastEl = createNativePlaybackRateToast(host, label);
+  host.appendChild(playbackRateNativeToastEl);
 
   playbackRateBubbleHideTimer = window.setTimeout(() => {
-    hideNativePlaybackRateBezel(container, iconBezel, hideIconBezel);
+    playbackRateNativeToastEl?.remove();
+    playbackRateNativeToastEl = null;
     playbackRateBubbleHideTimer = null;
   }, PLAYBACK_RATE_BUBBLE_HIDE_DELAY_MS);
 
@@ -2346,6 +2494,7 @@ function showPlaybackRateBubble(rate: number): void {
   if (!host) return;
   const label = formatPlaybackRateBubbleLabel(rate);
 
+  removePlaybackRateBubbles();
   if (showNativePlaybackRateBezel(label)) return;
 
   if (window.getComputedStyle(host).position === 'static') {
@@ -2359,16 +2508,14 @@ function showPlaybackRateBubble(rate: number): void {
   }
 
   playbackRateBubbleEl.textContent = label;
-  playbackRateBubbleEl.dataset.visible = 'true';
   playbackRateBubbleEl.style.zIndex = '2147483000';
 
-  if (playbackRateBubbleHideTimer !== null) {
-    clearTimeout(playbackRateBubbleHideTimer);
-  }
+  clearPlaybackRateBubbleHideTimer();
 
   playbackRateBubbleHideTimer = window.setTimeout(() => {
     if (playbackRateBubbleEl) {
-      playbackRateBubbleEl.dataset.visible = 'false';
+      playbackRateBubbleEl.remove();
+      playbackRateBubbleEl = null;
     }
     playbackRateBubbleHideTimer = null;
   }, PLAYBACK_RATE_BUBBLE_HIDE_DELAY_MS);
@@ -2560,6 +2707,13 @@ function handlePlaybackCtrlWheel(event: WheelEvent): void {
 }
 
 function setupPlaybackSpeed(s: Settings): void {
+  const configuredRate = clampPlaybackRate(s.playbackSpeed);
+  if (configuredRate !== lastConfiguredPlaybackRate) {
+    lastConfiguredPlaybackRate = configuredRate;
+    pagePlaybackOverride = null;
+    playbackSpeedInitialApplyUntil = Date.now() + 6000;
+  }
+
   if (!speedListenersSetup) {
     speedListenersSetup = true;
     document.addEventListener('yt-navigate-finish', () => {
@@ -5623,9 +5777,18 @@ function setupDownloadThumbnailButton(s: Settings): void {
   const screenshotEnabled = !!s.betaVideoFrameScreenshot;
   const downloadEnabled = !!s.downloadThumbnailButton;
   const statsEnabled = !!s.showChannelStatsLinks;
+  const relocatedActionsEnabled = RELOCATED_WATCH_ACTIONS.some((action) => isWatchActionHiddenBySettings(action, s));
   const isWatchPage = window.location.pathname === '/watch';
 
-  if (!isWatchPage || (!downloadEnabled && !screenshotEnabled && !statsEnabled)) {
+  if (!isWatchPage) {
+    document.querySelectorAll('.ytr-download-btn, .ytr-screenshot-btn-wrap, .ytr-video-stats-btn-wrap').forEach((el) => el.remove());
+    downloadBtnInjected = false;
+    return;
+  }
+
+  ensureRelocatedWatchActionsMenuListeners();
+
+  if (!downloadEnabled && !screenshotEnabled && !statsEnabled && !relocatedActionsEnabled) {
     document.querySelectorAll('.ytr-download-btn, .ytr-screenshot-btn-wrap, .ytr-video-stats-btn-wrap').forEach((el) => el.remove());
     downloadBtnInjected = false;
     return;
@@ -5635,16 +5798,22 @@ function setupDownloadThumbnailButton(s: Settings): void {
     const downloadEnabled = !!currentSettings?.downloadThumbnailButton;
     const screenshotEnabledNow = !!currentSettings?.betaVideoFrameScreenshot;
     const statsEnabledNow = !!currentSettings?.showChannelStatsLinks;
-    if (!downloadEnabled && !screenshotEnabledNow && !statsEnabledNow) return;
+    const relocatedActionsEnabledNow = RELOCATED_WATCH_ACTIONS.some((action) => isWatchActionHiddenBySettings(action, currentSettings));
+    if (!downloadEnabled && !screenshotEnabledNow && !statsEnabledNow && !relocatedActionsEnabledNow) {
+      scheduleRelocatedWatchActionsMenuSync();
+      return;
+    }
 
     const videoId = new URLSearchParams(window.location.search).get('v');
     if (!videoId) {
       document.querySelectorAll('.ytr-download-btn, .ytr-screenshot-btn-wrap, .ytr-video-stats-btn-wrap').forEach((el) => el.remove());
+      scheduleRelocatedWatchActionsMenuSync();
       return;
     }
 
-    const moreBtn = document.querySelector('ytd-watch-metadata ytd-menu-renderer yt-button-shape.ytd-menu-renderer, ytd-watch-metadata ytd-menu-renderer #button-shape');
-    const insertTarget = moreBtn?.parentElement || document.querySelector('ytd-watch-metadata #actions-inner, ytd-watch-metadata #actions, #top-level-buttons-computed');
+    const moreBtn = getWatchMoreActionsButtonShape();
+    const moreButtonHost = getWatchMoreActionsButtonHost();
+    const insertTarget = moreButtonHost?.parentElement || document.querySelector('ytd-watch-metadata #actions-inner, ytd-watch-metadata #actions, #top-level-buttons-computed');
     if (!insertTarget) return;
     const nativeActionAnchor = moreBtn instanceof Element
       ? moreBtn
@@ -5681,13 +5850,9 @@ function setupDownloadThumbnailButton(s: Settings): void {
       statsWrapper = null;
     }
 
-    const insertAfterMore = (node: HTMLElement) => {
-      if (moreBtn?.parentElement) {
-        if (moreBtn.nextSibling) {
-          moreBtn.parentElement.insertBefore(node, moreBtn.nextSibling);
-        } else {
-          moreBtn.parentElement.appendChild(node);
-        }
+    const insertBeforeMore = (node: HTMLElement) => {
+      if (moreButtonHost?.parentElement) {
+        moreButtonHost.parentElement.insertBefore(node, moreButtonHost);
       } else {
         insertTarget.appendChild(node);
       }
@@ -5701,7 +5866,7 @@ function setupDownloadThumbnailButton(s: Settings): void {
           anchor.parentElement.appendChild(node);
         }
       } else {
-        insertAfterMore(node);
+        insertBeforeMore(node);
       }
     };
 
@@ -5722,7 +5887,7 @@ function setupDownloadThumbnailButton(s: Settings): void {
       if (downloadWrapper?.parentElement) {
         downloadWrapper.parentElement.insertBefore(screenshotWrapper, downloadWrapper);
       } else {
-        insertAfterMore(screenshotWrapper);
+        insertBeforeMore(screenshotWrapper);
       }
     }
 
@@ -5737,7 +5902,7 @@ function setupDownloadThumbnailButton(s: Settings): void {
       } else if (screenshotWrapper?.parentElement) {
         insertAfterNode(statsWrapper, screenshotWrapper);
       } else {
-        insertAfterMore(statsWrapper);
+        insertBeforeMore(statsWrapper);
       }
     }
 
@@ -5878,11 +6043,32 @@ function setupDownloadThumbnailButton(s: Settings): void {
       setButtonIconWithLabel(
         videoItem,
         '<svg viewBox="0 -960 960 960" width="20" height="20" fill="currentColor"><path d="M235-333h340q9 0 13-8t-1-16l-99-135q-2-3-5-4.5t-7-1.5q-4 0-7 1.5t-5 4.5l-82 109q-2 3-5.5 4t-6.5 1q-3 0-6.5-1t-5.5-4l-47-60q-2-3-5.5-4t-6.5-1q-3 0-6.5 1.5T287-442l-64 85q-5 8-1 16t13 8Zm-95 173q-24 0-42-18t-18-42v-520q0-24 18-42t42-18h520q24 0 42 18t18 42v215l134-134q7-7 16.5-3.5T880-649v338q0 10-9.5 13.5T854-301L720-435v215q0 24-18 42t-42 18H140Z"/></svg>',
-        isRu ? 'Скачать видео' : 'Download video',
+        isRu ? 'Скачать видео (Cobalt)' : 'Download video (Cobalt)',
         'ytr-download-menu-item-icon',
         'ytr-download-menu-item-label',
       );
-      videoItem.addEventListener('click', (e) => {
+      videoItem.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        closeAllYtrMenus();
+        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        try {
+          await navigator.clipboard.writeText(videoUrl);
+          showYtrToast(isRu ? 'Ссылка на видео скопирована' : 'Video link copied');
+        } catch {}
+        window.open('https://cobalt.tools/', '_blank');
+      });
+
+      const fallbackVideoItem = document.createElement('button');
+      fallbackVideoItem.className = 'ytr-download-menu-item';
+      fallbackVideoItem.type = 'button';
+      setButtonIconWithLabel(
+        fallbackVideoItem,
+        '<svg viewBox="0 -960 960 960" width="20" height="20" fill="currentColor"><path d="M280-160q-33 0-56.5-23.5T200-240v-480h80v480h480v80H280Zm160-160q-33 0-56.5-23.5T360-400v-360q0-33 23.5-56.5T440-840h360q33 0 56.5 23.5T880-760v360q0 33-23.5 56.5T800-320H440Zm0-80h360v-360H440v360ZM200-720v-80h120v80H200Zm0 160v-80h120v80H200Zm0 160v-80h120v80H200Z"/></svg>',
+        isRu ? 'Альтернатива (SaveFrom)' : 'Alternative (SaveFrom)',
+        'ytr-download-menu-item-icon',
+        'ytr-download-menu-item-label',
+      );
+      fallbackVideoItem.addEventListener('click', (e) => {
         e.stopPropagation();
         closeAllYtrMenus();
         window.open(`https://en.savefrom.net/1-youtube-video-downloader-430/?url=https://www.youtube.com/watch?v=${videoId}`, '_blank');
@@ -5890,6 +6076,7 @@ function setupDownloadThumbnailButton(s: Settings): void {
 
       menu.appendChild(thumbItem);
       menu.appendChild(videoItem);
+      menu.appendChild(fallbackVideoItem);
 
       const portaledMenu = menu as PortaledYtrMenu;
       if (!portaledMenu.__ytrResizeObserver) {
@@ -5931,9 +6118,18 @@ function setupDownloadThumbnailButton(s: Settings): void {
       } else if (statsWrapper?.parentElement) {
         statsWrapper.parentElement.insertBefore(downloadWrapper, statsWrapper);
       } else {
-        insertAfterMore(downloadWrapper);
+        insertBeforeMore(downloadWrapper);
       }
     }
+
+    const orderedUtilityWrappers = [screenshotWrapper, downloadWrapper, statsWrapper].filter((node): node is HTMLElement => !!node);
+    orderedUtilityWrappers.forEach((wrapper) => insertBeforeMore(wrapper));
+
+    if (moreButtonHost?.parentElement) {
+      moreButtonHost.parentElement.appendChild(moreButtonHost);
+    }
+
+    scheduleRelocatedWatchActionsMenuSync();
   };
 
   if (!downloadNavListenerAdded) {

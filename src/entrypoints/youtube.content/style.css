@@ -2485,6 +2485,54 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
   transition: background 0.12s ease, transform 0.14s cubic-bezier(0.2, 0, 0, 1);
 }
 
+.ytr-relocated-action-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--yt-spec-text-primary, #f1f1f1);
+  font: 500 14px/1.25 'Roboto', 'Arial', sans-serif;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.ytr-relocated-action-menu-item:hover {
+  background: var(--yt-spec-badge-chip-background, rgba(255, 255, 255, 0.12));
+}
+
+.ytr-relocated-action-menu-item:active {
+  transform: scale(0.99);
+}
+
+.ytr-relocated-action-menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.ytr-relocated-action-menu-item-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.ytr-relocated-action-menu-item-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ytr-download-menu-item:hover {
   background: var(--ytr-ui-surface-highest);
   transform: scale(1.01);
@@ -4359,14 +4407,9 @@ html:not([dark]) ytd-app:not([dark]) .ytr-action-btn-video-stats {
   box-shadow: none;
   backdrop-filter: none;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.16s ease, transform 0.16s ease;
-  z-index: 2147483000;
-}
-
-.ytr-playback-rate-bubble[data-visible="true"] {
   opacity: 1;
-  transform: translateX(-50%);
+  transition: none;
+  z-index: 2147483000;
 }
 
 .ytr-ai-chat-panel {
