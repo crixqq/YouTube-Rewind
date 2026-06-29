@@ -1958,8 +1958,8 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   flex: 0 0 auto;
   position: relative;
   vertical-align: top;
-  height: 36px;
-  min-width: 36px;
+  height: var(--ytr-action-size, 36px);
+  min-width: var(--ytr-action-size, 36px);
   margin: 0;
 }
 
@@ -1977,9 +1977,9 @@ html[data-ytr-clean-video-capture="true"] #movie_player .ytp-ad-overlay-containe
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
+  width: var(--ytr-action-size, 36px);
+  height: var(--ytr-action-size, 36px);
+  min-width: var(--ytr-action-size, 36px);
   padding: 0;
   border: none;
   border-radius: 999px;

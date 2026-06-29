@@ -49,7 +49,7 @@ Read the full policy in [docs/privacy-policy.md](docs/privacy-policy.md).
 
 ## Languages
 
-The settings UI supports English, Russian, Ukrainian, Spanish, Portuguese, French, German, Turkish, Italian, Polish, Dutch, Japanese, Korean, and Chinese, with English fallback for any missing string.
+The settings UI is translated into 11 languages: English, Russian, Ukrainian, Spanish, Portuguese, French, German, Turkish, Japanese, Korean, and Chinese, with English fallback for any missing string. The optional Video Sense AI assistant can additionally reply in Italian, Polish, and Dutch.
 
 ## Installation
 

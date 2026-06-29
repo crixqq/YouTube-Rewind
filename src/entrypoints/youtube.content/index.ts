@@ -6002,6 +6002,35 @@ function getNativeActionButtonTemplate(anchor: Element | null): { wrapperClassNa
   };
 }
 
+// Measure the native watch-action button (e.g. the "More" three-dots button) so our
+// injected buttons match its exact rendered diameter instead of a hard-coded guess.
+// YouTube changes this size between layouts (currently 40px), which is what made the
+// custom buttons look slightly flattened next to the native ones.
+function getNativeActionButtonSize(anchor: Element | null): number | null {
+  if (!(anchor instanceof HTMLElement)) return null;
+  // Measure the inner <button> — that's the visible round control (40px). The outer
+  // yt-button-shape carries extra padding (~44px), so measuring it overshoots; size
+  // against the inner button and fall back to the anchor only when there is none.
+  const inner = anchor.querySelector('button');
+  const target = inner instanceof HTMLElement ? inner : anchor;
+  const size = Math.round(target.getBoundingClientRect().height);
+  return size >= 24 && size <= 64 ? size : null;
+}
+
+// Force a square box sized to the native button, overriding YT's own size-m height
+// rule that rides along on the copied native classes (otherwise the button renders
+// 40px wide but only 36px tall — flattened).
+function applyNativeActionSize(el: HTMLElement, size: number | null, square: boolean): void {
+  const dims = square ? ['width', 'height', 'min-width', 'min-height'] : ['height', 'min-height'];
+  if (size) {
+    el.style.setProperty('--ytr-action-size', `${size}px`);
+    for (const dim of dims) el.style.setProperty(dim, `${size}px`, 'important');
+  } else {
+    el.style.removeProperty('--ytr-action-size');
+    for (const dim of ['width', 'height', 'min-width', 'min-height']) el.style.removeProperty(dim);
+  }
+}
+
 function applyNativeActionWrapperClasses(wrapper: HTMLElement, anchor: Element | null, extraClasses: string[]): void {
   const template = getNativeActionButtonTemplate(anchor);
   const classes = new Set<string>(extraClasses);
@@ -6010,6 +6039,7 @@ function applyNativeActionWrapperClasses(wrapper: HTMLElement, anchor: Element |
   }
   wrapper.className = [...classes].join(' ');
   wrapper.dataset.ytrNative = template.wrapperClassName ? 'true' : 'false';
+  applyNativeActionSize(wrapper, getNativeActionButtonSize(anchor), false);
 }
 
 function applyNativeActionButtonClasses(button: HTMLButtonElement, anchor: Element | null, extraClasses: string[] = []): void {
@@ -6020,6 +6050,7 @@ function applyNativeActionButtonClasses(button: HTMLButtonElement, anchor: Eleme
   }
   button.className = [...classes].join(' ');
   button.dataset.ytrNative = template.buttonClassName ? 'true' : 'false';
+  applyNativeActionSize(button, getNativeActionButtonSize(anchor), true);
 }
 
 type DownloadThumbnailVariant = {
